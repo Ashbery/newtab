@@ -5,11 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ashbery 新分頁</title>
     
-    <!-- 自訂分頁圖標 -->
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="shortcut icon" href="favicon.ico">
-    <link rel="apple-touch-icon" href="favicon.ico">
-    
     <style>
         * {
             margin: 0;
@@ -218,7 +213,8 @@
             padding: 30px;
             border-radius: 12px;
             position: relative;
-            min-width: 350px;
+            min-width: 400px;
+            max-width: 90vw;
             color: #333;
             text-align: center;
             backdrop-filter: blur(20px);
@@ -322,20 +318,31 @@
             margin-top: 5px;
         }
 
-        .local-path-input {
+        .progress-container {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            background: #f0f0f0;
+            border-radius: 10px;
             margin: 10px 0;
-            font-size: 0.9rem;
+            display: none;
         }
 
-        .path-help {
+        .progress-bar {
+            width: 0%;
+            height: 20px;
+            background: linear-gradient(90deg, #4a6cf7, #3a5ce5);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+        }
+
+        .storage-info {
             font-size: 0.75rem;
             color: #666;
             margin-top: 5px;
-            text-align: left;
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -396,8 +403,12 @@
             <div class="file-input-wrapper">
                 <input type="file" id="video-file" accept="video/mp4" class="file-input">
                 <div class="file-info" id="file-info">
-                    選擇本機 MP4 影片檔案
+                    選擇 MP4 影片檔案（建議小於 20MB 以確保最佳體驗）
                 </div>
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-bar" id="progress-bar">0%</div>
+                </div>
+                <div class="storage-info" id="storage-info"></div>
             </div>
 
             <div style="margin: 20px 0; text-align: center; color: #666;">
@@ -407,18 +418,6 @@
             <div>
                 <input type="url" id="video-url" class="url-input" placeholder="輸入影片網址 (MP4)">
                 <button id="load-url-btn" class="upload-btn">載入網址影片</button>
-            </div>
-
-            <div style="margin: 20px 0; text-align: center; color: #666;">
-                — 或 —
-            </div>
-
-            <div>
-                <input type="text" id="local-path" class="local-path-input" placeholder="輸入本機檔案路徑 (例如: C:/Videos/background.mp4)">
-                <button id="load-path-btn" class="upload-btn">載入本機路徑</button>
-                <div class="path-help">
-                    注意：本機路徑方式需要將網頁儲存為本機 HTML 檔案才能正常運作
-                </div>
             </div>
 
             <button id="confirm-upload" class="upload-btn" disabled>確認設定</button>
@@ -473,29 +472,115 @@
         const settingsGear = document.getElementById('settings-gear');
         let selectedFile = null;
         let selectedVideoUrl = '';
-        let selectedLocalPath = '';
 
-        // 簡單的設定儲存系統
-        function saveVideoSettings(type, value, name) {
-            localStorage.setItem('videoType', type);
-            localStorage.setItem('videoValue', value);
-            localStorage.setItem('videoName', name);
-            localStorage.setItem('videoTimestamp', new Date().getTime());
+        // Base64 儲存系統（青柠起始页使用的方法）
+        function saveVideoAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onloadstart = function() {
+                    document.getElementById('progress-container').style.display = 'block';
+                };
+                
+                reader.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total) * 100;
+                        document.getElementById('progress-bar').style.width = percent + '%';
+                        document.getElementById('progress-bar').textContent = Math.round(percent) + '%';
+                    }
+                };
+                
+                reader.onload = function(e) {
+                    const base64 = e.target.result;
+                    
+                    // 計算儲存空間使用量
+                    const sizeMB = (base64.length * 0.75) / (1024 * 1024); // Base64 大約比原始檔案大 33%
+                    document.getElementById('storage-info').textContent = 
+                        `預計使用儲存空間: ${sizeMB.toFixed(2)} MB`;
+                    
+                    // 儲存到 localStorage（分割儲存以避免大小限制）
+                    saveLargeData('customVideoData', base64);
+                    localStorage.setItem('videoType', 'base64');
+                    localStorage.setItem('videoName', file.name);
+                    localStorage.setItem('videoSize', file.size);
+                    localStorage.setItem('videoDate', new Date().toISOString());
+                    
+                    resolve(base64);
+                };
+                
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(file);
+            });
         }
 
-        function loadVideoSettings() {
-            const type = localStorage.getItem('videoType');
-            const value = localStorage.getItem('videoValue');
-            const name = localStorage.getItem('videoName');
+        // 處理大數據儲存（分割儲存）
+        function saveLargeData(key, data) {
+            // 清除舊數據
+            for (let i = 0; i < localStorage.length; i++) {
+                const storageKey = localStorage.key(i);
+                if (storageKey && storageKey.startsWith(key + '_')) {
+                    localStorage.removeItem(storageKey);
+                }
+            }
             
-            return { type, value, name };
+            // 分割儲存（每 1MB 分割一次）
+            const chunkSize = 1024 * 1024; // 1MB
+            const chunks = Math.ceil(data.length / chunkSize);
+            
+            for (let i = 0; i < chunks; i++) {
+                const chunk = data.substring(i * chunkSize, (i + 1) * chunkSize);
+                localStorage.setItem(key + '_' + i, chunk);
+            }
+            
+            localStorage.setItem(key + '_chunks', chunks);
         }
 
-        function clearVideoSettings() {
-            localStorage.removeItem('videoType');
-            localStorage.removeItem('videoValue');
-            localStorage.removeItem('videoName');
-            localStorage.removeItem('videoTimestamp');
+        // 讀取大數據
+        function loadLargeData(key) {
+            const chunks = localStorage.getItem(key + '_chunks');
+            if (!chunks) return null;
+            
+            let data = '';
+            for (let i = 0; i < parseInt(chunks); i++) {
+                const chunk = localStorage.getItem(key + '_' + i);
+                if (chunk) {
+                    data += chunk;
+                }
+            }
+            return data;
+        }
+
+        function loadSavedVideo() {
+            const videoType = localStorage.getItem('videoType');
+            
+            if (videoType === 'base64') {
+                const base64Data = loadLargeData('customVideoData');
+                if (base64Data) {
+                    video.src = base64Data;
+                    const videoName = localStorage.getItem('videoName') || '自訂影片';
+                    updateCurrentVideoInfo(videoName);
+                    return true;
+                }
+            } else if (videoType === 'url') {
+                const videoUrl = localStorage.getItem('videoUrl');
+                if (videoUrl) {
+                    video.src = videoUrl;
+                    updateCurrentVideoInfo('自訂網址影片');
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function clearSavedVideo() {
+            // 清除所有相關的 localStorage 數據
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('customVideoData') || 
+                    key.startsWith('video'))) {
+                    localStorage.removeItem(key);
+                }
+            }
         }
 
         // 齒輪點擊事件
@@ -537,7 +622,7 @@
             video.src = defaultVideo;
             video.play();
             
-            clearVideoSettings();
+            clearSavedVideo();
             updateCurrentVideoInfo('預設影片');
             settingsMenu.style.display = 'none';
         });
@@ -550,25 +635,31 @@
 
         document.getElementById('close-upload').addEventListener('click', function() {
             uploadContainer.style.display = 'none';
+            resetUploadForm();
         });
 
         // 檔案選擇
         document.getElementById('video-file').addEventListener('change', function(e) {
             selectedFile = e.target.files[0];
             selectedVideoUrl = '';
-            selectedLocalPath = '';
             document.getElementById('video-url').value = '';
-            document.getElementById('local-path').value = '';
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('storage-info').textContent = '';
             
             if (selectedFile && selectedFile.type === 'video/mp4') {
-                // 顯示檔案資訊
                 const fileSize = (selectedFile.size / (1024 * 1024)).toFixed(2);
                 document.getElementById('file-info').textContent = 
                     `已選擇: ${selectedFile.name} (${fileSize} MB)`;
                 document.getElementById('confirm-upload').disabled = false;
+                
+                // 顯示檔案大小警告
+                if (selectedFile.size > 50 * 1024 * 1024) {
+                    document.getElementById('storage-info').textContent = 
+                        '警告：檔案較大，處理可能需要較長時間';
+                }
             } else {
                 document.getElementById('file-info').textContent = 
-                    '選擇本機 MP4 影片檔案';
+                    '選擇 MP4 影片檔案（建議小於 20MB 以確保最佳體驗）';
                 document.getElementById('confirm-upload').disabled = true;
                 if (selectedFile) {
                     alert('請選擇 MP4 格式的影片檔案');
@@ -582,31 +673,12 @@
             if (url) {
                 selectedVideoUrl = url;
                 selectedFile = null;
-                selectedLocalPath = '';
                 document.getElementById('video-file').value = '';
-                document.getElementById('local-path').value = '';
                 document.getElementById('file-info').textContent = 
-                    '選擇本機 MP4 影片檔案';
+                    '選擇 MP4 影片檔案（建議小於 20MB 以確保最佳體驗）';
                 document.getElementById('confirm-upload').disabled = false;
             } else {
                 alert('請輸入影片網址');
-            }
-        });
-
-        // 本機路徑載入
-        document.getElementById('load-path-btn').addEventListener('click', function() {
-            const path = document.getElementById('local-path').value.trim();
-            if (path) {
-                selectedLocalPath = path;
-                selectedFile = null;
-                selectedVideoUrl = '';
-                document.getElementById('video-file').value = '';
-                document.getElementById('video-url').value = '';
-                document.getElementById('file-info').textContent = 
-                    '選擇本機 MP4 影片檔案';
-                document.getElementById('confirm-upload').disabled = false;
-            } else {
-                alert('請輸入本機檔案路徑');
             }
         });
 
@@ -615,18 +687,18 @@
             const loadingIndicator = document.getElementById('loading-indicator');
             
             if (selectedFile) {
-                // 使用檔案上傳方式
+                // 使用 Base64 方式儲存
                 loadingIndicator.style.display = 'block';
                 this.disabled = true;
                 
                 try {
-                    // 創建 Object URL 播放
-                    const objectURL = URL.createObjectURL(selectedFile);
-                    video.src = objectURL;
+                    // 先創建臨時 URL 立即播放
+                    const tempURL = URL.createObjectURL(selectedFile);
+                    video.src = tempURL;
                     await video.play();
                     
-                    // 儲存設定（我們儲存檔案名稱，下次需要重新選擇）
-                    saveVideoSettings('file', selectedFile.name, selectedFile.name);
+                    // 在背景進行 Base64 轉換和儲存
+                    await saveVideoAsBase64(selectedFile);
                     
                     updateCurrentVideoInfo(selectedFile.name);
                     
@@ -634,7 +706,6 @@
                     this.disabled = false;
                     uploadContainer.style.display = 'none';
                     
-                    // 重置表單
                     resetUploadForm();
                     
                 } catch (error) {
@@ -653,7 +724,9 @@
                     video.src = selectedVideoUrl;
                     await video.play();
                     
-                    saveVideoSettings('url', selectedVideoUrl, '自訂網址影片');
+                    localStorage.setItem('videoUrl', selectedVideoUrl);
+                    localStorage.setItem('videoType', 'url');
+                    localStorage.setItem('videoName', '自訂網址影片');
                     
                     updateCurrentVideoInfo('自訂網址影片');
                     
@@ -669,45 +742,19 @@
                     this.disabled = false;
                     alert('載入網址影片失敗: ' + error.message);
                 }
-                
-            } else if (selectedLocalPath) {
-                // 使用本機路徑
-                loadingIndicator.style.display = 'block';
-                this.disabled = true;
-                
-                try {
-                    // 直接使用 file:// 協議載入本機檔案
-                    video.src = selectedLocalPath;
-                    await video.play();
-                    
-                    saveVideoSettings('local', selectedLocalPath, '本機檔案');
-                    
-                    updateCurrentVideoInfo('本機檔案');
-                    
-                    loadingIndicator.style.display = 'none';
-                    this.disabled = false;
-                    uploadContainer.style.display = 'none';
-                    
-                    resetUploadForm();
-                    
-                } catch (error) {
-                    console.error('載入本機影片失敗:', error);
-                    loadingIndicator.style.display = 'none';
-                    this.disabled = false;
-                    alert('載入本機影片失敗: ' + error.message + '\n\n請確認：\n1. 檔案路徑是否正確\n2. 是否使用 file:// 協議開啟此網頁\n3. 影片檔案是否存在');
-                }
             }
         });
 
         function resetUploadForm() {
             document.getElementById('video-file').value = '';
             document.getElementById('video-url').value = '';
-            document.getElementById('local-path').value = '';
-            document.getElementById('file-info').textContent = '選擇本機 MP4 影片檔案';
+            document.getElementById('file-info').textContent = 
+                '選擇 MP4 影片檔案（建議小於 20MB 以確保最佳體驗）';
             document.getElementById('confirm-upload').disabled = true;
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('storage-info').textContent = '';
             selectedFile = null;
             selectedVideoUrl = '';
-            selectedLocalPath = '';
         }
 
         function updateCurrentVideoInfo(name) {
@@ -715,45 +762,23 @@
             document.getElementById('current-video-name').textContent = name;
         }
 
-        // 載入儲存的影片設定
+        // 載入儲存的影片
         window.addEventListener('DOMContentLoaded', function() {
-            const settings = loadVideoSettings();
+            // 檢查是否有儲存的影片
+            const hasSavedVideo = loadSavedVideo();
             
-            if (settings.type && settings.value) {
-                try {
-                    if (settings.type === 'url') {
-                        video.src = settings.value;
-                        updateCurrentVideoInfo(settings.name || '自訂網址影片');
-                    } else if (settings.type === 'local') {
-                        // 對於本機路徑，直接使用儲存的路徑
-                        video.src = settings.value;
-                        updateCurrentVideoInfo(settings.name || '本機檔案');
-                    }
-                    // 對於檔案上傳類型，我們無法恢復 Object URL，所以跳過
-                    
-                    video.play().catch(e => {
-                        console.log('自動播放被阻止，需要用戶互動');
-                    });
-                    
-                } catch (error) {
-                    console.error('載入儲存影片失敗:', error);
-                    // 載入失敗時使用預設影片
-                    useDefaultVideo();
-                }
-            } else {
-                useDefaultVideo();
+            if (!hasSavedVideo) {
+                // 使用預設影片
+                updateCurrentVideoInfo('預設影片');
             }
+            
+            video.play().catch(e => {
+                console.log('自動播放被阻止，需要用戶互動');
+            });
             
             // 聚焦搜尋框
             searchInput.focus();
         });
-
-        function useDefaultVideo() {
-            updateCurrentVideoInfo('預設影片');
-            video.play().catch(e => {
-                console.log('自動播放被阻止，需要用戶互動');
-            });
-        }
 
         // 處理影片載入錯誤
         video.addEventListener('error', function() {
