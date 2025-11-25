@@ -54,12 +54,30 @@ function setupGoogleApps() {
     const appsBtn = document.getElementById('google-apps-btn');
     const appsMenu = document.getElementById('google-apps-menu');
     
-    if (!appsBtn || !appsMenu) return;
+    console.log('🔧 初始化 Google 應用程式資料夾...');
+    console.log('應用程式按鈕:', appsBtn);
+    console.log('應用程式選單:', appsMenu);
+    
+    if (!appsBtn || !appsMenu) {
+        console.error('❌ 找不到應用程式按鈕或選單元素');
+        return;
+    }
     
     // 點擊應用程式按鈕
     appsBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        appsMenu.style.display = appsMenu.style.display === 'block' ? 'none' : 'block';
+        console.log('📱 點擊應用程式按鈕');
+        const isVisible = appsMenu.style.display === 'block';
+        appsMenu.style.display = isVisible ? 'none' : 'block';
+        console.log('選單顯示狀態:', appsMenu.style.display);
+    });
+    
+    // 點擊應用程式項目
+    document.querySelectorAll('.app-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            console.log('📱 點擊應用程式:', this.querySelector('.app-name').textContent);
+            appsMenu.style.display = 'none';
+        });
     });
     
     // 點擊頁面其他區域關閉選單
@@ -68,6 +86,13 @@ function setupGoogleApps() {
             appsMenu.style.display = 'none';
         }
     });
+    
+    // 防止選單內部點擊時關閉
+    appsMenu.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    console.log('✅ Google 應用程式資料夾初始化完成');
 }
 
 // ==================== 極速影片載入系統 ====================
@@ -497,6 +522,12 @@ document.getElementById('mute-btn').addEventListener('click', function() {
     settingsMenu.style.display = 'none';
 });
 
+// 添加影片選擇按鈕事件
+document.getElementById('video-select-btn').addEventListener('click', function() {
+    videoSelector.style.display = 'flex';
+    settingsMenu.style.display = 'none';
+});
+
 document.getElementById('upload-video-btn').addEventListener('click', function() {
     uploadContainer.style.display = 'flex';
     settingsMenu.style.display = 'none';
@@ -660,10 +691,6 @@ video.addEventListener('error', function() {
 });
 
 // ==================== 視頻選擇器功能 ====================
-document.getElementById('video-select-btn').addEventListener('click', function () {
-    videoSelector.style.display = 'flex';
-});
-
 document.getElementById('close-selector').addEventListener('click', function () {
     videoSelector.style.display = 'none';
 });
@@ -691,6 +718,8 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 設置 Google 應用程式資料夾
     setupGoogleApps();
+    
+    console.log('✅ 所有功能初始化完成');
     
     // 聚焦搜索框
     setTimeout(() => {
