@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ashbery 新分頁</title>
     
-    <!-- 使用線上 Favicon 避免路徑問題 -->
-    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAAAF0lEQVRIx2NgGAWjYBSMglEwCkbBSAcACAkBAWrYrNEAAAAASUVORK5CYII=">
-    <link rel="shortcut icon" href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAAAF0lEQVRIx2NgGAWjYBSMglEwCkbBSAcACAkBAWrYrNEAAAAASUVORK5CYII=">
+    <!-- 使用根目錄的 favicon.ico -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="shortcut icon" href="/favicon.ico">
     
     <style>
         * {
@@ -417,7 +417,6 @@
     <!-- 使用可靠的影片來源 -->
     <video id="video-background" autoplay muted loop playsinline>
         <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4" type="video/mp4">
-        您的瀏覽器不支援影片播放
     </video>
 
     <div class="header-container">
@@ -621,89 +620,6 @@
         let selectedFile = null;
         let selectedVideoUrl = '';
 
-        // 安全播放影片的函數
-        function safePlayVideo(videoElement, src) {
-            return new Promise((resolve, reject) => {
-                // 先暫停當前影片
-                videoElement.pause();
-                
-                // 設定新的源
-                videoElement.src = src;
-                
-                // 等待影片載入
-                videoElement.addEventListener('loadeddata', function onLoaded() {
-                    videoElement.removeEventListener('loadeddata', onLoaded);
-                    
-                    // 嘗試播放
-                    videoElement.play().then(() => {
-                        console.log('影片播放成功');
-                        resolve();
-                    }).catch(error => {
-                        console.log('自動播放失敗，等待用戶交互:', error);
-                        // 即使自動播放失敗，也解析Promise，因為影片已經載入
-                        resolve();
-                    });
-                }, { once: true });
-                
-                videoElement.addEventListener('error', function onError(e) {
-                    videoElement.removeEventListener('error', onError);
-                    console.error('影片載入錯誤:', e);
-                    reject(new Error('影片載入失敗'));
-                }, { once: true });
-                
-                // 設定超時
-                setTimeout(() => {
-                    videoElement.removeEventListener('loadeddata', onLoaded);
-                    videoElement.removeEventListener('error', onError);
-                    resolve(); // 即使超時也解析，不阻礙後續操作
-                }, 10000);
-            });
-        }
-
-        // 初始化影片
-        function initializeVideo() {
-            if (!video) return;
-
-            // 設定影片屬性
-            video.preload = 'auto';
-            video.muted = true;
-            video.playsInline = true;
-            video.loop = true;
-            
-            // 使用事件監聽器來安全地載入和播放影片
-            video.addEventListener('loadedmetadata', function() {
-                console.log('影片元數據已載入，嘗試播放');
-                this.play().catch(error => {
-                    console.log('自動播放被阻止，需要用戶交互:', error);
-                });
-            });
-
-            video.addEventListener('error', function(e) {
-                console.error('影片載入錯誤:', e);
-                // 如果預設影片載入失敗，嘗試使用備用影片
-                video.src = 'https://cdn.pixabay.com/video/2023/02/22/159881-802243019_large.mp4';
-            });
-
-            // 載入儲存的影片
-            loadSavedVideo();
-        }
-
-        // 載入儲存的影片
-        function loadSavedVideo() {
-            const savedVideo = localStorage.getItem('customVideo');
-            const videoSource = localStorage.getItem('videoSource');
-            const videoName = localStorage.getItem('videoName');
-            
-            if (savedVideo) {
-                safePlayVideo(video, savedVideo).then(() => {
-                    updateCurrentVideoInfo(videoName || '自訂影片');
-                    console.log('從本地儲存載入影片成功');
-                }).catch(() => {
-                    console.log('從本地儲存載入影片失敗，使用預設影片');
-                });
-            }
-        }
-
         // 齒輪點擊事件
         settingsGear.addEventListener('click', function() {
             settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
@@ -779,36 +695,30 @@
             if (selectedFile) {
                 // 上傳本地檔案
                 const videoURL = URL.createObjectURL(selectedFile);
+                video.src = videoURL;
+                video.play();
                 
-                safePlayVideo(video, videoURL).then(() => {
-                    // 儲存到本地儲存
-                    localStorage.setItem('customVideo', videoURL);
-                    localStorage.setItem('videoSource', 'file');
-                    localStorage.setItem('videoName', selectedFile.name);
-                    
-                    updateCurrentVideoInfo(selectedFile.name);
-                    
-                    uploadContainer.style.display = 'none';
-                }).catch(error => {
-                    alert('影片載入失敗: ' + error.message);
-                });
+                // 儲存到本地儲存
+                localStorage.setItem('customVideo', videoURL);
+                localStorage.setItem('videoSource', 'file');
+                localStorage.setItem('videoName', selectedFile.name);
+                
+                updateCurrentVideoInfo(selectedFile.name);
                 
             } else if (selectedVideoUrl) {
                 // 使用網址影片
-                safePlayVideo(video, selectedVideoUrl).then(() => {
-                    // 儲存到本地儲存
-                    localStorage.setItem('customVideo', selectedVideoUrl);
-                    localStorage.setItem('videoSource', 'url');
-                    localStorage.setItem('videoName', '自訂網址影片');
-                    
-                    updateCurrentVideoInfo('自訂網址影片');
-                    
-                    uploadContainer.style.display = 'none';
-                }).catch(error => {
-                    alert('影片載入失敗: ' + error.message);
-                });
+                video.src = selectedVideoUrl;
+                video.play();
+                
+                // 儲存到本地儲存
+                localStorage.setItem('customVideo', selectedVideoUrl);
+                localStorage.setItem('videoSource', 'url');
+                localStorage.setItem('videoName', '自訂網址影片');
+                
+                updateCurrentVideoInfo('自訂網址影片');
             }
             
+            uploadContainer.style.display = 'none';
             // 重置表單
             document.getElementById('video-file').value = '';
             document.getElementById('video-url').value = '';
@@ -822,9 +732,18 @@
             document.getElementById('current-video-name').textContent = name;
         }
 
-        // 初始化
+        // 載入儲存的影片
         window.addEventListener('DOMContentLoaded', function() {
-            initializeVideo();
+            const savedVideo = localStorage.getItem('customVideo');
+            const videoSource = localStorage.getItem('videoSource');
+            const videoName = localStorage.getItem('videoName');
+            
+            if (savedVideo) {
+                video.src = savedVideo;
+                updateCurrentVideoInfo(videoName || '自訂影片');
+            }
+            
+            video.play();
             
             // 聚焦搜尋框
             searchInput.focus();
