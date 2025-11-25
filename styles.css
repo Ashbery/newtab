@@ -1,4 +1,4 @@
-﻿* {
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -32,11 +32,20 @@ body {
     z-index: -1;
 }
 
-.time-container {
+.header-container {
     position: fixed;
     top: 20px;
     left: 20px;
+    right: 20px;
     z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.time-container {
+    flex-shrink: 0;
+    min-width: 200px;
 }
 
 .clock {
@@ -44,6 +53,7 @@ body {
     font-weight: 300;
     margin-bottom: 5px;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    font-variant-numeric: tabular-nums;
 }
 
 .date {
@@ -52,50 +62,393 @@ body {
 }
 
 .search-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 90%;
+    flex: 1;
     max-width: 600px;
-    z-index: 10;
-    text-align: center;
 }
 
-.search-box input {
+.search-box {
+    position: relative;
+}
+
+.search-input {
     width: 100%;
     padding: 15px 20px;
     border: none;
-    border-radius: 30px;
+    border-radius: 25px;
     background: rgba(255, 255, 255, 0.15);
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
-    text-align: center;
     backdrop-filter: blur(10px);
     transition: all 0.3s ease;
+    outline: none;
+    text-align: left;
 }
 
-    .search-box input:focus {
-        outline: none;
-        background: rgba(255, 255, 255, 0.25);
-        border: 1px solid rgba(255, 255, 255, 0.6);
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-    }
+.search-input:focus {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
 
-    .search-box input::placeholder {
-        color: rgba(255, 255, 255, 0.8);
-    }
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.8);
+    text-align: left;
+}
 
-.controls {
+/* 右上角快捷鍵 */
+.quick-links {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.quick-link {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.quick-link:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+/* Google 應用程式資料夾 */
+.google-apps-container {
+    position: relative;
+}
+
+.google-apps-btn {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.google-apps-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.1);
+}
+
+.google-apps-menu {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: none;
+    min-width: 300px;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.google-apps-menu::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid rgba(255, 255, 255, 0.95);
+}
+
+.apps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.app-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+    padding: 12px 8px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.app-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+}
+
+.app-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    font-size: 1.2rem;
+    color: #5f6368;
+    transition: all 0.2s ease;
+}
+
+.app-item:hover .app-icon {
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+.app-name {
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.apps-footer {
+    border-top: 1px solid #e8eaed;
+    padding-top: 12px;
+}
+
+.more-apps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    color: #5f6368;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.more-apps:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1a73e8;
+}
+
+.more-apps i {
+    margin-right: 8px;
+    font-size: 0.9rem;
+}
+
+/* 應用程式圖標顏色 */
+.app-item:nth-child(1) .app-icon { color: #34A853; } /* 雲端硬碟 */
+.app-item:nth-child(2) .app-icon { color: #4285F4; } /* 地圖 */
+.app-item:nth-child(3) .app-icon { color: #EA4335; } /* 相簿 */
+.app-item:nth-child(4) .app-icon { color: #FBBC04; } /* 日曆 */
+.app-item:nth-child(5) .app-icon { color: #FF6D01; } /* Keep */
+.app-item:nth-child(6) .app-icon { color: #34A853; } /* 聯絡人 */
+.app-item:nth-child(7) .app-icon { color: #4285F4; } /* 翻譯 */
+.app-item:nth-child(8) .app-icon { color: #EA4335; } /* 新聞 */
+.app-item:nth-child(9) .app-icon { color: #00897B; } /* Meet */
+.app-item:nth-child(10) .app-icon { color: #00BCD4; } /* Chat */
+.app-item:nth-child(11) .app-icon { color: #4285F4; } /* 文件 */
+.app-item:nth-child(12) .app-icon { color: #0F9D58; } /* 試算表 */
+
+.app-item:hover .app-icon {
+    background: currentColor;
+    color: white !important;
+}
+
+/* 右上角 Google 登入按鈕 */
+.google-login-container {
+    position: relative;
+}
+
+.google-login-btn {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.google-login-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+.google-login-btn.authenticated {
+    background: rgba(66, 133, 244, 0.3);
+    border-color: rgba(66, 133, 244, 0.6);
+}
+
+.google-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+}
+
+.google-login-menu {
+    position: absolute;
+    top: 45px;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    display: none;
+    min-width: 180px;
+    backdrop-filter: blur(10px);
+}
+
+.google-login-menu::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: 15px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid rgba(255, 255, 255, 0.95);
+}
+
+.login-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    color: #333;
+    text-decoration: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 5px;
+    font-size: 0.85rem;
+}
+
+.login-menu-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.login-menu-item i {
+    width: 20px;
+    margin-right: 10px;
+    font-size: 0.9rem;
+}
+
+/* 右下角齒輪圖標 */
+.settings-gear {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    display: flex;
-    gap: 10px;
     z-index: 10;
+    cursor: pointer;
+    font-size: 1.6rem;
+    color: white;
+    transition: all 0.3s ease;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    background: none;
+    backdrop-filter: none;
+    border: none;
+    border-radius: 0;
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
 }
 
+.settings-gear:hover {
+    transform: rotate(90deg);
+    opacity: 1;
+    background: none;
+    border-color: transparent;
+}
+
+/* 設定選單 */
+.settings-menu {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    display: none;
+    min-width: 200px;
+    backdrop-filter: blur(10px);
+}
+
+.settings-menu::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    right: 15px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid rgba(255, 255, 255, 0.95);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: #333;
+    text-decoration: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 5px;
+}
+
+.menu-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.menu-item:last-child {
+    margin-bottom: 0;
+}
+
+.menu-item i {
+    width: 20px;
+    margin-right: 10px;
+    font-size: 1rem;
+}
+
+.menu-item span {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* 影片控制按鈕 */
 .control-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
@@ -111,11 +464,355 @@ body {
     transition: all 0.3s ease;
 }
 
-    .control-btn:hover {
-        background: rgba(255, 255, 255, 0.3);
-        transform: scale(1.1);
-    }
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
 
+/* 上傳容器 */
+.video-upload-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.upload-box {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 30px;
+    border-radius: 12px;
+    position: relative;
+    min-width: 450px;
+    color: #333;
+    text-align: center;
+    backdrop-filter: blur(20px);
+}
+
+.upload-box h3 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.upload-options {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.cloud-upload-btn {
+    background: #4285f4;
+    color: white;
+    border: none;
+    padding: 12px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    flex: 1;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.cloud-upload-btn:hover {
+    background: #3367d6;
+    transform: translateY(-2px);
+}
+
+.cloud-upload-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.file-input-wrapper {
+    margin: 20px 0;
+}
+
+.file-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.file-input:hover {
+    border-color: #4a6cf7;
+    background: #f0f4ff;
+}
+
+.file-input:focus {
+    outline: none;
+    border-color: #4a6cf7;
+}
+
+.upload-btn {
+    background: #4a6cf7;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+
+.upload-btn:hover {
+    background: #3a5ce5;
+}
+
+.upload-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.close-upload {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 5px;
+}
+
+.close-upload:hover {
+    color: #333;
+}
+
+.current-video {
+    margin-top: 15px;
+    padding: 10px;
+    background: #e8f4fd;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #155724;
+}
+
+.url-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin: 10px 0;
+    font-size: 0.9rem;
+}
+
+.url-input:focus {
+    outline: none;
+    border-color: #4a6cf7;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    margin: 10px 0;
+    overflow: hidden;
+    display: none;
+}
+
+.progress {
+    width: 0%;
+    height: 100%;
+    background: #4a6cf7;
+    transition: width 0.3s ease;
+}
+
+.file-info {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+}
+
+.upload-status {
+    margin: 10px 0;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    display: none;
+}
+
+.upload-status.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.upload-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.storage-info {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 5px;
+    text-align: center;
+}
+
+.divider {
+    margin: 20px 0;
+    text-align: center;
+    color: #666;
+    position: relative;
+}
+
+.divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #ddd;
+    z-index: 1;
+}
+
+.divider span {
+    background: white;
+    padding: 0 15px;
+    position: relative;
+    z-index: 2;
+}
+
+.login-prompt {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.login-prompt i {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    color: #4285f4;
+}
+
+/* API 設定容器 */
+.api-setup-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+}
+
+.setup-box {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 30px;
+    border-radius: 12px;
+    position: relative;
+    min-width: 500px;
+    max-width: 600px;
+    color: #333;
+    backdrop-filter: blur(20px);
+}
+
+.setup-box h3 {
+    margin-bottom: 15px;
+    color: #333;
+    text-align: center;
+}
+
+.setup-instructions {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #4285f4;
+}
+
+.setup-instructions h4 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.setup-instructions ol {
+    text-align: left;
+    font-size: 0.8rem;
+    color: #666;
+    padding-left: 20px;
+    line-height: 1.5;
+}
+
+.setup-instructions li {
+    margin-bottom: 8px;
+}
+
+.setup-instructions code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.setup-instructions a {
+    color: #4285f4;
+    text-decoration: none;
+}
+
+.setup-instructions a:hover {
+    text-decoration: underline;
+}
+
+.form-group {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.setup-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.btn-secondary {
+    background: #6c757d;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.google-status {
+    font-size: 0.7rem;
+    margin-top: 5px;
+    color: #666;
+}
+
+.google-status.connected {
+    color: #34A853;
+}
+
+/* 視頻選擇器 */
 .video-selector {
     position: fixed;
     top: 0;
@@ -138,10 +835,10 @@ body {
     min-width: 300px;
 }
 
-    .video-options h3 {
-        margin-bottom: 20px;
-        text-align: center;
-    }
+.video-options h3 {
+    margin-bottom: 20px;
+    text-align: center;
+}
 
 .video-option {
     display: flex;
@@ -154,9 +851,9 @@ body {
     transition: all 0.3s ease;
 }
 
-    .video-option:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
+.video-option:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
 
 .video-thumbnail {
     width: 40px;
@@ -175,41 +872,4 @@ body {
     color: white;
     cursor: pointer;
     font-size: 1.2rem;
-}
-.header-container {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    right: 20px;
-    z-index: 10;
-    display: flex;
-    align-items: center; /* 改回置中對齊 */
-    gap: 40px;
-}
-
-.time-container {
-    flex-shrink: 0;
-    min-width: 200px;
-}
-
-.search-container {
-    flex: 1;
-    max-width: 600px;
-    /* 移除 margin-top */
-}
-
-.search-input {
-    width: 100%;
-    padding: 15px 20px; /* 增加上下 padding 恢復原來高度 */
-    border: none;
-    border-radius: 25px;
-    background: rgba(255, 255, 255, 0.15);
-    font-size: 1rem;
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
-    outline: none;
-    text-align: left;
-    height: auto; /* 確保高度自動調整 */
 }
