@@ -303,6 +303,57 @@ function hideProgress() {
     progress.style.width = '0%';
 }
 
+// 快速載入影片函數
+async function loadVideoFast() {
+    console.log('🚀 開始快速載入影片...');
+    
+    // 1. 優先嘗試網址影片（最快）
+    const videoUrl = localStorage.getItem('videoUrl');
+    if (videoUrl) {
+        console.log('📹 載入網址影片:', videoUrl);
+        video.src = videoUrl;
+        updateCurrentVideoInfo('自訂網址影片');
+        video.play().catch(e => console.log('網址影片自動播放被阻止'));
+        return true;
+    }
+    
+    // 2. 嘗試擴充功能快速載入
+    if (window.extensionHelper) {
+        try {
+            const result = await window.extensionHelper.loadVideoFast();
+            if (result.success) {
+                if (result.type === 'url') {
+                    video.src = result.url;
+                    updateCurrentVideoInfo(result.name);
+                } else if (result.type === 'base64') {
+                    video.src = result.data;
+                    updateCurrentVideoInfo(result.name);
+                } else if (result.type === 'cloud') {
+                    // 處理雲端影片
+                    console.log('☁️ 載入雲端影片:', result.cloudVideo.url);
+                    // 這裡可以添加雲端影片的載入邏輯
+                }
+                video.play().catch(e => console.log('影片自動播放被阻止'));
+                console.log('✅ 快速載入成功');
+                return true;
+            }
+        } catch (error) {
+            console.log('❌ 擴充功能快速載入失敗:', error);
+        }
+    }
+    
+    // 3. 使用預設影片
+    console.log('📹 使用預設影片');
+    updateCurrentVideoInfo('預設影片');
+    video.play().catch(e => console.log('預設影片自動播放被阻止'));
+    return false;
+}
+
+function updateCurrentVideoInfo(name) {
+    document.getElementById('current-video-info').style.display = 'block';
+    document.getElementById('current-video-name').textContent = name;
+}
+
 // Google 登入按鈕點擊
 googleLoginBtn.addEventListener('click', function(e) {
     e.stopPropagation();
@@ -503,7 +554,7 @@ function resetUploadForm() {
     confirmBtn.disabled = true;
 }
 
-// 確認設定
+// 確認設定 - 優化版本
 document.getElementById('confirm-upload').addEventListener('click', async function() {
     const confirmBtn = this;
     confirmBtn.disabled = true;
@@ -514,8 +565,44 @@ document.getElementById('confirm-upload').addEventListener('click', async functi
         let videoUrl;
         let videoName;
 
-        if (cloudVideoUrl) {
-            // 使用雲端影片 - 使用 fetch 載入
+        if (selectedVideoUrl) {
+            // 優先使用網址影片（最快）
+            videoUrl = selectedVideoUrl;
+            videoName = '自訂網址影片';
+            localStorage.setItem('videoUrl', selectedVideoUrl);
+            console.log('✅ 使用網址影片，載入最快');
+            
+            // 清除擴充功能中的舊影片，避免衝突
+            if (window.extensionHelper) {
+                setTimeout(() => {
+                    window.extensionHelper.clearVideo().catch(() => {});
+                }, 1000);
+            }
+            
+        } else if (selectedFile) {
+            // 本地檔案 - 建立 Blob URL 直接使用（快速）
+            videoUrl = URL.createObjectURL(selectedFile);
+            videoName = selectedFile.name;
+            console.log('✅ 使用 Blob URL，避免 Base64 解碼');
+            
+            // 非同步保存到擴充功能（不阻塞影片播放）
+            if (window.extensionHelper) {
+                setTimeout(() => {
+                    window.extensionHelper.saveVideo(selectedFile)
+                        .then(result => {
+                            console.log('✅ 背景保存成功:', result.name);
+                        })
+                        .catch(error => {
+                            console.log('⚠️ 背景保存失敗:', error.message);
+                        });
+                }, 1000);
+            }
+            
+            // 清除網址影片，避免衝突
+            localStorage.removeItem('videoUrl');
+            
+        } else if (cloudVideoUrl) {
+            // 雲端影片處理（保持原有邏輯）
             console.log('開始載入 Google Drive 影片...');
             
             const response = await fetch(cloudVideoUrl, {
@@ -532,7 +619,7 @@ document.getElementById('confirm-upload').addEventListener('click', async functi
             videoUrl = URL.createObjectURL(blob);
             videoName = 'Google Drive 影片';
             
-            console.log('✅ 影片載入成功，大小:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
+            console.log('✅ 雲端影片載入成功，大小:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
             
             // 保存到擴充功能
             if (window.extensionHelper) {
@@ -544,29 +631,13 @@ document.getElementById('confirm-upload').addEventListener('click', async functi
                 }
             }
             
-            // 保存到本地儲存
-            saveCloudVideoInfo(cloudVideoUrl, 'Google Drive 影片', 'google_drive');
-            
-        } else if (selectedFile) {
-            // 使用本地檔案 (建立 blob URL)
-            const blob = new Blob([selectedFile], { type: selectedFile.type });
-            videoUrl = URL.createObjectURL(blob);
-            videoName = selectedFile.name;
-            
-            // 保存到擴充功能
+            // 清除其他影片來源
+            localStorage.removeItem('videoUrl');
             if (window.extensionHelper) {
-                try {
-                    await window.extensionHelper.saveVideo(selectedFile);
-                } catch (error) {
-                    console.log('擴充功能保存失敗:', error);
-                }
+                setTimeout(() => {
+                    window.extensionHelper.clearVideo().catch(() => {});
+                }, 1000);
             }
-            
-        } else if (selectedVideoUrl) {
-            // 使用網址影片
-            videoUrl = selectedVideoUrl;
-            videoName = '自訂網址影片';
-            localStorage.setItem('videoUrl', selectedVideoUrl);
         }
 
         if (videoUrl) {
@@ -592,199 +663,23 @@ document.getElementById('confirm-upload').addEventListener('click', async functi
     }
 });
 
-// 保存雲端影片資訊
-function saveCloudVideoInfo(url, name, type) {
-    const videoInfo = {
-        url: url,
-        name: name,
-        type: type,
-        timestamp: Date.now(),
-        source: 'cloud'
-    };
-    localStorage.setItem('cloudVideoInfo', JSON.stringify(videoInfo));
-}
-
-// 載入雲端影片資訊
-function loadCloudVideoInfo() {
-    const saved = localStorage.getItem('cloudVideoInfo');
-    return saved ? JSON.parse(saved) : null;
-}
-
-function updateCurrentVideoInfo(name) {
-    document.getElementById('current-video-info').style.display = 'block';
-    document.getElementById('current-video-name').textContent = name;
-}
-
-// 載入非 Google Drive 影片
-function loadNonGoogleDriveVideos() {
-    console.log('🔍 載入非 Google Drive 影片...');
-    
-    // 1. 優先從擴充功能載入本地影片
-    if (window.extensionHelper) {
-        try {
-            const savedData = window.extensionHelper.loadVideo();
-            console.log('從擴充功能載入資料:', savedData);
-            
-            // 載入本地影片（非雲端）
-            if (savedData.customVideo && !savedData.cloudVideo) {
-                console.log('📹 從擴充功能載入本地影片');
-                let videoData = savedData.customVideo;
-                if (!videoData.startsWith('data:')) {
-                    videoData = `data:video/mp4;base64,${videoData}`;
-                }
-                video.src = videoData;
-                updateCurrentVideoInfo(savedData.videoName || '自訂影片');
-                video.play().catch(e => console.log('本地影片自動播放被阻止'));
-                return true;
-            }
-        } catch (error) {
-            console.log('擴充功能載入失敗:', error);
-        }
-    }
-    
-    // 2. 嘗試載入網址影片
-    const videoUrl = localStorage.getItem('videoUrl');
-    if (videoUrl && !videoUrl.includes('drive.google.com') && !videoUrl.includes('googleapis.com')) {
-        console.log('📹 載入網址影片:', videoUrl);
-        video.src = videoUrl;
-        updateCurrentVideoInfo('自訂網址影片');
-        video.play().catch(e => console.log('網址影片自動播放被阻止'));
-        return true;
-    }
-    
-    // 3. 嘗試載入保存的選擇（非Google Drive）
-    const savedVideo = localStorage.getItem('selectedVideo');
-    if (savedVideo && !savedVideo.includes('drive.google.com') && !savedVideo.includes('googleapis.com')) {
-        console.log('📹 載入保存的非Google Drive影片:', savedVideo);
-        video.src = savedVideo;
-        video.play().catch(e => console.log('保存影片自動播放被阻止'));
-        return true;
-    }
-    
-    return false;
-}
-
-// 載入 Google Drive 影片
-function loadGoogleDriveVideo() {
-    // 1. 從擴充功能載入雲端影片
-    if (window.extensionHelper) {
-        try {
-            const savedData = window.extensionHelper.loadVideo();
-            if (savedData.cloudVideo && googleUser && googleUser.accessToken) {
-                console.log('🚀 從擴充功能載入 Google Drive 影片...');
-                return loadGoogleDriveVideoFromUrl(
-                    savedData.cloudVideo.url, 
-                    savedData.cloudVideo.name || '雲端影片'
-                );
-            }
-        } catch (error) {
-            console.log('擴充功能雲端影片載入失敗:', error);
-        }
-    }
-    
-    // 2. 從本地儲存載入雲端影片
-    const cloudVideo = loadCloudVideoInfo();
-    if (cloudVideo && cloudVideo.url && cloudVideo.type === 'google_drive' && 
-        googleUser && googleUser.accessToken) {
-        console.log('🚀 從本地儲存載入 Google Drive 影片...');
-        return loadGoogleDriveVideoFromUrl(cloudVideo.url, cloudVideo.name || '雲端影片');
-    }
-    
-    return false;
-}
-
-// 從 URL 載入 Google Drive 影片
-async function loadGoogleDriveVideoFromUrl(videoUrl, videoName) {
-    try {
-        console.log('開始載入 Google Drive 影片:', videoUrl);
-        
-        const response = await fetch(videoUrl, {
-            headers: {
-                'Authorization': `Bearer ${googleUser.accessToken}`
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        video.src = blobUrl;
-        updateCurrentVideoInfo(videoName);
-        
-        console.log('✅ Google Drive 影片載入成功，大小:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Google Drive 影片載入失敗:', error);
-        return false;
-    }
-}
-
-// 回退影片載入
-function loadFallbackVideo() {
-    console.log('🔄 執行回退影片載入...');
-    
-    // 使用預設影片
-    console.log('📹 使用預設影片');
-    updateCurrentVideoInfo('預設影片');
-    video.play().catch(e => console.log('預設影片自動播放被阻止'));
-}
-
 // 影片錯誤處理
 video.addEventListener('error', function() {
-    console.error('❌ 當前影片載入失敗，嘗試回退到其他來源');
-    loadFallbackVideo();
+    console.error('❌ 當前影片載入失敗，嘗試回退到預設影片');
+    video.src = 'https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4';
+    video.play();
+    updateCurrentVideoInfo('預設影片');
 });
 
-// 頁面載入 - 完整分層載入策略
+// 頁面載入 - 使用快速載入策略
 window.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 頁面開始載入，啟動分層影片載入策略...');
+    console.log('🚀 頁面開始載入，使用快速載入策略...');
     
     // 初始化 Google API 設定管理器
     googleConfig = new GoogleAPIConfig();
     
-    // 步驟1: 立即載入非 Google Drive 影片
-    const nonGoogleVideoLoaded = loadNonGoogleDriveVideos();
-    
-    if (nonGoogleVideoLoaded) {
-        console.log('✅ 非 Google Drive 影片載入成功');
-    } else {
-        console.log('ℹ️ 無非 Google Drive 影片，等待 Google Drive 影片');
-    }
-    
-    // 步驟2: 初始化 Google API 並載入 Google Drive 影片
-    const waitForGoogleInit = setInterval(() => {
-        if (googleConfig && googleConfig.gisInited) {
-            clearInterval(waitForGoogleInit);
-            console.log('🔄 Google API 就緒，嘗試載入 Google Drive 影片');
-            
-            const driveVideoLoaded = loadGoogleDriveVideo();
-            
-            if (!driveVideoLoaded && !nonGoogleVideoLoaded) {
-                console.log('⚠️ 無可用影片，載入回退影片');
-                loadFallbackVideo();
-            }
-        } else if (googleConfig && !googleConfig.clientId) {
-            clearInterval(waitForGoogleInit);
-            console.log('⚠️ 未設定 Google API，使用現有影片');
-            if (!nonGoogleVideoLoaded) {
-                loadFallbackVideo();
-            }
-        }
-    }, 100);
-    
-    // 超時保護
-    setTimeout(() => {
-        clearInterval(waitForGoogleInit);
-        if (googleConfig && !googleConfig.gisInited) {
-            console.log('⏰ Google API 初始化超時，使用現有影片');
-            if (!nonGoogleVideoLoaded) {
-                loadFallbackVideo();
-            }
-        }
-    }, 5000);
+    // 使用快速載入
+    loadVideoFast();
     
     searchInput.focus();
 });
