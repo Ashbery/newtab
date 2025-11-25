@@ -35,11 +35,6 @@
             z-index: -1;
         }
 
-        /* 移除變暗的 overlay */
-        .overlay {
-            display: none;
-        }
-
         .header-container {
             position: fixed;
             top: 20px;
@@ -47,7 +42,7 @@
             right: 20px;
             z-index: 10;
             display: flex;
-            align-items: center; /* 置中對齊 */
+            align-items: center;
             gap: 40px;
         }
 
@@ -72,7 +67,6 @@
         .search-container {
             flex: 1;
             max-width: 600px;
-            /* 移除 margin-top */
         }
 
         .search-box {
@@ -81,7 +75,7 @@
 
         .search-input {
             width: 100%;
-            padding: 15px 20px; /* 恢復原來的高度 */
+            padding: 15px 20px;
             border: none;
             border-radius: 25px;
             background: rgba(255, 255, 255, 0.15);
@@ -105,7 +99,6 @@
             text-align: left;
         }
 
-        /* 右上角快捷鍵 */
         .quick-links {
             position: fixed;
             top: 20px;
@@ -133,7 +126,6 @@
             transform: translateY(-2px);
         }
 
-        /* 齒輪圖標 */
         .settings-gear {
             position: fixed;
             bottom: 20px;
@@ -151,7 +143,6 @@
             color: rgba(255, 255, 255, 0.8);
         }
 
-        /* 設定選單 */
         .settings-menu {
             position: fixed;
             bottom: 70px;
@@ -257,11 +248,6 @@
             background: #f0f4ff;
         }
 
-        .file-input:focus {
-            outline: none;
-            border-color: #4a6cf7;
-        }
-
         .upload-btn {
             background: #4a6cf7;
             color: white;
@@ -322,6 +308,35 @@
             outline: none;
             border-color: #4a6cf7;
         }
+
+        .loading-indicator {
+            display: none;
+            margin-top: 10px;
+            color: #4a6cf7;
+            font-size: 0.9rem;
+        }
+
+        .file-info {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .local-path-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 0.9rem;
+        }
+
+        .path-help {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 5px;
+            text-align: left;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -329,7 +344,6 @@
     <video id="video-background" autoplay muted loop>
         <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4" type="video/mp4">
     </video>
-    <div class="overlay"></div>
 
     <div class="header-container">
         <div class="time-container">
@@ -344,18 +358,15 @@
         </div>
     </div>
 
-    <!-- 右上角快捷鍵 -->
     <div class="quick-links">
         <a href="https://www.google.com/imghp" class="quick-link" target="_blank">圖片</a>
         <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
     </div>
 
-    <!-- 齒輪設定圖標 -->
     <div class="settings-gear" id="settings-gear">
         ⚙️
     </div>
 
-    <!-- 設定選單 -->
     <div class="settings-menu" id="settings-menu">
         <div class="menu-item" id="play-pause-btn">
             <i class="fas fa-play"></i>
@@ -367,7 +378,11 @@
         </div>
         <div class="menu-item" id="upload-video-btn">
             <i class="fas fa-upload"></i>
-            <span>上傳背景影片</span>
+            <span>設定背景影片</span>
+        </div>
+        <div class="menu-item" id="reset-video-btn">
+            <i class="fas fa-redo"></i>
+            <span>恢復預設影片</span>
         </div>
     </div>
 
@@ -376,12 +391,12 @@
             <button class="close-upload" id="close-upload">
                 <i class="fas fa-times"></i>
             </button>
-            <h3>上傳自訂背景影片</h3>
+            <h3>設定背景影片</h3>
             
             <div class="file-input-wrapper">
                 <input type="file" id="video-file" accept="video/mp4" class="file-input">
-                <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
-                    支援 MP4 格式影片
+                <div class="file-info" id="file-info">
+                    選擇本機 MP4 影片檔案
                 </div>
             </div>
 
@@ -394,7 +409,22 @@
                 <button id="load-url-btn" class="upload-btn">載入網址影片</button>
             </div>
 
+            <div style="margin: 20px 0; text-align: center; color: #666;">
+                — 或 —
+            </div>
+
+            <div>
+                <input type="text" id="local-path" class="local-path-input" placeholder="輸入本機檔案路徑 (例如: C:/Videos/background.mp4)">
+                <button id="load-path-btn" class="upload-btn">載入本機路徑</button>
+                <div class="path-help">
+                    注意：本機路徑方式需要將網頁儲存為本機 HTML 檔案才能正常運作
+                </div>
+            </div>
+
             <button id="confirm-upload" class="upload-btn" disabled>確認設定</button>
+            <div class="loading-indicator" id="loading-indicator">
+                <i class="fas fa-spinner fa-spin"></i> 正在處理影片...
+            </div>
 
             <div class="current-video" id="current-video-info" style="display: none;">
                 目前使用: <span id="current-video-name">預設影片</span>
@@ -423,7 +453,6 @@
 
         // 搜尋功能
         const searchInput = document.getElementById('search-input');
-
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 const query = this.value.trim();
@@ -444,6 +473,30 @@
         const settingsGear = document.getElementById('settings-gear');
         let selectedFile = null;
         let selectedVideoUrl = '';
+        let selectedLocalPath = '';
+
+        // 簡單的設定儲存系統
+        function saveVideoSettings(type, value, name) {
+            localStorage.setItem('videoType', type);
+            localStorage.setItem('videoValue', value);
+            localStorage.setItem('videoName', name);
+            localStorage.setItem('videoTimestamp', new Date().getTime());
+        }
+
+        function loadVideoSettings() {
+            const type = localStorage.getItem('videoType');
+            const value = localStorage.getItem('videoValue');
+            const name = localStorage.getItem('videoName');
+            
+            return { type, value, name };
+        }
+
+        function clearVideoSettings() {
+            localStorage.removeItem('videoType');
+            localStorage.removeItem('videoValue');
+            localStorage.removeItem('videoName');
+            localStorage.removeItem('videoTimestamp');
+        }
 
         // 齒輪點擊事件
         settingsGear.addEventListener('click', function() {
@@ -478,6 +531,17 @@
             settingsMenu.style.display = 'none';
         });
 
+        // 恢復預設影片
+        document.getElementById('reset-video-btn').addEventListener('click', function() {
+            const defaultVideo = 'https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4';
+            video.src = defaultVideo;
+            video.play();
+            
+            clearVideoSettings();
+            updateCurrentVideoInfo('預設影片');
+            settingsMenu.style.display = 'none';
+        });
+
         // 上傳影片介面
         document.getElementById('upload-video-btn').addEventListener('click', function() {
             uploadContainer.style.display = 'flex';
@@ -492,13 +556,23 @@
         document.getElementById('video-file').addEventListener('change', function(e) {
             selectedFile = e.target.files[0];
             selectedVideoUrl = '';
+            selectedLocalPath = '';
             document.getElementById('video-url').value = '';
+            document.getElementById('local-path').value = '';
             
             if (selectedFile && selectedFile.type === 'video/mp4') {
+                // 顯示檔案資訊
+                const fileSize = (selectedFile.size / (1024 * 1024)).toFixed(2);
+                document.getElementById('file-info').textContent = 
+                    `已選擇: ${selectedFile.name} (${fileSize} MB)`;
                 document.getElementById('confirm-upload').disabled = false;
             } else {
+                document.getElementById('file-info').textContent = 
+                    '選擇本機 MP4 影片檔案';
                 document.getElementById('confirm-upload').disabled = true;
-                alert('請選擇 MP4 格式的影片檔案');
+                if (selectedFile) {
+                    alert('請選擇 MP4 格式的影片檔案');
+                }
             }
         });
 
@@ -508,70 +582,189 @@
             if (url) {
                 selectedVideoUrl = url;
                 selectedFile = null;
+                selectedLocalPath = '';
                 document.getElementById('video-file').value = '';
+                document.getElementById('local-path').value = '';
+                document.getElementById('file-info').textContent = 
+                    '選擇本機 MP4 影片檔案';
                 document.getElementById('confirm-upload').disabled = false;
             } else {
                 alert('請輸入影片網址');
             }
         });
 
+        // 本機路徑載入
+        document.getElementById('load-path-btn').addEventListener('click', function() {
+            const path = document.getElementById('local-path').value.trim();
+            if (path) {
+                selectedLocalPath = path;
+                selectedFile = null;
+                selectedVideoUrl = '';
+                document.getElementById('video-file').value = '';
+                document.getElementById('video-url').value = '';
+                document.getElementById('file-info').textContent = 
+                    '選擇本機 MP4 影片檔案';
+                document.getElementById('confirm-upload').disabled = false;
+            } else {
+                alert('請輸入本機檔案路徑');
+            }
+        });
+
         // 確認設定
-        document.getElementById('confirm-upload').addEventListener('click', function() {
+        document.getElementById('confirm-upload').addEventListener('click', async function() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            
             if (selectedFile) {
-                // 上傳本地檔案
-                const videoURL = URL.createObjectURL(selectedFile);
-                video.src = videoURL;
-                video.play();
+                // 使用檔案上傳方式
+                loadingIndicator.style.display = 'block';
+                this.disabled = true;
                 
-                // 儲存到本地儲存
-                localStorage.setItem('customVideo', videoURL);
-                localStorage.setItem('videoSource', 'file');
-                localStorage.setItem('videoName', selectedFile.name);
-                
-                updateCurrentVideoInfo(selectedFile.name);
+                try {
+                    // 創建 Object URL 播放
+                    const objectURL = URL.createObjectURL(selectedFile);
+                    video.src = objectURL;
+                    await video.play();
+                    
+                    // 儲存設定（我們儲存檔案名稱，下次需要重新選擇）
+                    saveVideoSettings('file', selectedFile.name, selectedFile.name);
+                    
+                    updateCurrentVideoInfo(selectedFile.name);
+                    
+                    loadingIndicator.style.display = 'none';
+                    this.disabled = false;
+                    uploadContainer.style.display = 'none';
+                    
+                    // 重置表單
+                    resetUploadForm();
+                    
+                } catch (error) {
+                    console.error('處理影片失敗:', error);
+                    loadingIndicator.style.display = 'none';
+                    this.disabled = false;
+                    alert('處理影片失敗: ' + error.message);
+                }
                 
             } else if (selectedVideoUrl) {
                 // 使用網址影片
-                video.src = selectedVideoUrl;
-                video.play();
+                loadingIndicator.style.display = 'block';
+                this.disabled = true;
                 
-                // 儲存到本地儲存
-                localStorage.setItem('customVideo', selectedVideoUrl);
-                localStorage.setItem('videoSource', 'url');
-                localStorage.setItem('videoName', '自訂網址影片');
+                try {
+                    video.src = selectedVideoUrl;
+                    await video.play();
+                    
+                    saveVideoSettings('url', selectedVideoUrl, '自訂網址影片');
+                    
+                    updateCurrentVideoInfo('自訂網址影片');
+                    
+                    loadingIndicator.style.display = 'none';
+                    this.disabled = false;
+                    uploadContainer.style.display = 'none';
+                    
+                    resetUploadForm();
+                    
+                } catch (error) {
+                    console.error('載入網址影片失敗:', error);
+                    loadingIndicator.style.display = 'none';
+                    this.disabled = false;
+                    alert('載入網址影片失敗: ' + error.message);
+                }
                 
-                updateCurrentVideoInfo('自訂網址影片');
+            } else if (selectedLocalPath) {
+                // 使用本機路徑
+                loadingIndicator.style.display = 'block';
+                this.disabled = true;
+                
+                try {
+                    // 直接使用 file:// 協議載入本機檔案
+                    video.src = selectedLocalPath;
+                    await video.play();
+                    
+                    saveVideoSettings('local', selectedLocalPath, '本機檔案');
+                    
+                    updateCurrentVideoInfo('本機檔案');
+                    
+                    loadingIndicator.style.display = 'none';
+                    this.disabled = false;
+                    uploadContainer.style.display = 'none';
+                    
+                    resetUploadForm();
+                    
+                } catch (error) {
+                    console.error('載入本機影片失敗:', error);
+                    loadingIndicator.style.display = 'none';
+                    this.disabled = false;
+                    alert('載入本機影片失敗: ' + error.message + '\n\n請確認：\n1. 檔案路徑是否正確\n2. 是否使用 file:// 協議開啟此網頁\n3. 影片檔案是否存在');
+                }
             }
-            
-            uploadContainer.style.display = 'none';
-            // 重置表單
+        });
+
+        function resetUploadForm() {
             document.getElementById('video-file').value = '';
             document.getElementById('video-url').value = '';
+            document.getElementById('local-path').value = '';
+            document.getElementById('file-info').textContent = '選擇本機 MP4 影片檔案';
             document.getElementById('confirm-upload').disabled = true;
             selectedFile = null;
             selectedVideoUrl = '';
-        });
+            selectedLocalPath = '';
+        }
 
         function updateCurrentVideoInfo(name) {
             document.getElementById('current-video-info').style.display = 'block';
             document.getElementById('current-video-name').textContent = name;
         }
 
-        // 載入儲存的影片
+        // 載入儲存的影片設定
         window.addEventListener('DOMContentLoaded', function() {
-            const savedVideo = localStorage.getItem('customVideo');
-            const videoSource = localStorage.getItem('videoSource');
-            const videoName = localStorage.getItem('videoName');
+            const settings = loadVideoSettings();
             
-            if (savedVideo) {
-                video.src = savedVideo;
-                updateCurrentVideoInfo(videoName || '自訂影片');
+            if (settings.type && settings.value) {
+                try {
+                    if (settings.type === 'url') {
+                        video.src = settings.value;
+                        updateCurrentVideoInfo(settings.name || '自訂網址影片');
+                    } else if (settings.type === 'local') {
+                        // 對於本機路徑，直接使用儲存的路徑
+                        video.src = settings.value;
+                        updateCurrentVideoInfo(settings.name || '本機檔案');
+                    }
+                    // 對於檔案上傳類型，我們無法恢復 Object URL，所以跳過
+                    
+                    video.play().catch(e => {
+                        console.log('自動播放被阻止，需要用戶互動');
+                    });
+                    
+                } catch (error) {
+                    console.error('載入儲存影片失敗:', error);
+                    // 載入失敗時使用預設影片
+                    useDefaultVideo();
+                }
+            } else {
+                useDefaultVideo();
             }
-            
-            video.play();
             
             // 聚焦搜尋框
             searchInput.focus();
+        });
+
+        function useDefaultVideo() {
+            updateCurrentVideoInfo('預設影片');
+            video.play().catch(e => {
+                console.log('自動播放被阻止，需要用戶互動');
+            });
+        }
+
+        // 處理影片載入錯誤
+        video.addEventListener('error', function() {
+            console.error('影片載入失敗');
+            // 如果自訂影片失敗，恢復預設影片
+            if (localStorage.getItem('videoType')) {
+                const defaultVideo = 'https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4';
+                video.src = defaultVideo;
+                video.play();
+                updateCurrentVideoInfo('預設影片（自訂影片載入失敗）');
+            }
         });
     </script>
 </body>
