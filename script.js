@@ -32,14 +32,14 @@ searchInput.addEventListener('keypress', function(e) {
     }
 });
 
-// 應用資料夾收合功能
+// Google應用圖標收合功能
 document.addEventListener('DOMContentLoaded', function() {
-    const folderToggle = document.querySelector('.folder-toggle');
-    const appsFolder = document.querySelector('.apps-folder');
+    const appsToggle = document.querySelector('.google-apps-toggle');
+    const appsGrid = document.querySelector('.google-apps-grid');
     
-    if (folderToggle && appsFolder) {
-        folderToggle.addEventListener('click', function() {
-            appsFolder.classList.toggle('collapsed');
+    if (appsToggle && appsGrid) {
+        appsToggle.addEventListener('click', function() {
+            appsGrid.classList.toggle('collapsed');
         });
     }
 });
@@ -181,16 +181,16 @@ window.addEventListener('DOMContentLoaded', function() {
     searchInput.focus();
 });
 
-// 應用資料夾拖曳功能
+// Google應用圖標拖曳功能
 let isDragging = false;
 let dragOffsetX, dragOffsetY;
 
 document.addEventListener('DOMContentLoaded', function() {
-    const appsFolder = document.querySelector('.apps-folder');
-    const folderHeader = document.querySelector('.folder-header');
+    const appsGrid = document.querySelector('.google-apps-grid');
+    const appsHeader = document.querySelector('.google-apps-header');
     
-    if (appsFolder && folderHeader) {
-        folderHeader.addEventListener('mousedown', startDrag);
+    if (appsGrid && appsHeader) {
+        appsHeader.addEventListener('mousedown', startDrag);
         document.addEventListener('mousemove', drag);
         document.addEventListener('mouseup', stopDrag);
     }
@@ -198,38 +198,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function startDrag(e) {
     isDragging = true;
-    const appsFolder = document.querySelector('.apps-folder');
-    const rect = appsFolder.getBoundingClientRect();
+    const appsGrid = document.querySelector('.google-apps-grid');
+    const rect = appsGrid.getBoundingClientRect();
     dragOffsetX = e.clientX - rect.left;
     dragOffsetY = e.clientY - rect.top;
-    appsFolder.style.cursor = 'grabbing';
+    appsGrid.style.cursor = 'grabbing';
 }
 
 function drag(e) {
     if (!isDragging) return;
     
-    const appsFolder = document.querySelector('.apps-folder');
-    appsFolder.style.left = (e.clientX - dragOffsetX) + 'px';
-    appsFolder.style.top = (e.clientY - dragOffsetY) + 'px';
-    appsFolder.style.right = 'auto';
+    const appsGrid = document.querySelector('.google-apps-grid');
+    appsGrid.style.left = (e.clientX - dragOffsetX) + 'px';
+    appsGrid.style.top = (e.clientY - dragOffsetY) + 'px';
+    appsGrid.style.right = 'auto';
 }
 
 function stopDrag() {
     isDragging = false;
-    const appsFolder = document.querySelector('.apps-folder');
-    if (appsFolder) {
-        appsFolder.style.cursor = 'move';
+    const appsGrid = document.querySelector('.google-apps-grid');
+    if (appsGrid) {
+        appsGrid.style.cursor = 'move';
     }
 }
 
 // 鍵盤快捷鍵
 document.addEventListener('keydown', function(e) {
-    // Ctrl+Shift+F 切換應用資料夾顯示
-    if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+    // Ctrl+Shift+G 切換Google應用圖標顯示
+    if (e.ctrlKey && e.shiftKey && e.key === 'G') {
         e.preventDefault();
-        const appsFolder = document.querySelector('.apps-folder');
-        if (appsFolder) {
-            appsFolder.style.display = appsFolder.style.display === 'none' ? 'block' : 'none';
+        const appsGrid = document.querySelector('.google-apps-grid');
+        if (appsGrid) {
+            appsGrid.style.display = appsGrid.style.display === 'none' ? 'block' : 'none';
         }
     }
     
