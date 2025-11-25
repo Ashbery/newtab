@@ -210,32 +210,36 @@
             font-size: 0.9rem;
         }
 
-        /* 右下角齒輪圖標 - 改為簍空風格 */
+        /* 右下角齒輪圖標 - 改為簍空風格，無背景無邊框 */
         .settings-gear {
             position: fixed;
             bottom: 20px;
             right: 20px;
             z-index: 10;
             cursor: pointer;
-            font-size: 2rem;
+            font-size: 1.6rem; /* 尺寸縮小20% */
             color: white;
             transition: all 0.3s ease;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            /* 移除背景和邊框 */
+            background: none;
+            backdrop-filter: none;
+            border: none;
+            border-radius: 0;
+            width: auto;
+            height: auto;
             display: flex;
             align-items: center;
             justify-content: center;
+            opacity: 0.8;
         }
 
         .settings-gear:hover {
             transform: rotate(90deg);
-            background: rgba(255, 255, 255, 0.2);
-            border-color: rgba(255, 255, 255, 0.6);
+            opacity: 1;
+            /* 移除懸停時的背景效果 */
+            background: none;
+            border-color: transparent;
         }
 
         /* 設定選單 */
@@ -788,7 +792,7 @@
                     <li>啟用 <strong>Google Drive API</strong> 和 <strong>Google Picker API</strong></li>
                     <li>前往「API 和服務」→「OAuth 同意畫面」設定應用程式名稱</li>
                     <li>前往「憑證」→「建立憑證」→「OAuth 用戶端 ID」</li>
-                    <li>應用程式類型選擇「網頁應用程式」</li>
+                    <li>應用程式類型選擇「網頁應用程式</li>
                     <li>在「已授權的 JavaScript 來源」中添加：<code>https://ashbery.github.io</code></li>
                     <li>複製「用戶端 ID」並貼到下方欄位</li>
                 </ol>
@@ -870,6 +874,18 @@
                 this.gapiInited = false;
                 this.gisInited = false;
                 
+                // 載入保存的登入狀態
+                const savedAuth = localStorage.getItem('google_auth');
+                if (savedAuth) {
+                    try {
+                        googleUser = JSON.parse(savedAuth);
+                        console.log('載入已保存的登入狀態');
+                    } catch (e) {
+                        console.error('載入登入狀態失敗:', e);
+                        localStorage.removeItem('google_auth');
+                    }
+                }
+                
                 if (this.clientId) {
                     this.initGoogleAPI();
                 }
@@ -933,16 +949,38 @@
 
             // 處理登入成功
             handleAuthSuccess(accessToken) {
-                googleUser = { accessToken: accessToken };
+                const authData = {
+                    accessToken: accessToken,
+                    timestamp: Date.now()
+                };
+                googleUser = authData;
+                
+                // 保存登入狀態
+                localStorage.setItem('google_auth', JSON.stringify(authData));
+                
                 this.updateUI();
                 this.initializePicker();
                 showUploadStatus('Google 帳號登入成功！', 'success');
             }
 
+            // 檢查 token 是否過期 (1小時)
+            isTokenExpired() {
+                if (!googleUser || !googleUser.timestamp) return true;
+                const oneHour = 60 * 60 * 1000;
+                return (Date.now() - googleUser.timestamp) > oneHour;
+            }
+
             // 更新 UI 狀態
             updateUI() {
                 const isConfigured = this.isConfigured();
-                const isAuthenticated = !!googleUser;
+                const isAuthenticated = !!googleUser && !this.isTokenExpired();
+
+                // 如果 token 過期，清除登入狀態
+                if (googleUser && this.isTokenExpired()) {
+                    console.log('Token 已過期，自動登出');
+                    this.logout();
+                    return;
+                }
 
                 // 更新右上角按鈕
                 if (isAuthenticated) {
@@ -1045,6 +1083,7 @@
                 }
                 
                 googleUser = null;
+                localStorage.removeItem('google_auth');
                 this.updateUI();
                 showUploadStatus('已登出 Google 帳號', 'info');
             }
@@ -1079,11 +1118,11 @@
         googleLoginBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             if (googleConfig && googleConfig.isConfigured()) {
-                if (googleUser) {
+                if (googleUser && !googleConfig.isTokenExpired()) {
                     // 已登入，顯示選單
                     googleLoginMenu.style.display = googleLoginMenu.style.display === 'block' ? 'none' : 'block';
                 } else {
-                    // 未登入，直接請求授權
+                    // 未登入或 token 過期，直接請求授權
                     googleConfig.requestAuth();
                 }
             } else {
@@ -1092,7 +1131,7 @@
             }
         });
 
-        // 點擊頁面其他區域關閉選單 - 修復閃爍問題
+        // 點擊頁面其他區域關閉選單
         document.addEventListener('click', function(e) {
             if (!googleLoginBtn.contains(e.target) && !googleLoginMenu.contains(e.target)) {
                 googleLoginMenu.style.display = 'none';
@@ -1165,6 +1204,7 @@
                 selectedFile = null;
                 selectedVideoUrl = '';
                 
+                // 啟用確認按鈕
                 document.getElementById('confirm-upload').disabled = false;
                 document.getElementById('file-info').textContent = `已選擇: ${driveFile.name}`;
                 showUploadStatus('Google Drive 影片選擇成功！', 'success');
@@ -1370,9 +1410,24 @@
             // 1. 嘗試載入雲端影片
             const cloudVideo = loadCloudVideoInfo();
             if (cloudVideo && cloudVideo.url) {
-                video.src = cloudVideo.url;
-                updateCurrentVideoInfo(cloudVideo.name || '雲端影片');
-                return true;
+                try {
+                    // 測試影片是否可載入
+                    await new Promise((resolve, reject) => {
+                        const testVideo = document.createElement('video');
+                        testVideo.src = cloudVideo.url;
+                        testVideo.onloadeddata = resolve;
+                        testVideo.onerror = reject;
+                    });
+                    
+                    video.src = cloudVideo.url;
+                    updateCurrentVideoInfo(cloudVideo.name || '雲端影片');
+                    console.log('成功載入雲端影片');
+                    return true;
+                } catch (error) {
+                    console.warn('雲端影片載入失敗，嘗試其他來源:', error);
+                    // 如果雲端影片載入失敗，清除保存的資訊
+                    localStorage.removeItem('cloudVideoInfo');
+                }
             }
 
             // 2. 嘗試載入網址影片
