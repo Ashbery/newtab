@@ -274,8 +274,7 @@ body {
     z-index: 10;
     cursor: pointer;
     transition: all 0.3s ease;
-    /* 移除原來的字體大小和顏色設定 */
-    width: 40px; /* 縮小30%，原約57px */
+    width: 40px; /* 縮小30% */
     height: 40px;
     display: flex;
     align-items: center;
@@ -299,11 +298,11 @@ body {
 .settings-gear:hover .google-app-icon {
     background: white;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    transform: scale(1.1) rotate(90deg); /* 懸停時旋轉 */
+    transform: scale(1.1) rotate(90deg);
 }
 
 .settings-gear .google-app-icon i {
-    font-size: 18px; /* 縮小30%，原約26px */
+    font-size: 18px; /* 縮小30% */
     color: #5f6368;
 }
 
