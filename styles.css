@@ -234,7 +234,7 @@ body {
     transform: rotate(-90deg);
 }
 
-/* ===== 修改後的齒輪圖標 - 再縮小30%，無背景無陰影 ===== */
+/* ===== 最終修改的齒輪圖標 - 再縮小30%，無背景無陰影 ===== */
 .settings-gear {
     position: fixed;
     bottom: 20px;
@@ -242,8 +242,8 @@ body {
     z-index: 10;
     cursor: pointer;
     transition: all 0.3s ease;
-    width: 20px; /* 再縮小30%，從28px縮小到20px */
-    height: 20px;
+    width: 14px; /* 再縮小30%，從20px縮小到14px */
+    height: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -253,7 +253,7 @@ body {
 }
 
 .settings-gear i {
-    font-size: 20px; /* 再縮小30%，從28px縮小到20px */
+    font-size: 14px; /* 再縮小30%，從20px縮小到14px */
     color: rgba(255, 255, 255, 0.8); /* 半透明白色，與搜尋欄風格一致 */
     transition: all 0.3s ease;
     text-shadow: none;
@@ -268,10 +268,11 @@ body {
 /* ===== 修改設定選單為透明毛玻璃效果 ===== */
 .settings-menu {
     position: fixed;
-    bottom: 50px; /* 調整位置，避免與齒輪重疊 */
+    bottom: 45px; /* 調整位置，避免與齒輪重疊 */
     right: 20px;
     background: rgba(255, 255, 255, 0.15); /* 與搜尋欄相同的透明背景 */
     backdrop-filter: blur(10px); /* 毛玻璃效果 */
+    -webkit-backdrop-filter: blur(10px); /* Safari 支援 */
     border: 1px solid rgba(255, 255, 255, 0.3); /* 與搜尋欄相同的邊框 */
     border-radius: 12px;
     padding: 15px;
@@ -474,18 +475,18 @@ body {
     }
     
     .settings-gear {
-        width: 18px;
-        height: 18px;
+        width: 12px;
+        height: 12px;
         bottom: 15px;
         right: 15px;
     }
     
     .settings-gear i {
-        font-size: 18px;
+        font-size: 12px;
     }
     
     .settings-menu {
-        bottom: 45px;
+        bottom: 40px;
         right: 15px;
         min-width: 180px;
     }
