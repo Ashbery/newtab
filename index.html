@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ashbery 新分頁</title>
+    
+    <!-- 自訂分頁圖標 -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="favicon.ico">
+    
     <style>
         * {
             margin: 0;
@@ -56,42 +62,6 @@
         .date {
             font-size: 0.8rem;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-        }
-
-        .search-container {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90%;
-            max-width: 600px;
-            z-index: 10;
-            text-align: center;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: 15px 20px;
-            border: none;
-            border-radius: 30px;
-            background: rgba(255, 255, 255, 0.15);
-            font-size: 1.1rem;
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            text-align: center;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-        }
-
-        .search-box input:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-        }
-
-        .search-box input::placeholder {
-            color: rgba(255, 255, 255, 0.8);
         }
 
         .controls {
@@ -253,12 +223,6 @@
         <div class="clock" id="clock">00:00:00</div>
         <div class="date" id="date">2023年1月1日 星期一</div>
     </div>
-    
-    <div class="search-container">
-        <div class="search-box">
-            <input type="text" id="search-input" placeholder="搜尋網頁或輸入網址...">
-        </div>
-    </div>
 
     <div class="controls">
         <button class="control-btn" id="play-pause-btn">
@@ -324,20 +288,6 @@
 
         updateClock();
         setInterval(updateClock, 1000);
-
-        // 搜尋功能
-        document.getElementById('search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                const query = this.value.trim();
-                if (query) {
-                    if (query.includes('.') || query.includes('://')) {
-                        window.location.href = query.includes('://') ? query : 'https://' + query;
-                    } else {
-                        window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-                    }
-                }
-            }
-        });
 
         // 影片控制
         const video = document.getElementById('video-background');
@@ -454,9 +404,6 @@
             }
             
             video.play();
-            
-            // 聚焦搜尋框
-            document.getElementById('search-input').focus();
         });
     </script>
 </body>
