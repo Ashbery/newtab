@@ -316,21 +316,10 @@
             font-size: 0.9rem;
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: #f0f0f0;
-            border-radius: 3px;
-            margin: 10px 0;
-            overflow: hidden;
-            display: none;
-        }
-
-        .progress {
-            width: 0%;
-            height: 100%;
-            background: #4a6cf7;
-            transition: width 0.3s ease;
+        .file-info {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -390,13 +379,9 @@
             
             <div class="file-input-wrapper">
                 <input type="file" id="video-file" accept="video/mp4" class="file-input">
-                <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
-                    支援 MP4 格式影片
+                <div class="file-info" id="file-info">
+                    支援 MP4 格式影片（無檔案大小限制）
                 </div>
-            </div>
-
-            <div class="progress-bar" id="progress-bar">
-                <div class="progress" id="progress"></div>
             </div>
 
             <div style="margin: 20px 0; text-align: center; color: #666;">
@@ -410,7 +395,7 @@
 
             <button id="confirm-upload" class="upload-btn" disabled>確認設定</button>
             <div class="loading-indicator" id="loading-indicator">
-                <i class="fas fa-spinner fa-spin"></i> 正在處理影片...
+                <i class="fas fa-spinner fa-spin"></i> 正在儲存影片...
             </div>
 
             <div class="current-video" id="current-video-info" style="display: none;">
@@ -461,7 +446,7 @@
         let selectedFile = null;
         let selectedVideoUrl = '';
 
-        // IndexedDB 設定
+        // 使用 IndexedDB 儲存大檔案
         const DB_NAME = 'VideoBackgroundDB';
         const DB_VERSION = 1;
         const STORE_NAME = 'videos';
@@ -477,7 +462,8 @@
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
                     if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        db.createObjectStore(STORE_NAME);
+                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                        store.createIndex('timestamp', 'timestamp', { unique: false });
                     }
                 };
             });
@@ -492,7 +478,16 @@
                     
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        const request = store.put(e.target.result, 'customVideo');
+                        const videoData = {
+                            id: 'customVideo',
+                            data: e.target.result,
+                            name: file.name,
+                            type: file.type,
+                            size: file.size,
+                            timestamp: new Date().getTime()
+                        };
+                        
+                        const request = store.put(videoData);
                         request.onsuccess = () => resolve();
                         request.onerror = () => reject(request.error);
                     };
@@ -512,9 +507,12 @@
                     
                     request.onsuccess = () => {
                         if (request.result) {
-                            const blob = new Blob([request.result], { type: 'video/mp4' });
+                            const blob = new Blob([request.result.data], { type: request.result.type });
                             const url = URL.createObjectURL(blob);
-                            resolve(url);
+                            resolve({
+                                url: url,
+                                name: request.result.name
+                            });
                         } else {
                             resolve(null);
                         }
@@ -604,10 +602,18 @@
             document.getElementById('video-url').value = '';
             
             if (selectedFile && selectedFile.type === 'video/mp4') {
+                // 顯示檔案資訊
+                const fileSize = (selectedFile.size / (1024 * 1024)).toFixed(2);
+                document.getElementById('file-info').textContent = 
+                    `已選擇: ${selectedFile.name} (${fileSize} MB)`;
                 document.getElementById('confirm-upload').disabled = false;
             } else {
+                document.getElementById('file-info').textContent = 
+                    '支援 MP4 格式影片（無檔案大小限制）';
                 document.getElementById('confirm-upload').disabled = true;
-                alert('請選擇 MP4 格式的影片檔案');
+                if (selectedFile) {
+                    alert('請選擇 MP4 格式的影片檔案');
+                }
             }
         });
 
@@ -618,6 +624,8 @@
                 selectedVideoUrl = url;
                 selectedFile = null;
                 document.getElementById('video-file').value = '';
+                document.getElementById('file-info').textContent = 
+                    '支援 MP4 格式影片（無檔案大小限制）';
                 document.getElementById('confirm-upload').disabled = false;
             } else {
                 alert('請輸入影片網址');
@@ -627,30 +635,20 @@
         // 確認設定
         document.getElementById('confirm-upload').addEventListener('click', async function() {
             const loadingIndicator = document.getElementById('loading-indicator');
-            const progressBar = document.getElementById('progress-bar');
-            const progress = document.getElementById('progress');
             
             if (selectedFile) {
                 // 上傳本地檔案
                 loadingIndicator.style.display = 'block';
-                progressBar.style.display = 'block';
                 this.disabled = true;
                 
                 try {
-                    // 顯示進度
-                    progress.style.width = '50%';
-                    
                     // 先創建臨時 URL 立即播放
                     const tempURL = URL.createObjectURL(selectedFile);
                     video.src = tempURL;
                     await video.play();
                     
-                    progress.style.width = '80%';
-                    
                     // 儲存到 IndexedDB
                     await saveVideoToDB(selectedFile);
-                    
-                    progress.style.width = '100%';
                     
                     // 儲存到本地儲存
                     localStorage.setItem('videoSource', 'file');
@@ -658,25 +656,22 @@
                     
                     updateCurrentVideoInfo(selectedFile.name);
                     
-                    // 完成
-                    setTimeout(() => {
-                        loadingIndicator.style.display = 'none';
-                        progressBar.style.display = 'none';
-                        this.disabled = false;
-                        uploadContainer.style.display = 'none';
-                        
-                        // 重置表單
-                        document.getElementById('video-file').value = '';
-                        document.getElementById('video-url').value = '';
-                        document.getElementById('confirm-upload').disabled = true;
-                        selectedFile = null;
-                        selectedVideoUrl = '';
-                    }, 500);
+                    loadingIndicator.style.display = 'none';
+                    this.disabled = false;
+                    uploadContainer.style.display = 'none';
+                    
+                    // 重置表單
+                    document.getElementById('video-file').value = '';
+                    document.getElementById('video-url').value = '';
+                    document.getElementById('file-info').textContent = 
+                        '支援 MP4 格式影片（無檔案大小限制）';
+                    document.getElementById('confirm-upload').disabled = true;
+                    selectedFile = null;
+                    selectedVideoUrl = '';
                     
                 } catch (error) {
                     console.error('處理影片失敗:', error);
                     loadingIndicator.style.display = 'none';
-                    progressBar.style.display = 'none';
                     this.disabled = false;
                     alert('處理影片失敗: ' + error.message);
                 }
@@ -704,6 +699,8 @@
                     // 重置表單
                     document.getElementById('video-file').value = '';
                     document.getElementById('video-url').value = '';
+                    document.getElementById('file-info').textContent = 
+                        '支援 MP4 格式影片（無檔案大小限制）';
                     document.getElementById('confirm-upload').disabled = true;
                     selectedFile = null;
                     selectedVideoUrl = '';
@@ -730,11 +727,11 @@
             try {
                 if (videoSource === 'file') {
                     // 從 IndexedDB 載入影片
-                    const videoURL = await loadVideoFromDB();
-                    if (videoURL) {
-                        video.src = videoURL;
+                    const videoData = await loadVideoFromDB();
+                    if (videoData) {
+                        video.src = videoData.url;
                         video.play().catch(e => console.log('自動播放被阻止'));
-                        updateCurrentVideoInfo(videoName || '自訂影片');
+                        updateCurrentVideoInfo(videoData.name || videoName || '自訂影片');
                         return;
                     }
                 } else if (videoSource === 'url') {
