@@ -131,7 +131,7 @@
             transform: translateY(-2px);
         }
 
-        /* 右上角 Google 登入按鈕 - 改為與網頁風格一致 */
+        /* 右上角 Google 登入按鈕 - 使用網站 favicon */
         .google-login-container {
             position: relative;
         }
@@ -159,6 +159,12 @@
         .google-login-btn.authenticated {
             background: rgba(66, 133, 244, 0.3);
             border-color: rgba(66, 133, 244, 0.6);
+        }
+
+        .google-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 2px;
         }
 
         .google-login-menu {
@@ -672,10 +678,10 @@
         <a href="https://www.google.com/imghp" class="quick-link" target="_blank">圖片</a>
         <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
         
-        <!-- Google 登入按鈕 - 改為與網頁風格一致 -->
+        <!-- Google 登入按鈕 - 使用網站 favicon -->
         <div class="google-login-container">
             <button class="google-login-btn" id="google-login-btn">
-                <i class="fab fa-google"></i>
+                <img src="favicon.ico" class="google-icon" alt="Google">
                 <span>Google</span>
             </button>
             <div class="google-login-menu" id="google-login-menu">
@@ -792,7 +798,7 @@
                     <li>啟用 <strong>Google Drive API</strong> 和 <strong>Google Picker API</strong></li>
                     <li>前往「API 和服務」→「OAuth 同意畫面」設定應用程式名稱</li>
                     <li>前往「憑證」→「建立憑證」→「OAuth 用戶端 ID」</li>
-                    <li>應用程式類型選擇「網頁應用程式</li>
+                    <li>應用程式類型選擇「網頁應用程式」</li>
                     <li>在「已授權的 JavaScript 來源」中添加：<code>https://ashbery.github.io</code></li>
                     <li>複製「用戶端 ID」並貼到下方欄位</li>
                 </ol>
@@ -985,10 +991,10 @@
                 // 更新右上角按鈕
                 if (isAuthenticated) {
                     googleLoginBtn.classList.add('authenticated');
-                    googleLoginBtn.innerHTML = '<i class="fab fa-google"></i><span>已連線</span>';
+                    googleLoginBtn.innerHTML = '<img src="favicon.ico" class="google-icon" alt="Google"><span>已連線</span>';
                 } else {
                     googleLoginBtn.classList.remove('authenticated');
-                    googleLoginBtn.innerHTML = '<i class="fab fa-google"></i><span>Google</span>';
+                    googleLoginBtn.innerHTML = '<img src="favicon.ico" class="google-icon" alt="Google"><span>Google</span>';
                 }
 
                 // 更新選單項目
@@ -1320,7 +1326,7 @@
             confirmBtn.disabled = true;
         }
 
-        // 確認設定
+        // 確認設定 - 修改後的完整函數
         document.getElementById('confirm-upload').addEventListener('click', async function() {
             const confirmBtn = this;
             confirmBtn.disabled = true;
@@ -1335,6 +1341,18 @@
                     // 使用雲端影片
                     videoUrl = cloudVideoUrl;
                     videoName = 'Google Drive 影片';
+                    
+                    // 保存到擴充功能
+                    if (window.extensionHelper) {
+                        try {
+                            await window.extensionHelper.saveCloudVideo(cloudVideoUrl, 'Google Drive 影片');
+                            console.log('雲端影片已保存到擴充功能');
+                        } catch (error) {
+                            console.log('擴充功能保存失敗:', error);
+                        }
+                    }
+                    
+                    // 保存到本地儲存
                     saveCloudVideoInfo(cloudVideoUrl, 'Google Drive 影片', 'google_drive');
                     
                 } else if (selectedFile) {
@@ -1343,7 +1361,7 @@
                     videoUrl = URL.createObjectURL(blob);
                     videoName = selectedFile.name;
                     
-                    // 保存到擴充功能 (如果可用)
+                    // 保存到擴充功能
                     if (window.extensionHelper) {
                         try {
                             await window.extensionHelper.saveVideo(selectedFile);
@@ -1405,51 +1423,66 @@
             document.getElementById('current-video-name').textContent = name;
         }
 
-        // 智慧載入影片
+        // 智慧載入影片 - 修改後的完整函數
         async function loadVideo() {
-            // 1. 嘗試載入雲端影片
-            const cloudVideo = loadCloudVideoInfo();
-            if (cloudVideo && cloudVideo.url) {
+            // 1. 優先從擴充功能載入
+            if (window.extensionHelper) {
                 try {
-                    // 測試影片是否可載入
-                    await new Promise((resolve, reject) => {
-                        const testVideo = document.createElement('video');
-                        testVideo.src = cloudVideo.url;
-                        testVideo.onloadeddata = resolve;
-                        testVideo.onerror = reject;
-                    });
+                    const savedData = await window.extensionHelper.loadVideo();
+                    console.log('從擴充功能載入資料:', savedData);
                     
-                    video.src = cloudVideo.url;
-                    updateCurrentVideoInfo(cloudVideo.name || '雲端影片');
-                    console.log('成功載入雲端影片');
-                    return true;
+                    // 優先載入雲端影片
+                    if (savedData.cloudVideo) {
+                        try {
+                            video.src = savedData.cloudVideo.url;
+                            updateCurrentVideoInfo(savedData.cloudVideo.name || '雲端影片');
+                            console.log('從擴充功能載入雲端影片');
+                            return true;
+                        } catch (error) {
+                            console.warn('擴充功能雲端影片載入失敗:', error);
+                        }
+                    }
+                    
+                    // 其次載入本地影片
+                    if (savedData.customVideo) {
+                        try {
+                            // 處理壓縮的資料
+                            let videoData = savedData.customVideo;
+                            if (!videoData.startsWith('data:')) {
+                                videoData = `data:video/mp4;base64,${videoData}`;
+                            }
+                            video.src = videoData;
+                            updateCurrentVideoInfo(savedData.videoName || '自訂影片');
+                            console.log('從擴充功能載入本地影片');
+                            return true;
+                        } catch (error) {
+                            console.warn('擴充功能本地影片載入失敗:', error);
+                        }
+                    }
                 } catch (error) {
-                    console.warn('雲端影片載入失敗，嘗試其他來源:', error);
-                    // 如果雲端影片載入失敗，清除保存的資訊
-                    localStorage.removeItem('cloudVideoInfo');
+                    console.log('擴充功能載入失敗:', error);
                 }
             }
 
-            // 2. 嘗試載入網址影片
+            // 2. 嘗試載入本地儲存的雲端影片
+            const cloudVideo = loadCloudVideoInfo();
+            if (cloudVideo && cloudVideo.url) {
+                try {
+                    video.src = cloudVideo.url;
+                    updateCurrentVideoInfo(cloudVideo.name || '雲端影片');
+                    console.log('從本地儲存載入雲端影片');
+                    return true;
+                } catch (error) {
+                    console.warn('本地雲端影片載入失敗:', error);
+                }
+            }
+
+            // 3. 嘗試載入網址影片
             const videoUrl = localStorage.getItem('videoUrl');
             if (videoUrl) {
                 video.src = videoUrl;
                 updateCurrentVideoInfo('自訂網址影片');
                 return true;
-            }
-
-            // 3. 嘗試從擴充功能載入
-            if (window.extensionHelper) {
-                try {
-                    const savedData = await window.extensionHelper.loadVideo();
-                    if (savedData && savedData.customVideo) {
-                        video.src = savedData.customVideo;
-                        updateCurrentVideoInfo(savedData.videoName || '自訂影片');
-                        return true;
-                    }
-                } catch (error) {
-                    console.log('擴充功能載入失敗:', error);
-                }
             }
 
             // 4. 使用預設影片
