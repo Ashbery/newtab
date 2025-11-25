@@ -407,7 +407,7 @@
 
             <button id="confirm-upload" class="upload-btn" disabled>確認設定</button>
             <div class="loading-indicator" id="loading-indicator">
-                <i class="fas fa-spinner fa-spin"></i> 正在儲存影片...
+                <i class="fas fa-spinner fa-spin"></i> 正在處理影片...
             </div>
 
             <div class="current-video" id="current-video-info" style="display: none;">
@@ -459,78 +459,45 @@
         let selectedFile = null;
         let selectedVideoUrl = '';
 
-        // 初始化 IndexedDB
-        let db;
-        const DB_NAME = 'AshberyNewTabDB';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'videos';
-        
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
+        // 簡化的影片儲存系統
+        function saveVideoData(videoData, fileName) {
+            return new Promise((resolve) => {
+                // 使用 localStorage 儲存基本資訊
+                localStorage.setItem('customVideoType', 'file');
+                localStorage.setItem('customVideoName', fileName);
+                localStorage.setItem('customVideoDate', new Date().toISOString());
                 
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => {
-                    db = request.result;
-                    resolve(db);
-                };
-                
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        db.createObjectStore(STORE_NAME);
-                    }
-                };
-            });
-        }
-
-        // 儲存影片到 IndexedDB
-        function saveVideoToDB(file) {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                
+                // 使用 sessionStorage 儲存影片數據（臨時方案）
+                // 注意：對於大檔案，這可能不是最佳方案
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const request = store.put(e.target.result, 'customVideo');
-                    request.onsuccess = () => resolve();
-                    request.onerror = () => reject(request.error);
+                    // 只儲存前 1MB 作為標識（實際播放還是用 Blob URL）
+                    const dataUrl = e.target.result;
+                    localStorage.setItem('customVideoData', dataUrl.substring(0, 100000)); // 限制大小
+                    resolve();
                 };
-                reader.onerror = () => reject(reader.error);
-                reader.readAsArrayBuffer(file);
+                reader.readAsDataURL(videoData);
             });
         }
 
-        // 從 IndexedDB 載入影片
-        function loadVideoFromDB() {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.get('customVideo');
-                
-                request.onsuccess = () => {
-                    if (request.result) {
-                        const blob = new Blob([request.result], { type: 'video/mp4' });
-                        const url = URL.createObjectURL(blob);
-                        resolve(url);
-                    } else {
-                        resolve(null);
-                    }
-                };
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        // 從 IndexedDB 刪除影片
-        function deleteVideoFromDB() {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.delete('customVideo');
-                
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
+        function loadSavedVideo() {
+            const videoType = localStorage.getItem('customVideoType');
+            const videoName = localStorage.getItem('customVideoName');
+            
+            if (videoType === 'file' && videoName) {
+                // 對於本地檔案，我們需要重新上傳才能獲得新的 Blob URL
+                // 這裡只是更新顯示資訊
+                updateCurrentVideoInfo(videoName);
+                return true;
+            } else if (videoType === 'url') {
+                const videoUrl = localStorage.getItem('customVideoUrl');
+                if (videoUrl) {
+                    video.src = videoUrl;
+                    updateCurrentVideoInfo('自訂網址影片');
+                    return true;
+                }
+            }
+            return false;
         }
 
         // 齒輪點擊事件
@@ -572,13 +539,14 @@
             video.src = defaultVideo;
             video.play();
             
-            // 刪除儲存的影片
-            deleteVideoFromDB().then(() => {
-                localStorage.removeItem('videoSource');
-                localStorage.removeItem('videoName');
-                updateCurrentVideoInfo('預設影片');
-            });
+            // 清除儲存的影片資料
+            localStorage.removeItem('customVideoType');
+            localStorage.removeItem('customVideoName');
+            localStorage.removeItem('customVideoDate');
+            localStorage.removeItem('customVideoData');
+            localStorage.removeItem('customVideoUrl');
             
+            updateCurrentVideoInfo('預設影片');
             settingsMenu.style.display = 'none';
         });
 
@@ -620,7 +588,7 @@
         });
 
         // 確認設定
-        document.getElementById('confirm-upload').addEventListener('click', async function() {
+        document.getElementById('confirm-upload').addEventListener('click', function() {
             const loadingIndicator = document.getElementById('loading-indicator');
             
             if (selectedFile) {
@@ -628,29 +596,35 @@
                 loadingIndicator.style.display = 'block';
                 this.disabled = true;
                 
-                try {
-                    // 儲存到 IndexedDB
-                    await saveVideoToDB(selectedFile);
-                    
-                    // 載入影片
-                    const videoURL = await loadVideoFromDB();
-                    if (videoURL) {
-                        video.src = videoURL;
-                        video.play();
-                        
-                        // 儲存到本地儲存
-                        localStorage.setItem('videoSource', 'file');
-                        localStorage.setItem('videoName', selectedFile.name);
-                        
+                // 立即創建 Blob URL 並播放
+                const videoURL = URL.createObjectURL(selectedFile);
+                video.src = videoURL;
+                video.play().then(() => {
+                    // 儲存影片資訊
+                    saveVideoData(selectedFile, selectedFile.name).then(() => {
                         updateCurrentVideoInfo(selectedFile.name);
-                    }
-                } catch (error) {
-                    console.error('儲存影片失敗:', error);
-                    alert('儲存影片失敗，請重試');
-                } finally {
+                        loadingIndicator.style.display = 'none';
+                        this.disabled = false;
+                        uploadContainer.style.display = 'none';
+                        
+                        // 重置表單
+                        document.getElementById('video-file').value = '';
+                        document.getElementById('video-url').value = '';
+                        document.getElementById('confirm-upload').disabled = true;
+                        selectedFile = null;
+                        selectedVideoUrl = '';
+                    }).catch(error => {
+                        console.error('儲存影片資訊失敗:', error);
+                        loadingIndicator.style.display = 'none';
+                        this.disabled = false;
+                        alert('儲存影片資訊失敗，但影片已設定成功');
+                    });
+                }).catch(error => {
+                    console.error('播放影片失敗:', error);
                     loadingIndicator.style.display = 'none';
                     this.disabled = false;
-                }
+                    alert('影片播放失敗，請檢查檔案格式');
+                });
                 
             } else if (selectedVideoUrl) {
                 // 使用網址影片
@@ -658,20 +632,20 @@
                 video.play();
                 
                 // 儲存到本地儲存
-                localStorage.setItem('customVideo', selectedVideoUrl);
-                localStorage.setItem('videoSource', 'url');
-                localStorage.setItem('videoName', '自訂網址影片');
+                localStorage.setItem('customVideoType', 'url');
+                localStorage.setItem('customVideoUrl', selectedVideoUrl);
+                localStorage.setItem('customVideoName', '自訂網址影片');
                 
                 updateCurrentVideoInfo('自訂網址影片');
+                uploadContainer.style.display = 'none';
+                
+                // 重置表單
+                document.getElementById('video-file').value = '';
+                document.getElementById('video-url').value = '';
+                document.getElementById('confirm-upload').disabled = true;
+                selectedFile = null;
+                selectedVideoUrl = '';
             }
-            
-            uploadContainer.style.display = 'none';
-            // 重置表單
-            document.getElementById('video-file').value = '';
-            document.getElementById('video-url').value = '';
-            document.getElementById('confirm-upload').disabled = true;
-            selectedFile = null;
-            selectedVideoUrl = '';
         });
 
         function updateCurrentVideoInfo(name) {
@@ -680,37 +654,33 @@
         }
 
         // 載入儲存的影片
-        window.addEventListener('DOMContentLoaded', async function() {
-            // 初始化資料庫
-            await initDB();
+        window.addEventListener('DOMContentLoaded', function() {
+            // 檢查是否有儲存的影片
+            const hasSavedVideo = loadSavedVideo();
             
-            const videoSource = localStorage.getItem('videoSource');
-            const videoName = localStorage.getItem('videoName');
-            
-            if (videoSource === 'file') {
-                // 從 IndexedDB 載入影片
-                try {
-                    const videoURL = await loadVideoFromDB();
-                    if (videoURL) {
-                        video.src = videoURL;
-                        updateCurrentVideoInfo(videoName || '自訂影片');
-                    }
-                } catch (error) {
-                    console.error('載入影片失敗:', error);
-                }
-            } else if (videoSource === 'url') {
-                // 載入網址影片
-                const savedVideo = localStorage.getItem('customVideo');
-                if (savedVideo) {
-                    video.src = savedVideo;
-                    updateCurrentVideoInfo(videoName || '自訂網址影片');
-                }
+            if (!hasSavedVideo) {
+                // 使用預設影片
+                updateCurrentVideoInfo('預設影片');
             }
             
-            video.play();
+            video.play().catch(e => {
+                console.log('自動播放被阻止，需要用戶互動');
+            });
             
             // 聚焦搜尋框
             searchInput.focus();
+        });
+
+        // 處理影片載入錯誤
+        video.addEventListener('error', function() {
+            console.error('影片載入失敗');
+            // 如果自訂影片失敗，恢復預設影片
+            if (localStorage.getItem('customVideoType')) {
+                const defaultVideo = 'https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4';
+                video.src = defaultVideo;
+                video.play();
+                updateCurrentVideoInfo('預設影片（自訂影片載入失敗）');
+            }
         });
     </script>
 </body>
