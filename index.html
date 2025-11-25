@@ -1032,7 +1032,7 @@
                 }
             }
 
-            // 開啟 Google Drive 選擇器
+            // 開啟 Google Drive 選擇器 - 修改後的版本
             async openGoogleDrivePicker() {
                 if (!googleUser || !googleUser.accessToken) {
                     throw new Error('請先登入 Google 帳號');
@@ -1054,12 +1054,19 @@
                             if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
                                 const doc = data[google.picker.Response.DOCUMENTS][0];
                                 const fileId = doc[google.picker.Document.ID];
-                                // 轉換為可直接播放的 URL
-                                const videoUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+                                
+                                console.log('選擇的檔案資訊:', doc);
+                                
+                                // 使用 Google Drive API 直接串流 URL - 修改這裡！
+                                const videoUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${googleUser.accessToken}`;
+                                
+                                console.log('生成的影片 URL:', videoUrl);
+                                
                                 resolve({
                                     url: videoUrl,
                                     name: doc.name,
-                                    id: fileId
+                                    id: fileId,
+                                    mimeType: doc.mimeType
                                 });
                             } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
                                 reject(new Error('用戶取消選擇'));
@@ -1197,7 +1204,7 @@
             }
         });
 
-        // Google Drive 選擇器
+        // Google Drive 選擇器 - 外部函數
         async function openGoogleDrivePicker() {
             const btn = document.getElementById('google-drive-btn');
             btn.disabled = true;
@@ -1326,7 +1333,7 @@
             confirmBtn.disabled = true;
         }
 
-        // 確認設定 - 修改後的完整函數
+        // 確認設定
         document.getElementById('confirm-upload').addEventListener('click', async function() {
             const confirmBtn = this;
             confirmBtn.disabled = true;
@@ -1423,7 +1430,7 @@
             document.getElementById('current-video-name').textContent = name;
         }
 
-        // 智慧載入影片 - 修改後的完整函數
+        // 智慧載入影片
         async function loadVideo() {
             // 1. 優先從擴充功能載入
             if (window.extensionHelper) {
