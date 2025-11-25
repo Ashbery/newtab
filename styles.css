@@ -234,39 +234,7 @@ body {
     transform: rotate(-90deg);
 }
 
-/* 響應式設計 */
-@media (max-width: 768px) {
-    .google-apps-grid {
-        top: 70px;
-        right: 10px;
-        padding: 12px;
-    }
-    
-    .header-container {
-        flex-direction: column;
-        gap: 20px;
-    }
-    
-    .time-container {
-        min-width: auto;
-        text-align: center;
-    }
-    
-    .google-app-icon {
-        width: 36px;
-        height: 36px;
-    }
-    
-    .google-app-icon i {
-        font-size: 16px;
-    }
-    
-    .google-app-label {
-        font-size: 11px;
-    }
-}
-
-/* 齒輪圖標 */
+/* ===== 修改後的齒輪圖標 - 再縮小30%，無背景無陰影 ===== */
 .settings-gear {
     position: fixed;
     bottom: 20px;
@@ -274,46 +242,43 @@ body {
     z-index: 10;
     cursor: pointer;
     transition: all 0.3s ease;
-    width: 28px; /* 縮小30% */
-    height: 28px;
+    width: 20px; /* 再縮小30%，從28px縮小到20px */
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     background: transparent;
-    /* 移除所有陰影效果 */
     box-shadow: none;
-    text-shadow: none;
 }
 
 .settings-gear i {
-    font-size: 28px; /* 縮小30% */
-    color: #5f6368; /* Google風格的灰色 */
+    font-size: 20px; /* 再縮小30%，從28px縮小到20px */
+    color: rgba(255, 255, 255, 0.8); /* 半透明白色，與搜尋欄風格一致 */
     transition: all 0.3s ease;
-    /* 確保圖標沒有陰影 */
     text-shadow: none;
     filter: none;
-    /* 添加輕微的白色外框，確保在任何背景上都可見 */
-    -webkit-text-stroke: 0.5px rgba(255, 255, 255, 0.5);
 }
 
 .settings-gear:hover i {
     transform: rotate(90deg);
-    color: #3c4043; /* 懸停時變深灰色 */
+    color: rgba(255, 255, 255, 1); /* 懸停時變為不透明白色 */
 }
-/* 設定選單 */
+
+/* ===== 修改設定選單為透明毛玻璃效果 ===== */
 .settings-menu {
     position: fixed;
-    bottom: 70px;
+    bottom: 50px; /* 調整位置，避免與齒輪重疊 */
     right: 20px;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.15); /* 與搜尋欄相同的透明背景 */
+    backdrop-filter: blur(10px); /* 毛玻璃效果 */
+    border: 1px solid rgba(255, 255, 255, 0.3); /* 與搜尋欄相同的邊框 */
     border-radius: 12px;
     padding: 15px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); /* 保留陰影以增強可讀性 */
     z-index: 100;
     display: none;
     min-width: 200px;
-    backdrop-filter: blur(10px);
 }
 
 .settings-menu::after {
@@ -325,14 +290,15 @@ body {
     height: 0;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
-    border-top: 8px solid rgba(255, 255, 255, 0.95);
+    border-top: 8px solid rgba(255, 255, 255, 0.15); /* 與選單背景相同的顏色 */
 }
 
+/* 設定選單項目樣式 */
 .menu-item {
     display: flex;
     align-items: center;
     padding: 12px 15px;
-    color: #333;
+    color: white; /* 白色文字 */
     text-decoration: none;
     border-radius: 8px;
     cursor: pointer;
@@ -341,7 +307,7 @@ body {
 }
 
 .menu-item:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.1); /* 懸停時輕微白色背景 */
 }
 
 .menu-item:last-child {
@@ -352,13 +318,16 @@ body {
     width: 20px;
     margin-right: 10px;
     font-size: 1rem;
+    color: rgba(255, 255, 255, 0.9); /* 圖標顏色 */
 }
 
 .menu-item span {
     font-size: 0.9rem;
     font-weight: 500;
+    color: white; /* 確保文字為白色 */
 }
 
+/* 影片上傳容器 */
 .video-upload-container {
     position: fixed;
     top: 0;
@@ -471,4 +440,53 @@ body {
 .url-input:focus {
     outline: none;
     border-color: #4a6cf7;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .google-apps-grid {
+        top: 70px;
+        right: 10px;
+        padding: 12px;
+    }
+    
+    .header-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .time-container {
+        min-width: auto;
+        text-align: center;
+    }
+    
+    .google-app-icon {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .google-app-icon i {
+        font-size: 16px;
+    }
+    
+    .google-app-label {
+        font-size: 11px;
+    }
+    
+    .settings-gear {
+        width: 18px;
+        height: 18px;
+        bottom: 15px;
+        right: 15px;
+    }
+    
+    .settings-gear i {
+        font-size: 18px;
+    }
+    
+    .settings-menu {
+        bottom: 45px;
+        right: 15px;
+        min-width: 180px;
+    }
 }
