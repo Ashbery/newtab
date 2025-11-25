@@ -193,11 +193,6 @@ document.addEventListener('DOMContentLoaded', function() {
         folderHeader.addEventListener('mousedown', startDrag);
         document.addEventListener('mousemove', drag);
         document.addEventListener('mouseup', stopDrag);
-        
-        // 觸控設備支援
-        folderHeader.addEventListener('touchstart', startDragTouch);
-        document.addEventListener('touchmove', dragTouch);
-        document.addEventListener('touchend', stopDrag);
     }
 });
 
@@ -210,16 +205,6 @@ function startDrag(e) {
     appsFolder.style.cursor = 'grabbing';
 }
 
-function startDragTouch(e) {
-    isDragging = true;
-    const appsFolder = document.querySelector('.apps-folder');
-    const touch = e.touches[0];
-    const rect = appsFolder.getBoundingClientRect();
-    dragOffsetX = touch.clientX - rect.left;
-    dragOffsetY = touch.clientY - rect.top;
-    appsFolder.style.cursor = 'grabbing';
-}
-
 function drag(e) {
     if (!isDragging) return;
     
@@ -229,21 +214,11 @@ function drag(e) {
     appsFolder.style.right = 'auto';
 }
 
-function dragTouch(e) {
-    if (!isDragging) return;
-    
-    const appsFolder = document.querySelector('.apps-folder');
-    const touch = e.touches[0];
-    appsFolder.style.left = (touch.clientX - dragOffsetX) + 'px';
-    appsFolder.style.top = (touch.clientY - dragOffsetY) + 'px';
-    appsFolder.style.right = 'auto';
-}
-
 function stopDrag() {
     isDragging = false;
     const appsFolder = document.querySelector('.apps-folder');
     if (appsFolder) {
-        appsFolder.style.cursor = 'grab';
+        appsFolder.style.cursor = 'move';
     }
 }
 
