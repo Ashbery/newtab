@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ashbery 新分頁</title>
     
-    <!-- 自訂分頁圖標 -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="shortcut icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="favicon.ico">
@@ -35,7 +34,6 @@
             z-index: -1;
         }
 
-        /* 移除變暗的 overlay */
         .overlay {
             display: none;
         }
@@ -47,7 +45,7 @@
             right: 20px;
             z-index: 10;
             display: flex;
-            align-items: center; /* 置中對齊 */
+            align-items: center;
             gap: 40px;
         }
 
@@ -72,7 +70,6 @@
         .search-container {
             flex: 1;
             max-width: 600px;
-            /* 移除 margin-top */
         }
 
         .search-box {
@@ -81,7 +78,7 @@
 
         .search-input {
             width: 100%;
-            padding: 15px 20px; /* 恢復原來的高度 */
+            padding: 15px 20px;
             border: none;
             border-radius: 25px;
             background: rgba(255, 255, 255, 0.15);
@@ -105,7 +102,7 @@
             text-align: left;
         }
 
-        /* 右上角快捷鍵 */
+        /* 右上角快捷鍵 - 新增 Google 帳號大頭貼 */
         .quick-links {
             position: fixed;
             top: 20px;
@@ -113,6 +110,7 @@
             z-index: 10;
             display: flex;
             gap: 15px;
+            align-items: center;
         }
 
         .quick-link {
@@ -131,6 +129,85 @@
         .quick-link:hover {
             background: rgba(255, 255, 255, 0.25);
             transform: translateY(-2px);
+        }
+
+        /* Google 帳號大頭貼 */
+        .google-account {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .google-account:hover {
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: scale(1.05);
+        }
+
+        .google-account img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .google-account .default-avatar {
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .google-account-menu {
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            display: none;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+        }
+
+        .google-account-menu::after {
+            content: '';
+            position: absolute;
+            top: -8px;
+            right: 15px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 8px solid rgba(255, 255, 255, 0.95);
+        }
+
+        .account-menu-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            color: #333;
+            text-decoration: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 5px;
+        }
+
+        .account-menu-item:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .account-menu-item i {
+            width: 20px;
+            margin-right: 10px;
+            font-size: 1rem;
         }
 
         /* 齒輪圖標 */
@@ -209,6 +286,7 @@
             font-weight: 500;
         }
 
+        /* 上傳容器 */
         .video-upload-container {
             position: fixed;
             top: 0;
@@ -227,7 +305,7 @@
             padding: 30px;
             border-radius: 12px;
             position: relative;
-            min-width: 350px;
+            min-width: 450px;
             color: #333;
             text-align: center;
             backdrop-filter: blur(20px);
@@ -236,6 +314,39 @@
         .upload-box h3 {
             margin-bottom: 20px;
             color: #333;
+        }
+
+        .upload-options {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .cloud-upload-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            flex: 1;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .cloud-upload-btn:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+        }
+
+        .cloud-upload-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .file-input-wrapper {
@@ -322,8 +433,196 @@
             outline: none;
             border-color: #4a6cf7;
         }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            margin: 10px 0;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress {
+            width: 0%;
+            height: 100%;
+            background: #4a6cf7;
+            transition: width 0.3s ease;
+        }
+
+        .file-info {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .upload-status {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            display: none;
+        }
+
+        .upload-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .upload-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .storage-info {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        .divider {
+            margin: 20px 0;
+            text-align: center;
+            color: #666;
+            position: relative;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #ddd;
+            z-index: 1;
+        }
+
+        .divider span {
+            background: white;
+            padding: 0 15px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .login-prompt {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .login-prompt i {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: #4285f4;
+        }
+
+        /* API 設定容器 */
+        .api-setup-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+        }
+
+        .setup-box {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            position: relative;
+            min-width: 500px;
+            max-width: 600px;
+            color: #333;
+            backdrop-filter: blur(20px);
+        }
+
+        .setup-box h3 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+
+        .setup-instructions {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4285f4;
+        }
+
+        .setup-instructions h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .setup-instructions ol {
+            text-align: left;
+            font-size: 0.8rem;
+            color: #666;
+            padding-left: 20px;
+            line-height: 1.5;
+        }
+
+        .setup-instructions li {
+            margin-bottom: 8px;
+        }
+
+        .setup-instructions code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .setup-instructions a {
+            color: #4285f4;
+            text-decoration: none;
+        }
+
+        .setup-instructions a:hover {
+            text-decoration: underline;
+        }
+
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .setup-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
     <video id="video-background" autoplay muted loop>
@@ -344,10 +643,35 @@
         </div>
     </div>
 
-    <!-- 右上角快捷鍵 -->
+    <!-- 右上角快捷鍵 - 新增 Google 帳號 -->
     <div class="quick-links">
         <a href="https://www.google.com/imghp" class="quick-link" target="_blank">圖片</a>
         <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
+        
+        <!-- Google 帳號大頭貼 -->
+        <div class="google-account" id="google-account">
+            <div class="default-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="google-account-menu" id="google-account-menu">
+                <div class="account-menu-item" id="google-login-btn">
+                    <i class="fab fa-google"></i>
+                    <span>登入 Google</span>
+                </div>
+                <div class="account-menu-item" id="setup-google-api-btn">
+                    <i class="fas fa-cog"></i>
+                    <span>設定 Google API</span>
+                </div>
+                <div class="account-menu-item" id="google-drive-picker-btn" style="display: none;">
+                    <i class="fab fa-google-drive"></i>
+                    <span>選擇 Drive 影片</span>
+                </div>
+                <div class="account-menu-item" id="google-logout-btn" style="display: none;">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>登出</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 齒輪設定圖標 -->
@@ -371,6 +695,7 @@
         </div>
     </div>
 
+    <!-- 影片上傳容器 -->
     <div class="video-upload-container" id="video-upload-container">
         <div class="upload-box">
             <button class="close-upload" id="close-upload">
@@ -378,17 +703,43 @@
             </button>
             <h3>上傳自訂背景影片</h3>
             
+            <!-- 雲端上傳選項 -->
+            <div class="upload-options">
+                <button class="cloud-upload-btn google" id="google-drive-btn" disabled>
+                    <i class="fab fa-google-drive"></i>
+                    Google Drive
+                </button>
+            </div>
+
+            <div id="google-drive-login-prompt" class="login-prompt">
+                <i class="fab fa-google-drive"></i>
+                <p>請先設定 Google API 並登入帳號</p>
+                <p style="font-size: 0.8rem; margin-top: 10px;">點擊右上角 Google 圖標進行設定</p>
+            </div>
+
+            <div class="upload-status" id="upload-status"></div>
+
+            <div class="divider">
+                <span>或使用本地檔案</span>
+            </div>
+
+            <!-- 本地檔案上傳 -->
             <div class="file-input-wrapper">
                 <input type="file" id="video-file" accept="video/mp4" class="file-input">
-                <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
-                    支援 MP4 格式影片
+                <div class="file-info" id="file-info">
+                    支援 MP4 格式，最大 50MB
                 </div>
             </div>
 
-            <div style="margin: 20px 0; text-align: center; color: #666;">
-                — 或 —
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress" id="progress"></div>
             </div>
 
+            <div style="margin: 20px 0; text-align: center; color: #666;">
+                — 或輸入網址 —
+            </div>
+
+            <!-- 網址輸入 -->
             <div>
                 <input type="url" id="video-url" class="url-input" placeholder="輸入影片網址 (MP4)">
                 <button id="load-url-btn" class="upload-btn">載入網址影片</button>
@@ -398,6 +749,48 @@
 
             <div class="current-video" id="current-video-info" style="display: none;">
                 目前使用: <span id="current-video-name">預設影片</span>
+            </div>
+
+            <div class="storage-info">
+                💡 使用 Google Drive 可獲得最佳載入速度
+            </div>
+        </div>
+    </div>
+
+    <!-- Google API 設定容器 -->
+    <div class="api-setup-container" id="api-setup-container">
+        <div class="setup-box">
+            <button class="close-upload" id="close-api-setup">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>設定 Google API</h3>
+            
+            <div class="setup-instructions">
+                <h4>如何取得 Google OAuth 用戶端 ID：</h4>
+                <ol>
+                    <li>訪問 <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                    <li>建立新專案或選擇現有專案</li>
+                    <li>啟用 <strong>Google Drive API</strong> 和 <strong>Google Picker API</strong></li>
+                    <li>前往「API 和服務」→「OAuth 同意畫面」設定應用程式名稱</li>
+                    <li>前往「憑證」→「建立憑證」→「OAuth 用戶端 ID」</li>
+                    <li>應用程式類型選擇「網頁應用程式」</li>
+                    <li>在「已授權的 JavaScript 來源」中添加：<code>https://ashbery.github.io</code></li>
+                    <li>複製「用戶端 ID」並貼到下方欄位</li>
+                </ol>
+            </div>
+
+            <div class="form-group">
+                <label for="google-client-id">Google OAuth 用戶端 ID：</label>
+                <input type="text" id="google-client-id" class="url-input" 
+                       placeholder="xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com">
+                <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
+                    格式應為：xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com
+                </div>
+            </div>
+
+            <div class="setup-actions">
+                <button id="save-api-config" class="upload-btn">儲存設定</button>
+                <button id="cancel-api-config" class="upload-btn btn-secondary">取消</button>
             </div>
         </div>
     </div>
@@ -423,7 +816,6 @@
 
         // 搜尋功能
         const searchInput = document.getElementById('search-input');
-
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 const query = this.value.trim();
@@ -442,19 +834,309 @@
         const uploadContainer = document.getElementById('video-upload-container');
         const settingsMenu = document.getElementById('settings-menu');
         const settingsGear = document.getElementById('settings-gear');
+        const progressBar = document.getElementById('progress-bar');
+        const progress = document.getElementById('progress');
+        const uploadStatus = document.getElementById('upload-status');
+        const apiSetupContainer = document.getElementById('api-setup-container');
+        
         let selectedFile = null;
         let selectedVideoUrl = '';
+        let cloudVideoUrl = '';
+        let googleUser = null;
 
-        // 齒輪點擊事件
-        settingsGear.addEventListener('click', function() {
-            settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+        // Google API 設定管理
+        class GoogleAPIConfig {
+            constructor() {
+                this.clientId = localStorage.getItem('google_client_id');
+                this.tokenClient = null;
+                this.gapiInited = false;
+            }
+
+            // 檢查是否已設定
+            isConfigured() {
+                return !!this.clientId;
+            }
+
+            // 儲存用戶端 ID
+            saveClientId(clientId) {
+                if (clientId && clientId.includes('.apps.googleusercontent.com')) {
+                    this.clientId = clientId;
+                    localStorage.setItem('google_client_id', clientId);
+                    this.initTokenClient();
+                    return true;
+                }
+                return false;
+            }
+
+            // 取得用戶端 ID
+            getClientId() {
+                return this.clientId;
+            }
+
+            // 初始化 Token Client
+            initTokenClient() {
+                if (!this.clientId) return;
+
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: this.clientId,
+                    scope: 'https://www.googleapis.com/auth/drive.readonly',
+                    callback: (response) => {
+                        if (response.error !== undefined) {
+                            showUploadStatus('Google 授權失敗: ' + response.error, 'error');
+                            return;
+                        }
+                        this.handleAuthSuccess(response.access_token);
+                    },
+                });
+            }
+
+            // 處理登入成功
+            handleAuthSuccess(accessToken) {
+                googleUser = { accessToken: accessToken };
+                this.updateUIAfterLogin();
+                this.initializePicker();
+            }
+
+            // 更新登入後的 UI
+            updateUIAfterLogin() {
+                // 更新右上角大頭貼
+                const googleAccount = document.getElementById('google-account');
+                googleAccount.innerHTML = '<i class="fas fa-check" style="color: #34A853;"></i>';
+                
+                // 更新帳號選單
+                document.getElementById('google-login-btn').style.display = 'none';
+                document.getElementById('google-drive-picker-btn').style.display = 'flex';
+                document.getElementById('google-logout-btn').style.display = 'flex';
+                
+                // 啟用 Google Drive 按鈕
+                document.getElementById('google-drive-btn').disabled = false;
+                document.getElementById('google-drive-login-prompt').style.display = 'none';
+                
+                showUploadStatus('Google 帳號登入成功！', 'success');
+            }
+
+            // 初始化 Picker
+            async initializePicker() {
+                if (!this.gapiInited) {
+                    await new Promise((resolve) => {
+                        gapi.load('client:picker', () => {
+                            this.gapiInited = true;
+                            resolve();
+                        });
+                    });
+                }
+                await gapi.client.init({});
+            }
+
+            // 開啟 Google Drive 選擇器
+            async openGoogleDrivePicker() {
+                if (!googleUser || !googleUser.accessToken) {
+                    throw new Error('請先登入 Google 帳號');
+                }
+
+                if (!this.gapiInited) {
+                    throw new Error('Google API 尚未初始化完成');
+                }
+
+                return new Promise((resolve, reject) => {
+                    const view = new google.picker.View(google.picker.ViewId.DOCS);
+                    view.setMimeTypes('video/mp4');
+                    
+                    const picker = new google.picker.PickerBuilder()
+                        .setAppId(this.clientId)
+                        .setOAuthToken(googleUser.accessToken)
+                        .addView(view)
+                        .setCallback((data) => {
+                            if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
+                                const doc = data[google.picker.Response.DOCUMENTS][0];
+                                const fileId = doc[google.picker.Document.ID];
+                                // 轉換為可直接播放的 URL
+                                const videoUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+                                resolve({
+                                    url: videoUrl,
+                                    name: doc.name,
+                                    id: fileId
+                                });
+                            } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
+                                reject(new Error('用戶取消選擇'));
+                            }
+                        })
+                        .build();
+                    
+                    picker.setVisible(true);
+                });
+            }
+
+            // 請求授權
+            requestAuth() {
+                if (this.tokenClient) {
+                    this.tokenClient.requestAccessToken();
+                } else {
+                    showUploadStatus('請先設定 Google API 用戶端 ID', 'error');
+                }
+            }
+
+            // 登出
+            logout() {
+                if (googleUser && googleUser.accessToken) {
+                    google.accounts.oauth2.revoke(googleUser.accessToken, () => {
+                        console.log('Access token 已撤銷');
+                    });
+                }
+                
+                googleUser = null;
+                this.updateUIAfterLogout();
+            }
+
+            // 更新登出後的 UI
+            updateUIAfterLogout() {
+                const googleAccount = document.getElementById('google-account');
+                googleAccount.innerHTML = '<div class="default-avatar"><i class="fas fa-user"></i></div>';
+                
+                document.getElementById('google-login-btn').style.display = 'flex';
+                document.getElementById('google-drive-picker-btn').style.display = 'none';
+                document.getElementById('google-logout-btn').style.display = 'none';
+                
+                document.getElementById('google-drive-btn').disabled = true;
+                document.getElementById('google-drive-login-prompt').style.display = 'block';
+                
+                showUploadStatus('已登出 Google 帳號', 'info');
+            }
+        }
+
+        // 初始化 Google API 設定管理器
+        const googleConfig = new GoogleAPIConfig();
+
+        // 顯示上傳狀態
+        function showUploadStatus(message, type = 'info') {
+            uploadStatus.textContent = message;
+            uploadStatus.className = 'upload-status';
+            uploadStatus.classList.add(type);
+            uploadStatus.style.display = 'block';
+        }
+
+        // 隱藏上傳狀態
+        function hideUploadStatus() {
+            uploadStatus.style.display = 'none';
+        }
+
+        // 更新進度條
+        function updateProgress(percent) {
+            progressBar.style.display = 'block';
+            progress.style.width = percent + '%';
+        }
+
+        // 隱藏進度條
+        function hideProgress() {
+            progressBar.style.display = 'none';
+            progress.style.width = '0%';
+        }
+
+        // Google 帳號大頭貼點擊
+        document.getElementById('google-account').addEventListener('click', function(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('google-account-menu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
         });
 
         // 點擊頁面其他區域關閉選單
-        document.addEventListener('click', function(event) {
-            if (!settingsGear.contains(event.target) && !settingsMenu.contains(event.target)) {
-                settingsMenu.style.display = 'none';
+        document.addEventListener('click', function() {
+            document.getElementById('google-account-menu').style.display = 'none';
+            settingsMenu.style.display = 'none';
+        });
+
+        // Google 登入按鈕
+        document.getElementById('google-login-btn').addEventListener('click', function() {
+            if (googleConfig.isConfigured()) {
+                googleConfig.requestAuth();
+            } else {
+                showAPISetupPrompt();
             }
+            document.getElementById('google-account-menu').style.display = 'none';
+        });
+
+        // Google API 設定按鈕
+        document.getElementById('setup-google-api-btn').addEventListener('click', function() {
+            showAPISetupPrompt();
+            document.getElementById('google-account-menu').style.display = 'none';
+        });
+
+        // Google Drive 選擇器按鈕 (右上角)
+        document.getElementById('google-drive-picker-btn').addEventListener('click', async function() {
+            await openGoogleDrivePicker();
+            document.getElementById('google-account-menu').style.display = 'none';
+        });
+
+        // Google 登出按鈕
+        document.getElementById('google-logout-btn').addEventListener('click', function() {
+            googleConfig.logout();
+            document.getElementById('google-account-menu').style.display = 'none';
+        });
+
+        // 顯示 API 設定提示
+        function showAPISetupPrompt() {
+            apiSetupContainer.style.display = 'flex';
+            // 載入已儲存的用戶端 ID
+            const savedClientId = googleConfig.getClientId();
+            if (savedClientId) {
+                document.getElementById('google-client-id').value = savedClientId;
+            }
+        }
+
+        // 關閉 API 設定
+        document.getElementById('close-api-setup').addEventListener('click', function() {
+            apiSetupContainer.style.display = 'none';
+        });
+
+        document.getElementById('cancel-api-config').addEventListener('click', function() {
+            apiSetupContainer.style.display = 'none';
+        });
+
+        // 儲存 API 設定
+        document.getElementById('save-api-config').addEventListener('click', function() {
+            const clientId = document.getElementById('google-client-id').value.trim();
+            if (googleConfig.saveClientId(clientId)) {
+                showUploadStatus('Google API 設定成功！', 'success');
+                apiSetupContainer.style.display = 'none';
+                
+                // 自動嘗試登入
+                setTimeout(() => {
+                    googleConfig.requestAuth();
+                }, 1000);
+            } else {
+                showUploadStatus('請輸入有效的 Google OAuth 用戶端 ID', 'error');
+            }
+        });
+
+        // Google Drive 選擇器
+        async function openGoogleDrivePicker() {
+            const btn = document.getElementById('google-drive-btn');
+            btn.disabled = true;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 載入中...';
+
+            try {
+                const driveFile = await googleConfig.openGoogleDrivePicker();
+                cloudVideoUrl = driveFile.url;
+                selectedFile = null;
+                selectedVideoUrl = '';
+                
+                document.getElementById('confirm-upload').disabled = false;
+                document.getElementById('file-info').textContent = `已選擇: ${driveFile.name}`;
+                showUploadStatus('Google Drive 影片選擇成功！', 'success');
+            } catch (error) {
+                console.error('Google Drive 選擇失敗:', error);
+                showUploadStatus(`Google Drive 選擇失敗: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fab fa-google-drive"></i> Google Drive';
+            }
+        }
+
+        // 齒輪點擊事件
+        settingsGear.addEventListener('click', function(e) {
+            e.stopPropagation();
+            settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
         });
 
         // 播放/暫停
@@ -482,23 +1164,43 @@
         document.getElementById('upload-video-btn').addEventListener('click', function() {
             uploadContainer.style.display = 'flex';
             settingsMenu.style.display = 'none';
+            resetUploadForm();
         });
 
         document.getElementById('close-upload').addEventListener('click', function() {
             uploadContainer.style.display = 'none';
+            resetUploadForm();
         });
+
+        // Google Drive 按鈕 (上傳視窗內)
+        document.getElementById('google-drive-btn').addEventListener('click', openGoogleDrivePicker);
 
         // 檔案選擇
         document.getElementById('video-file').addEventListener('change', function(e) {
             selectedFile = e.target.files[0];
+            cloudVideoUrl = '';
             selectedVideoUrl = '';
             document.getElementById('video-url').value = '';
             
-            if (selectedFile && selectedFile.type === 'video/mp4') {
+            if (selectedFile) {
+                // 檢查檔案類型和大小
+                if (selectedFile.type !== 'video/mp4') {
+                    showUploadStatus('請選擇 MP4 格式的影片檔案', 'error');
+                    resetUploadForm();
+                    return;
+                }
+                
+                if (selectedFile.size > 50 * 1024 * 1024) {
+                    showUploadStatus('檔案太大！請選擇小於 50MB 的影片', 'error');
+                    resetUploadForm();
+                    return;
+                }
+                
                 document.getElementById('confirm-upload').disabled = false;
+                document.getElementById('file-info').textContent = 
+                    `已選擇: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`;
             } else {
                 document.getElementById('confirm-upload').disabled = true;
-                alert('請選擇 MP4 格式的影片檔案');
             }
         });
 
@@ -507,71 +1209,173 @@
             const url = document.getElementById('video-url').value.trim();
             if (url) {
                 selectedVideoUrl = url;
+                cloudVideoUrl = '';
                 selectedFile = null;
                 document.getElementById('video-file').value = '';
                 document.getElementById('confirm-upload').disabled = false;
+                document.getElementById('file-info').textContent = '已輸入網址影片';
+                showUploadStatus('網址影片設定成功！', 'success');
             } else {
-                alert('請輸入影片網址');
+                showUploadStatus('請輸入影片網址', 'error');
             }
         });
 
-        // 確認設定
-        document.getElementById('confirm-upload').addEventListener('click', function() {
-            if (selectedFile) {
-                // 上傳本地檔案
-                const videoURL = URL.createObjectURL(selectedFile);
-                video.src = videoURL;
-                video.play();
-                
-                // 儲存到本地儲存
-                localStorage.setItem('customVideo', videoURL);
-                localStorage.setItem('videoSource', 'file');
-                localStorage.setItem('videoName', selectedFile.name);
-                
-                updateCurrentVideoInfo(selectedFile.name);
-                
-            } else if (selectedVideoUrl) {
-                // 使用網址影片
-                video.src = selectedVideoUrl;
-                video.play();
-                
-                // 儲存到本地儲存
-                localStorage.setItem('customVideo', selectedVideoUrl);
-                localStorage.setItem('videoSource', 'url');
-                localStorage.setItem('videoName', '自訂網址影片');
-                
-                updateCurrentVideoInfo('自訂網址影片');
-            }
-            
-            uploadContainer.style.display = 'none';
-            // 重置表單
+        // 重置上傳表單
+        function resetUploadForm() {
+            selectedFile = null;
+            selectedVideoUrl = '';
+            cloudVideoUrl = '';
             document.getElementById('video-file').value = '';
             document.getElementById('video-url').value = '';
             document.getElementById('confirm-upload').disabled = true;
-            selectedFile = null;
-            selectedVideoUrl = '';
+            hideProgress();
+            hideUploadStatus();
+            document.getElementById('file-info').textContent = '支援 MP4 格式，最大 50MB';
+            
+            const confirmBtn = document.getElementById('confirm-upload');
+            confirmBtn.innerHTML = '確認設定';
+            confirmBtn.disabled = true;
+        }
+
+        // 確認設定
+        document.getElementById('confirm-upload').addEventListener('click', async function() {
+            const confirmBtn = this;
+            confirmBtn.disabled = true;
+            const originalText = confirmBtn.innerHTML;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 設定中...';
+
+            try {
+                let videoUrl;
+                let videoName;
+
+                if (cloudVideoUrl) {
+                    // 使用雲端影片
+                    videoUrl = cloudVideoUrl;
+                    videoName = 'Google Drive 影片';
+                    saveCloudVideoInfo(cloudVideoUrl, 'Google Drive 影片', 'google_drive');
+                    
+                } else if (selectedFile) {
+                    // 使用本地檔案 (建立 blob URL)
+                    const blob = new Blob([selectedFile], { type: selectedFile.type });
+                    videoUrl = URL.createObjectURL(blob);
+                    videoName = selectedFile.name;
+                    
+                    // 保存到擴充功能 (如果可用)
+                    if (window.extensionHelper) {
+                        try {
+                            await window.extensionHelper.saveVideo(selectedFile);
+                        } catch (error) {
+                            console.log('擴充功能保存失敗:', error);
+                        }
+                    }
+                    
+                } else if (selectedVideoUrl) {
+                    // 使用網址影片
+                    videoUrl = selectedVideoUrl;
+                    videoName = '自訂網址影片';
+                    localStorage.setItem('videoUrl', selectedVideoUrl);
+                }
+
+                if (videoUrl) {
+                    video.src = videoUrl;
+                    video.play();
+                    updateCurrentVideoInfo(videoName);
+                    
+                    showUploadStatus('影片設定成功！', 'success');
+                    
+                    setTimeout(() => {
+                        uploadContainer.style.display = 'none';
+                        resetUploadForm();
+                    }, 1500);
+                } else {
+                    throw new Error('沒有選擇有效的影片來源');
+                }
+                
+            } catch (error) {
+                console.error('設定失敗:', error);
+                showUploadStatus(`設定失敗: ${error.message}`, 'error');
+                confirmBtn.innerHTML = originalText;
+                confirmBtn.disabled = false;
+            }
         });
+
+        // 保存雲端影片資訊
+        function saveCloudVideoInfo(url, name, type) {
+            const videoInfo = {
+                url: url,
+                name: name,
+                type: type,
+                timestamp: Date.now(),
+                source: 'cloud'
+            };
+            localStorage.setItem('cloudVideoInfo', JSON.stringify(videoInfo));
+        }
+
+        // 載入雲端影片資訊
+        function loadCloudVideoInfo() {
+            const saved = localStorage.getItem('cloudVideoInfo');
+            return saved ? JSON.parse(saved) : null;
+        }
 
         function updateCurrentVideoInfo(name) {
             document.getElementById('current-video-info').style.display = 'block';
             document.getElementById('current-video-name').textContent = name;
         }
 
-        // 載入儲存的影片
-        window.addEventListener('DOMContentLoaded', function() {
-            const savedVideo = localStorage.getItem('customVideo');
-            const videoSource = localStorage.getItem('videoSource');
-            const videoName = localStorage.getItem('videoName');
-            
-            if (savedVideo) {
-                video.src = savedVideo;
-                updateCurrentVideoInfo(videoName || '自訂影片');
+        // 智慧載入影片
+        async function loadVideo() {
+            // 1. 嘗試載入雲端影片
+            const cloudVideo = loadCloudVideoInfo();
+            if (cloudVideo && cloudVideo.url) {
+                video.src = cloudVideo.url;
+                updateCurrentVideoInfo(cloudVideo.name || '雲端影片');
+                return true;
             }
-            
+
+            // 2. 嘗試載入網址影片
+            const videoUrl = localStorage.getItem('videoUrl');
+            if (videoUrl) {
+                video.src = videoUrl;
+                updateCurrentVideoInfo('自訂網址影片');
+                return true;
+            }
+
+            // 3. 嘗試從擴充功能載入
+            if (window.extensionHelper) {
+                try {
+                    const savedData = await window.extensionHelper.loadVideo();
+                    if (savedData && savedData.customVideo) {
+                        video.src = savedData.customVideo;
+                        updateCurrentVideoInfo(savedData.videoName || '自訂影片');
+                        return true;
+                    }
+                } catch (error) {
+                    console.log('擴充功能載入失敗:', error);
+                }
+            }
+
+            // 4. 使用預設影片
+            updateCurrentVideoInfo('預設影片');
+            return false;
+        }
+
+        // 頁面載入
+        window.addEventListener('DOMContentLoaded', function() {
+            // 初始化 Google API (如果已設定)
+            if (googleConfig.isConfigured()) {
+                googleConfig.initTokenClient();
+            }
+
+            loadVideo();
             video.play();
-            
-            // 聚焦搜尋框
             searchInput.focus();
+        });
+
+        // 清理 blob URL
+        window.addEventListener('beforeunload', function() {
+            if (video.src && video.src.startsWith('blob:')) {
+                URL.revokeObjectURL(video.src);
+            }
         });
     </script>
 </body>
