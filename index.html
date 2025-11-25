@@ -4,12 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ashbery 新分頁</title>
-    
-    <!-- 自訂分頁圖標 -->
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="shortcut icon" href="favicon.ico">
-    <link rel="apple-touch-icon" href="favicon.ico">
-    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
@@ -127,55 +122,76 @@
             transform: translateY(-2px);
         }
 
-        /* Google風格應用圖標容器 */
-        .google-apps-grid {
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            z-index: 10;
+        /* Google應用圖標觸發器 */
+        .apps-trigger {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
         }
 
-        .google-apps-header {
+        .apps-trigger:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.1);
+        }
+
+        /* Google應用資料夾 */
+        .google-apps-folder {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            display: none;
+            min-width: 300px;
+        }
+
+        .apps-folder-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
             padding-bottom: 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
 
-        .google-apps-title {
-            font-size: 14px;
+        .apps-folder-title {
+            font-size: 16px;
             font-weight: 500;
-            color: white;
-            letter-spacing: 0.25px;
+            color: #333;
         }
 
-        .google-apps-toggle {
+        .close-folder {
             cursor: pointer;
-            transition: transform 0.3s ease;
-            font-size: 12px;
-            color: white;
+            color: #666;
             padding: 4px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
         }
 
-        .google-apps-toggle:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .close-folder:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: #333;
         }
 
         /* 9宮格應用圖標 */
         .apps-grid-3x3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
+            gap: 12px;
         }
 
         .google-app-item {
@@ -185,38 +201,34 @@
             padding: 12px 8px;
             border-radius: 8px;
             text-decoration: none;
-            color: white;
+            color: #333;
             transition: all 0.2s ease;
             border: none;
             background: transparent;
-            min-width: 64px;
         }
 
         .google-app-item:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.05);
+            background: rgba(0, 0, 0, 0.05);
         }
 
         .google-app-icon {
-            width: 40px;
-            height: 40px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.9);
+            background: #f1f3f4;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 8px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
             transition: all 0.2s ease;
         }
 
         .google-app-item:hover .google-app-icon {
-            background: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            background: #e8f0fe;
         }
 
         .google-app-icon i {
-            font-size: 18px;
+            font-size: 20px;
             color: #5f6368;
         }
 
@@ -225,19 +237,6 @@
             font-weight: 400;
             text-align: center;
             line-height: 1.2;
-            max-width: 64px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        /* 資料夾收合狀態 */
-        .google-apps-grid.collapsed .apps-grid-3x3 {
-            display: none;
-        }
-
-        .google-apps-grid.collapsed .google-apps-toggle {
-            transform: rotate(-90deg);
         }
 
         /* 齒輪圖標 */
@@ -430,7 +429,6 @@
             border-color: #4a6cf7;
         }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <video id="video-background" autoplay muted loop>
@@ -454,22 +452,32 @@
     <div class="quick-links">
         <a href="https://www.google.com/imghp" class="quick-link" target="_blank">圖片</a>
         <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
+        <!-- Google應用圖標觸發器 -->
+        <div class="apps-trigger" id="apps-trigger">
+            <i class="fas fa-th"></i>
+        </div>
     </div>
 
-    <!-- Google風格應用圖標 -->
-    <div class="google-apps-grid">
-        <div class="google-apps-header">
-            <div class="google-apps-title">Google 應用</div>
-            <div class="google-apps-toggle">
-                <i class="fas fa-chevron-down"></i>
+    <!-- Google應用資料夾 -->
+    <div class="google-apps-folder" id="google-apps-folder">
+        <div class="apps-folder-header">
+            <div class="apps-folder-title">Google 應用</div>
+            <div class="close-folder" id="close-folder">
+                <i class="fas fa-times"></i>
             </div>
         </div>
         <div class="apps-grid-3x3">
-            <a href="https://drive.google.com" class="google-app-item" target="_blank">
+            <a href="https://mail.google.com" class="google-app-item" target="_blank">
                 <div class="google-app-icon">
-                    <i class="fas fa-cloud"></i>
+                    <i class="fas fa-envelope"></i>
                 </div>
-                <div class="google-app-label">雲端硬碟</div>
+                <div class="google-app-label">Gmail</div>
+            </a>
+            <a href="https://www.google.com/imghp" class="google-app-item" target="_blank">
+                <div class="google-app-icon">
+                    <i class="fas fa-images"></i>
+                </div>
+                <div class="google-app-label">圖片</div>
             </a>
             <a href="https://maps.google.com" class="google-app-item" target="_blank">
                 <div class="google-app-icon">
@@ -477,29 +485,41 @@
                 </div>
                 <div class="google-app-label">地圖</div>
             </a>
+            <a href="https://www.youtube.com" class="google-app-item" target="_blank">
+                <div class="google-app-icon">
+                    <i class="fab fa-youtube"></i>
+                </div>
+                <div class="google-app-label">YouTube</div>
+            </a>
+            <a href="https://play.google.com" class="google-app-item" target="_blank">
+                <div class="google-app-icon">
+                    <i class="fas fa-play-circle"></i>
+                </div>
+                <div class="google-app-label">Play</div>
+            </a>
+            <a href="https://news.google.com" class="google-app-item" target="_blank">
+                <div class="google-app-icon">
+                    <i class="fas fa-newspaper"></i>
+                </div>
+                <div class="google-app-label">新聞</div>
+            </a>
+            <a href="https://drive.google.com" class="google-app-item" target="_blank">
+                <div class="google-app-icon">
+                    <i class="fas fa-cloud"></i>
+                </div>
+                <div class="google-app-label">雲端硬碟</div>
+            </a>
             <a href="https://calendar.google.com" class="google-app-item" target="_blank">
                 <div class="google-app-icon">
                     <i class="fas fa-calendar"></i>
                 </div>
                 <div class="google-app-label">日曆</div>
             </a>
-            <a href="https://photos.google.com" class="google-app-item" target="_blank">
+            <a href="https://translate.google.com" class="google-app-item" target="_blank">
                 <div class="google-app-icon">
-                    <i class="fas fa-images"></i>
+                    <i class="fas fa-language"></i>
                 </div>
-                <div class="google-app-label">相簿</div>
-            </a>
-            <a href="https://keep.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-sticky-note"></i>
-                </div>
-                <div class="google-app-label">Keep</div>
-            </a>
-            <a href="https://contacts.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-address-book"></i>
-                </div>
-                <div class="google-app-label">通訊錄</div>
+                <div class="google-app-label">翻譯</div>
             </a>
         </div>
     </div>
@@ -591,15 +611,23 @@
             }
         });
 
-        // Google應用圖標收合功能
-        document.addEventListener('DOMContentLoaded', function() {
-            const appsToggle = document.querySelector('.google-apps-toggle');
-            const appsGrid = document.querySelector('.google-apps-grid');
-            
-            if (appsToggle && appsGrid) {
-                appsToggle.addEventListener('click', function() {
-                    appsGrid.classList.toggle('collapsed');
-                });
+        // Google應用圖標功能
+        const appsTrigger = document.getElementById('apps-trigger');
+        const appsFolder = document.getElementById('google-apps-folder');
+        const closeFolder = document.getElementById('close-folder');
+
+        appsTrigger.addEventListener('click', function() {
+            appsFolder.style.display = 'block';
+        });
+
+        closeFolder.addEventListener('click', function() {
+            appsFolder.style.display = 'none';
+        });
+
+        // 點擊頁面其他區域關閉應用資料夾
+        document.addEventListener('click', function(event) {
+            if (!appsTrigger.contains(event.target) && !appsFolder.contains(event.target)) {
+                appsFolder.style.display = 'none';
             }
         });
 
