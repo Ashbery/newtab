@@ -119,8 +119,8 @@ body {
     transform: translateY(-2px);
 }
 
-/* 應用資料夾樣式 */
-.apps-folder {
+/* Google風格應用圖標容器 */
+.google-apps-grid {
     position: fixed;
     top: 80px;
     right: 20px;
@@ -128,87 +128,118 @@ body {
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 15px;
-    padding: 15px;
-    min-width: 200px;
+    border-radius: 12px;
+    padding: 16px;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
     cursor: move;
 }
 
-.folder-header {
+.google-apps-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    font-size: 0.9rem;
+}
+
+.google-apps-title {
+    font-size: 14px;
     font-weight: 500;
     color: white;
-    cursor: pointer;
+    letter-spacing: 0.25px;
 }
 
-.folder-toggle {
+.google-apps-toggle {
     cursor: pointer;
     transition: transform 0.3s ease;
-    font-size: 0.8rem;
+    font-size: 12px;
+    color: white;
+    padding: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
 }
 
-.apps-grid {
+.google-apps-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 9宮格應用圖標 */
+.apps-grid-3x3 {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
 }
 
-.app-item {
+.google-app-item {
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 12px 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    border-radius: 8px;
     text-decoration: none;
     color: white;
-    transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    min-width: 64px;
 }
 
-.app-item:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.3);
+.google-app-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.05);
 }
 
-.app-item i {
-    font-size: 1.2rem;
-    margin-bottom: 5px;
+.google-app-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
 }
 
-.app-item span {
-    font-size: 0.7rem;
+.google-app-item:hover .google-app-icon {
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.google-app-icon i {
+    font-size: 18px;
+    color: #5f6368;
+}
+
+.google-app-label {
+    font-size: 12px;
+    font-weight: 400;
     text-align: center;
+    line-height: 1.2;
+    max-width: 64px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* 資料夾收合狀態 */
-.apps-folder.collapsed .apps-grid {
+.google-apps-grid.collapsed .apps-grid-3x3 {
     display: none;
 }
 
-.apps-folder.collapsed .folder-toggle {
+.google-apps-grid.collapsed .google-apps-toggle {
     transform: rotate(-90deg);
 }
 
 /* 響應式設計 */
 @media (max-width: 768px) {
-    .apps-folder {
+    .google-apps-grid {
         top: 70px;
         right: 10px;
-        min-width: 180px;
-    }
-    
-    .apps-grid {
-        grid-template-columns: 1fr;
+        padding: 12px;
     }
     
     .header-container {
@@ -219,6 +250,19 @@ body {
     .time-container {
         min-width: auto;
         text-align: center;
+    }
+    
+    .google-app-icon {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .google-app-icon i {
+        font-size: 16px;
+    }
+    
+    .google-app-label {
+        font-size: 11px;
     }
 }
 
