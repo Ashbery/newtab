@@ -144,47 +144,24 @@
             transform: scale(1.1);
         }
 
-        /* Google應用資料夾 */
+        .apps-trigger.active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Google應用資料夾 - 透明毛玻璃效果 */
         .google-apps-folder {
             position: fixed;
             top: 70px;
             right: 20px;
             z-index: 100;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 16px;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
             display: none;
             min-width: 300px;
-        }
-
-        .apps-folder-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-        }
-
-        .apps-folder-title {
-            font-size: 16px;
-            font-weight: 500;
-            color: #333;
-        }
-
-        .close-folder {
-            cursor: pointer;
-            color: #666;
-            padding: 4px;
-            border-radius: 50%;
-            transition: all 0.2s ease;
-        }
-
-        .close-folder:hover {
-            background: rgba(0, 0, 0, 0.05);
-            color: #333;
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         /* 9宮格應用圖標 */
@@ -201,21 +178,21 @@
             padding: 12px 8px;
             border-radius: 8px;
             text-decoration: none;
-            color: #333;
+            color: white;
             transition: all 0.2s ease;
             border: none;
             background: transparent;
         }
 
         .google-app-item:hover {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .google-app-icon {
             width: 48px;
             height: 48px;
             border-radius: 50%;
-            background: #f1f3f4;
+            background: rgba(255, 255, 255, 0.9);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -224,7 +201,8 @@
         }
 
         .google-app-item:hover .google-app-icon {
-            background: #e8f0fe;
+            background: white;
+            transform: scale(1.1);
         }
 
         .google-app-icon i {
@@ -458,14 +436,8 @@
         </div>
     </div>
 
-    <!-- Google應用資料夾 -->
+    <!-- Google應用資料夾 - 透明毛玻璃效果 -->
     <div class="google-apps-folder" id="google-apps-folder">
-        <div class="apps-folder-header">
-            <div class="apps-folder-title">Google 應用</div>
-            <div class="close-folder" id="close-folder">
-                <i class="fas fa-times"></i>
-            </div>
-        </div>
         <div class="apps-grid-3x3">
             <a href="https://mail.google.com" class="google-app-item" target="_blank">
                 <div class="google-app-icon">
@@ -614,20 +586,23 @@
         // Google應用圖標功能
         const appsTrigger = document.getElementById('apps-trigger');
         const appsFolder = document.getElementById('google-apps-folder');
-        const closeFolder = document.getElementById('close-folder');
 
-        appsTrigger.addEventListener('click', function() {
-            appsFolder.style.display = 'block';
-        });
-
-        closeFolder.addEventListener('click', function() {
-            appsFolder.style.display = 'none';
+        appsTrigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (appsFolder.style.display === 'block') {
+                appsFolder.style.display = 'none';
+                appsTrigger.classList.remove('active');
+            } else {
+                appsFolder.style.display = 'block';
+                appsTrigger.classList.add('active');
+            }
         });
 
         // 點擊頁面其他區域關閉應用資料夾
         document.addEventListener('click', function(event) {
             if (!appsTrigger.contains(event.target) && !appsFolder.contains(event.target)) {
                 appsFolder.style.display = 'none';
+                appsTrigger.classList.remove('active');
             }
         });
 
