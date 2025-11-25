@@ -32,24 +32,27 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: -2;
-        }
-
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.3);
             z-index: -1;
         }
 
-        .time-container {
+        /* 移除變暗的 overlay */
+        .overlay {
+            display: none;
+        }
+
+        .header-container {
             position: fixed;
             top: 20px;
             left: 20px;
+            right: 20px;
             z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .time-container {
+            flex-shrink: 0;
         }
 
         .clock {
@@ -64,38 +67,176 @@
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
 
-        .controls {
+        .search-container {
+            flex: 1;
+            max-width: 600px;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.15);
+            font-size: 1rem;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .search-input:focus {
+            background: rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* 圖片拖放擴展效果 */
+        .search-container.expanded {
+            transform: translateY(30%);
+        }
+
+        .image-search-indicator {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            backdrop-filter: blur(20px);
+            display: none;
+            animation: slideDown 0.2s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 右上角快捷鍵 */
+        .quick-links {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 15px;
+        }
+
+        .quick-link {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .quick-link:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        /* 齒輪圖標 */
+        .settings-gear {
             position: fixed;
             bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
+            right: 20px;
             z-index: 10;
+            cursor: pointer;
+            font-size: 2rem;
+            color: white;
+            transition: all 0.3s ease;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
-        .control-btn {
-            background: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 8px;
-            width: 120px;
-            height: 40px;
-            color: #333;
-            font-size: 0.9rem;
-            cursor: pointer;
+        .settings-gear:hover {
+            transform: rotate(90deg);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* 設定選單 */
+        .settings-menu {
+            position: fixed;
+            bottom: 70px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            display: none;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+        }
+
+        .settings-menu::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            right: 15px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid rgba(255, 255, 255, 0.95);
+        }
+
+        .menu-item {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            padding: 12px 15px;
+            color: #333;
+            text-decoration: none;
+            border-radius: 8px;
+            cursor: pointer;
             transition: all 0.3s ease;
-            font-weight: 500;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            margin-bottom: 5px;
         }
 
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 1);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        .menu-item:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .menu-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .menu-item i {
+            width: 20px;
+            margin-right: 10px;
+            font-size: 1rem;
+        }
+
+        .menu-item span {
+            font-size: 0.9rem;
+            font-weight: 500;
         }
 
         .video-upload-container {
@@ -108,7 +249,7 @@
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 100;
+            z-index: 1000;
         }
 
         .upload-box {
@@ -119,6 +260,7 @@
             min-width: 350px;
             color: #333;
             text-align: center;
+            backdrop-filter: blur(20px);
         }
 
         .upload-box h3 {
@@ -219,24 +361,47 @@
     </video>
     <div class="overlay"></div>
 
-    <div class="time-container">
-        <div class="clock" id="clock">00:00:00</div>
-        <div class="date" id="date">2023年1月1日 星期一</div>
+    <div class="header-container">
+        <div class="time-container">
+            <div class="clock" id="clock">00:00:00</div>
+            <div class="date" id="date">2023年1月1日 星期一</div>
+        </div>
+
+        <div class="search-container" id="search-container">
+            <div class="image-search-indicator" id="image-search-indicator">
+                使用圖片搜尋
+            </div>
+            <div class="search-box">
+                <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址">
+            </div>
+        </div>
     </div>
 
-    <div class="controls">
-        <button class="control-btn" id="play-pause-btn">
-            <i class="fas fa-pause"></i>
-            <span>暫停</span>
-        </button>
-        <button class="control-btn" id="mute-btn">
+    <!-- 右上角快捷鍵 -->
+    <div class="quick-links">
+        <a href="https://www.google.com/imghp" class="quick-link" target="_blank">圖片</a>
+        <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
+    </div>
+
+    <!-- 齒輪設定圖標 -->
+    <div class="settings-gear" id="settings-gear">
+        ⚙️
+    </div>
+
+    <!-- 設定選單 -->
+    <div class="settings-menu" id="settings-menu">
+        <div class="menu-item" id="play-pause-btn">
+            <i class="fas fa-play"></i>
+            <span>播放/暫停</span>
+        </div>
+        <div class="menu-item" id="mute-btn">
             <i class="fas fa-volume-up"></i>
-            <span>靜音</span>
-        </button>
-        <button class="control-btn" id="upload-video-btn">
+            <span>靜音/取消靜音</span>
+        </div>
+        <div class="menu-item" id="upload-video-btn">
             <i class="fas fa-upload"></i>
-            <span>上傳背景</span>
-        </button>
+            <span>上傳背景影片</span>
+        </div>
     </div>
 
     <div class="video-upload-container" id="video-upload-container">
@@ -289,21 +454,91 @@
         updateClock();
         setInterval(updateClock, 1000);
 
+        // 搜尋功能
+        const searchInput = document.getElementById('search-input');
+        const searchContainer = document.getElementById('search-container');
+        const imageSearchIndicator = document.getElementById('image-search-indicator');
+
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const query = this.value.trim();
+                if (query) {
+                    if (query.includes('.') || query.includes('://')) {
+                        window.location.href = query.includes('://') ? query : 'https://' + query;
+                    } else {
+                        window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                    }
+                }
+            }
+        });
+
+        // 圖片拖放功能
+        searchInput.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            searchContainer.classList.add('expanded');
+            imageSearchIndicator.style.display = 'block';
+        });
+
+        searchInput.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            // 檢查是否真的離開搜尋區域
+            if (!searchContainer.contains(e.relatedTarget)) {
+                searchContainer.classList.remove('expanded');
+                imageSearchIndicator.style.display = 'none';
+            }
+        });
+
+        searchInput.addEventListener('drop', function(e) {
+            e.preventDefault();
+            searchContainer.classList.remove('expanded');
+            imageSearchIndicator.style.display = 'none';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type.startsWith('image/')) {
+                    // 使用 Google 圖片搜尋
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    
+                    // 直接導向 Google 圖片搜尋
+                    window.open('https://www.google.com/imghp', '_blank');
+                } else {
+                    alert('請拖放圖片檔案');
+                }
+            }
+        });
+
         // 影片控制
         const video = document.getElementById('video-background');
         const uploadContainer = document.getElementById('video-upload-container');
+        const settingsMenu = document.getElementById('settings-menu');
+        const settingsGear = document.getElementById('settings-gear');
         let selectedFile = null;
         let selectedVideoUrl = '';
+
+        // 齒輪點擊事件
+        settingsGear.addEventListener('click', function() {
+            settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // 點擊頁面其他區域關閉選單
+        document.addEventListener('click', function(event) {
+            if (!settingsGear.contains(event.target) && !settingsMenu.contains(event.target)) {
+                settingsMenu.style.display = 'none';
+            }
+        });
 
         // 播放/暫停
         document.getElementById('play-pause-btn').addEventListener('click', function() {
             if (video.paused) {
                 video.play();
-                this.innerHTML = '<i class="fas fa-pause"></i><span>暫停</span>';
+                this.innerHTML = '<i class="fas fa-pause"></i><span>暫停影片</span>';
             } else {
                 video.pause();
-                this.innerHTML = '<i class="fas fa-play"></i><span>播放</span>';
+                this.innerHTML = '<i class="fas fa-play"></i><span>播放影片</span>';
             }
+            settingsMenu.style.display = 'none';
         });
 
         // 靜音/取消靜音
@@ -311,12 +546,14 @@
             video.muted = !video.muted;
             this.innerHTML = video.muted ? 
                 '<i class="fas fa-volume-mute"></i><span>取消靜音</span>' : 
-                '<i class="fas fa-volume-up"></i><span>靜音</span>';
+                '<i class="fas fa-volume-up"></i><span>靜音影片</span>';
+            settingsMenu.style.display = 'none';
         });
 
         // 上傳影片介面
         document.getElementById('upload-video-btn').addEventListener('click', function() {
             uploadContainer.style.display = 'flex';
+            settingsMenu.style.display = 'none';
         });
 
         document.getElementById('close-upload').addEventListener('click', function() {
@@ -404,6 +641,9 @@
             }
             
             video.play();
+            
+            // 聚焦搜尋框
+            searchInput.focus();
         });
     </script>
 </body>
