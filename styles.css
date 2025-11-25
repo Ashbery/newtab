@@ -274,52 +274,33 @@ body {
     z-index: 10;
     cursor: pointer;
     transition: all 0.3s ease;
-    width: 40px; /* 縮小30% */
-    height: 40px;
+    width: 28px; /* 縮小30% */
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     background: transparent;
+    /* 移除所有陰影效果 */
+    box-shadow: none;
+    text-shadow: none;
 }
 
-.settings-gear .google-app-icon {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.settings-gear i {
+    font-size: 28px; /* 縮小30% */
+    color: #5f6368; /* Google風格的灰色 */
     transition: all 0.3s ease;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    /* 確保圖標沒有陰影 */
+    text-shadow: none;
+    filter: none;
+    /* 添加輕微的白色外框，確保在任何背景上都可見 */
+    -webkit-text-stroke: 0.5px rgba(255, 255, 255, 0.5);
 }
 
-.settings-gear:hover .google-app-icon {
-    background: white;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    transform: scale(1.1) rotate(90deg);
+.settings-gear:hover i {
+    transform: rotate(90deg);
+    color: #3c4043; /* 懸停時變深灰色 */
 }
-
-.settings-gear .google-app-icon i {
-    font-size: 18px; /* 縮小30% */
-    color: #5f6368;
-}
-
-/* 移除原來的齒輪樣式 */
-.settings-gear {
-    /* 移除以下屬性 */
-    /* font-size: 2rem; */
-    /* color: white; */
-    /* text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); */
-}
-
-.settings-gear:hover {
-    /* 移除原來的旋轉效果，現在在 .google-app-icon 上實現 */
-    /* transform: rotate(90deg); */
-    /* color: rgba(255, 255, 255, 0.8); */
-}
-
 /* 設定選單 */
 .settings-menu {
     position: fixed;
