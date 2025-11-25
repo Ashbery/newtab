@@ -102,7 +102,7 @@
             text-align: left;
         }
 
-        /* 右上角快捷鍵 - 新增 Google 帳號大頭貼 */
+        /* 右上角快捷鍵 */
         .quick-links {
             position: fixed;
             top: 20px;
@@ -131,40 +131,39 @@
             transform: translateY(-2px);
         }
 
-        /* Google 帳號大頭貼 */
-        .google-account {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+        /* 右上角 Google 登入按鈕 - 改為與網頁風格一致 */
+        .google-login-container {
+            position: relative;
+        }
+
+        .google-login-btn {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
             cursor: pointer;
-            border: 2px solid rgba(255, 255, 255, 0.3);
             transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            gap: 8px;
         }
 
-        .google-account:hover {
-            border-color: rgba(255, 255, 255, 0.6);
-            transform: scale(1.05);
+        .google-login-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
         }
 
-        .google-account img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        .google-login-btn.authenticated {
+            background: rgba(66, 133, 244, 0.3);
+            border-color: rgba(66, 133, 244, 0.6);
         }
 
-        .google-account .default-avatar {
-            color: white;
-            font-size: 1.2rem;
-        }
-
-        .google-account-menu {
+        .google-login-menu {
             position: absolute;
-            top: 50px;
+            top: 45px;
             right: 0;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 12px;
@@ -172,11 +171,11 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
             z-index: 100;
             display: none;
-            min-width: 200px;
+            min-width: 180px;
             backdrop-filter: blur(10px);
         }
 
-        .google-account-menu::after {
+        .google-login-menu::after {
             content: '';
             position: absolute;
             top: -8px;
@@ -188,7 +187,7 @@
             border-bottom: 8px solid rgba(255, 255, 255, 0.95);
         }
 
-        .account-menu-item {
+        .login-menu-item {
             display: flex;
             align-items: center;
             padding: 10px 15px;
@@ -198,19 +197,20 @@
             cursor: pointer;
             transition: all 0.3s ease;
             margin-bottom: 5px;
+            font-size: 0.85rem;
         }
 
-        .account-menu-item:hover {
+        .login-menu-item:hover {
             background: rgba(0, 0, 0, 0.05);
         }
 
-        .account-menu-item i {
+        .login-menu-item i {
             width: 20px;
             margin-right: 10px;
-            font-size: 1rem;
+            font-size: 0.9rem;
         }
 
-        /* 齒輪圖標 */
+        /* 右下角齒輪圖標 - 改為簍空風格 */
         .settings-gear {
             position: fixed;
             bottom: 20px;
@@ -221,17 +221,27 @@
             color: white;
             transition: all 0.3s ease;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .settings-gear:hover {
             transform: rotate(90deg);
-            color: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.6);
         }
 
         /* 設定選單 */
         .settings-menu {
             position: fixed;
-            bottom: 70px;
+            bottom: 80px;
             right: 20px;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 12px;
@@ -618,6 +628,16 @@
         .btn-secondary:hover {
             background: #5a6268;
         }
+
+        .google-status {
+            font-size: 0.7rem;
+            margin-top: 5px;
+            color: #666;
+        }
+
+        .google-status.connected {
+            color: #34A853;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google API -->
@@ -643,30 +663,27 @@
         </div>
     </div>
 
-    <!-- 右上角快捷鍵 - 新增 Google 帳號 -->
+    <!-- 右上角快捷鍵 -->
     <div class="quick-links">
         <a href="https://www.google.com/imghp" class="quick-link" target="_blank">圖片</a>
         <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
         
-        <!-- Google 帳號大頭貼 -->
-        <div class="google-account" id="google-account">
-            <div class="default-avatar">
-                <i class="fas fa-user"></i>
-            </div>
-            <div class="google-account-menu" id="google-account-menu">
-                <div class="account-menu-item" id="google-login-btn">
-                    <i class="fab fa-google"></i>
-                    <span>登入 Google</span>
-                </div>
-                <div class="account-menu-item" id="setup-google-api-btn">
+        <!-- Google 登入按鈕 - 改為與網頁風格一致 -->
+        <div class="google-login-container">
+            <button class="google-login-btn" id="google-login-btn">
+                <i class="fab fa-google"></i>
+                <span>Google</span>
+            </button>
+            <div class="google-login-menu" id="google-login-menu">
+                <div class="login-menu-item" id="setup-google-api-btn">
                     <i class="fas fa-cog"></i>
-                    <span>設定 Google API</span>
+                    <span>設定 API</span>
                 </div>
-                <div class="account-menu-item" id="google-drive-picker-btn" style="display: none;">
+                <div class="login-menu-item" id="google-drive-picker-btn" style="display: none;">
                     <i class="fab fa-google-drive"></i>
-                    <span>選擇 Drive 影片</span>
+                    <span>選擇影片</span>
                 </div>
-                <div class="account-menu-item" id="google-logout-btn" style="display: none;">
+                <div class="login-menu-item" id="google-logout-btn" style="display: none;">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>登出</span>
                 </div>
@@ -674,9 +691,9 @@
         </div>
     </div>
 
-    <!-- 齒輪設定圖標 -->
+    <!-- 右下角齒輪圖標 - 改為簍空風格 -->
     <div class="settings-gear" id="settings-gear">
-        ⚙️
+        <i class="fas fa-cog"></i>
     </div>
 
     <!-- 設定選單 -->
@@ -711,10 +728,8 @@
                 </button>
             </div>
 
-            <div id="google-drive-login-prompt" class="login-prompt">
-                <i class="fab fa-google-drive"></i>
-                <p>請先設定 Google API 並登入帳號</p>
-                <p style="font-size: 0.8rem; margin-top: 10px;">點擊右上角 Google 圖標進行設定</p>
+            <div id="google-drive-status" class="google-status">
+                請先設定 Google API 並登入
             </div>
 
             <div class="upload-status" id="upload-status"></div>
@@ -838,11 +853,14 @@
         const progress = document.getElementById('progress');
         const uploadStatus = document.getElementById('upload-status');
         const apiSetupContainer = document.getElementById('api-setup-container');
+        const googleLoginBtn = document.getElementById('google-login-btn');
+        const googleLoginMenu = document.getElementById('google-login-menu');
         
         let selectedFile = null;
         let selectedVideoUrl = '';
         let cloudVideoUrl = '';
         let googleUser = null;
+        let googleConfig = null;
 
         // Google API 設定管理
         class GoogleAPIConfig {
@@ -850,6 +868,11 @@
                 this.clientId = localStorage.getItem('google_client_id');
                 this.tokenClient = null;
                 this.gapiInited = false;
+                this.gisInited = false;
+                
+                if (this.clientId) {
+                    this.initGoogleAPI();
+                }
             }
 
             // 檢查是否已設定
@@ -862,7 +885,7 @@
                 if (clientId && clientId.includes('.apps.googleusercontent.com')) {
                     this.clientId = clientId;
                     localStorage.setItem('google_client_id', clientId);
-                    this.initTokenClient();
+                    this.initGoogleAPI();
                     return true;
                 }
                 return false;
@@ -871,6 +894,21 @@
             // 取得用戶端 ID
             getClientId() {
                 return this.clientId;
+            }
+
+            // 初始化 Google API
+            async initGoogleAPI() {
+                if (!this.clientId) return;
+
+                // 載入 GAPI
+                await new Promise((resolve) => {
+                    gapi.load('client:picker', () => {
+                        this.gapiInited = true;
+                        console.log('GAPI 載入完成');
+                        this.initTokenClient();
+                        resolve();
+                    });
+                });
             }
 
             // 初始化 Token Client
@@ -888,44 +926,66 @@
                         this.handleAuthSuccess(response.access_token);
                     },
                 });
+
+                this.gisInited = true;
+                this.updateUI();
             }
 
             // 處理登入成功
             handleAuthSuccess(accessToken) {
                 googleUser = { accessToken: accessToken };
-                this.updateUIAfterLogin();
+                this.updateUI();
                 this.initializePicker();
+                showUploadStatus('Google 帳號登入成功！', 'success');
             }
 
-            // 更新登入後的 UI
-            updateUIAfterLogin() {
-                // 更新右上角大頭貼
-                const googleAccount = document.getElementById('google-account');
-                googleAccount.innerHTML = '<i class="fas fa-check" style="color: #34A853;"></i>';
+            // 更新 UI 狀態
+            updateUI() {
+                const isConfigured = this.isConfigured();
+                const isAuthenticated = !!googleUser;
+
+                // 更新右上角按鈕
+                if (isAuthenticated) {
+                    googleLoginBtn.classList.add('authenticated');
+                    googleLoginBtn.innerHTML = '<i class="fab fa-google"></i><span>已連線</span>';
+                } else {
+                    googleLoginBtn.classList.remove('authenticated');
+                    googleLoginBtn.innerHTML = '<i class="fab fa-google"></i><span>Google</span>';
+                }
+
+                // 更新選單項目
+                document.getElementById('google-drive-picker-btn').style.display = isAuthenticated ? 'flex' : 'none';
+                document.getElementById('google-logout-btn').style.display = isAuthenticated ? 'flex' : 'none';
+
+                // 更新上傳視窗中的狀態
+                const driveBtn = document.getElementById('google-drive-btn');
+                const statusText = document.getElementById('google-drive-status');
                 
-                // 更新帳號選單
-                document.getElementById('google-login-btn').style.display = 'none';
-                document.getElementById('google-drive-picker-btn').style.display = 'flex';
-                document.getElementById('google-logout-btn').style.display = 'flex';
-                
-                // 啟用 Google Drive 按鈕
-                document.getElementById('google-drive-btn').disabled = false;
-                document.getElementById('google-drive-login-prompt').style.display = 'none';
-                
-                showUploadStatus('Google 帳號登入成功！', 'success');
+                if (isAuthenticated) {
+                    driveBtn.disabled = false;
+                    statusText.textContent = '✓ Google Drive 已連線';
+                    statusText.className = 'google-status connected';
+                } else if (isConfigured) {
+                    driveBtn.disabled = true;
+                    statusText.textContent = '請點擊右上角 Google 按鈕登入';
+                    statusText.className = 'google-status';
+                } else {
+                    driveBtn.disabled = true;
+                    statusText.textContent = '請先設定 Google API';
+                    statusText.className = 'google-status';
+                }
             }
 
             // 初始化 Picker
             async initializePicker() {
-                if (!this.gapiInited) {
-                    await new Promise((resolve) => {
-                        gapi.load('client:picker', () => {
-                            this.gapiInited = true;
-                            resolve();
-                        });
-                    });
+                if (!this.gapiInited) return;
+                
+                try {
+                    await gapi.client.init({});
+                    console.log('Google Picker 初始化完成');
+                } catch (error) {
+                    console.error('Picker 初始化失敗:', error);
                 }
-                await gapi.client.init({});
             }
 
             // 開啟 Google Drive 選擇器
@@ -972,7 +1032,7 @@
                 if (this.tokenClient) {
                     this.tokenClient.requestAccessToken();
                 } else {
-                    showUploadStatus('請先設定 Google API 用戶端 ID', 'error');
+                    showUploadStatus('Google API 尚未準備好', 'error');
                 }
             }
 
@@ -985,27 +1045,10 @@
                 }
                 
                 googleUser = null;
-                this.updateUIAfterLogout();
-            }
-
-            // 更新登出後的 UI
-            updateUIAfterLogout() {
-                const googleAccount = document.getElementById('google-account');
-                googleAccount.innerHTML = '<div class="default-avatar"><i class="fas fa-user"></i></div>';
-                
-                document.getElementById('google-login-btn').style.display = 'flex';
-                document.getElementById('google-drive-picker-btn').style.display = 'none';
-                document.getElementById('google-logout-btn').style.display = 'none';
-                
-                document.getElementById('google-drive-btn').disabled = true;
-                document.getElementById('google-drive-login-prompt').style.display = 'block';
-                
+                this.updateUI();
                 showUploadStatus('已登出 Google 帳號', 'info');
             }
         }
-
-        // 初始化 Google API 設定管理器
-        const googleConfig = new GoogleAPIConfig();
 
         // 顯示上傳狀態
         function showUploadStatus(message, type = 'info') {
@@ -1013,11 +1056,11 @@
             uploadStatus.className = 'upload-status';
             uploadStatus.classList.add(type);
             uploadStatus.style.display = 'block';
-        }
-
-        // 隱藏上傳狀態
-        function hideUploadStatus() {
-            uploadStatus.style.display = 'none';
+            
+            // 3秒後自動隱藏
+            setTimeout(() => {
+                uploadStatus.style.display = 'none';
+            }, 3000);
         }
 
         // 更新進度條
@@ -1032,54 +1075,60 @@
             progress.style.width = '0%';
         }
 
-        // Google 帳號大頭貼點擊
-        document.getElementById('google-account').addEventListener('click', function(e) {
+        // Google 登入按鈕點擊
+        googleLoginBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            const menu = document.getElementById('google-account-menu');
-            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-        });
-
-        // 點擊頁面其他區域關閉選單
-        document.addEventListener('click', function() {
-            document.getElementById('google-account-menu').style.display = 'none';
-            settingsMenu.style.display = 'none';
-        });
-
-        // Google 登入按鈕
-        document.getElementById('google-login-btn').addEventListener('click', function() {
-            if (googleConfig.isConfigured()) {
-                googleConfig.requestAuth();
+            if (googleConfig && googleConfig.isConfigured()) {
+                if (googleUser) {
+                    // 已登入，顯示選單
+                    googleLoginMenu.style.display = googleLoginMenu.style.display === 'block' ? 'none' : 'block';
+                } else {
+                    // 未登入，直接請求授權
+                    googleConfig.requestAuth();
+                }
             } else {
+                // 未設定 API，顯示設定畫面
                 showAPISetupPrompt();
             }
-            document.getElementById('google-account-menu').style.display = 'none';
+        });
+
+        // 點擊頁面其他區域關閉選單 - 修復閃爍問題
+        document.addEventListener('click', function(e) {
+            if (!googleLoginBtn.contains(e.target) && !googleLoginMenu.contains(e.target)) {
+                googleLoginMenu.style.display = 'none';
+            }
+            if (!settingsGear.contains(e.target) && !settingsMenu.contains(e.target)) {
+                settingsMenu.style.display = 'none';
+            }
         });
 
         // Google API 設定按鈕
         document.getElementById('setup-google-api-btn').addEventListener('click', function() {
             showAPISetupPrompt();
-            document.getElementById('google-account-menu').style.display = 'none';
+            googleLoginMenu.style.display = 'none';
         });
 
-        // Google Drive 選擇器按鈕 (右上角)
+        // Google Drive 選擇器按鈕
         document.getElementById('google-drive-picker-btn').addEventListener('click', async function() {
             await openGoogleDrivePicker();
-            document.getElementById('google-account-menu').style.display = 'none';
+            googleLoginMenu.style.display = 'none';
         });
 
         // Google 登出按鈕
         document.getElementById('google-logout-btn').addEventListener('click', function() {
             googleConfig.logout();
-            document.getElementById('google-account-menu').style.display = 'none';
+            googleLoginMenu.style.display = 'none';
         });
 
         // 顯示 API 設定提示
         function showAPISetupPrompt() {
             apiSetupContainer.style.display = 'flex';
             // 載入已儲存的用戶端 ID
-            const savedClientId = googleConfig.getClientId();
-            if (savedClientId) {
-                document.getElementById('google-client-id').value = savedClientId;
+            if (googleConfig) {
+                const savedClientId = googleConfig.getClientId();
+                if (savedClientId) {
+                    document.getElementById('google-client-id').value = savedClientId;
+                }
             }
         }
 
@@ -1098,11 +1147,6 @@
             if (googleConfig.saveClientId(clientId)) {
                 showUploadStatus('Google API 設定成功！', 'success');
                 apiSetupContainer.style.display = 'none';
-                
-                // 自動嘗試登入
-                setTimeout(() => {
-                    googleConfig.requestAuth();
-                }, 1000);
             } else {
                 showUploadStatus('請輸入有效的 Google OAuth 用戶端 ID', 'error');
             }
@@ -1229,7 +1273,6 @@
             document.getElementById('video-url').value = '';
             document.getElementById('confirm-upload').disabled = true;
             hideProgress();
-            hideUploadStatus();
             document.getElementById('file-info').textContent = '支援 MP4 格式，最大 50MB';
             
             const confirmBtn = document.getElementById('confirm-upload');
@@ -1361,10 +1404,8 @@
 
         // 頁面載入
         window.addEventListener('DOMContentLoaded', function() {
-            // 初始化 Google API (如果已設定)
-            if (googleConfig.isConfigured()) {
-                googleConfig.initTokenClient();
-            }
+            // 初始化 Google API 設定管理器
+            googleConfig = new GoogleAPIConfig();
 
             loadVideo();
             video.play();
