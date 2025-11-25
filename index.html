@@ -47,12 +47,13 @@
             right: 20px;
             z-index: 10;
             display: flex;
-            align-items: center;
-            gap: 20px;
+            align-items: flex-start;
+            gap: 40px; /* 增加間距避免跳動 */
         }
 
         .time-container {
             flex-shrink: 0;
+            min-width: 200px; /* 固定寬度避免跳動 */
         }
 
         .clock {
@@ -60,6 +61,7 @@
             font-weight: 300;
             margin-bottom: 5px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            font-variant-numeric: tabular-nums; /* 等寬數字 */
         }
 
         .date {
@@ -70,12 +72,11 @@
         .search-container {
             flex: 1;
             max-width: 600px;
-            position: relative;
+            margin-top: 8px; /* 對齊時間文字 */
         }
 
         .search-box {
             position: relative;
-            transition: all 0.2s ease;
         }
 
         .search-input {
@@ -102,39 +103,6 @@
         .search-input::placeholder {
             color: rgba(255, 255, 255, 0.8);
             text-align: left;
-        }
-
-        /* 圖片拖放擴展效果 */
-        .search-container.expanded .search-box {
-            transform: translateY(30%);
-        }
-
-        .search-container.expanded .search-input {
-            background: rgba(255, 255, 255, 0.25);
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(10px);
-        }
-
-        .image-search-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 500;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
-        }
-
-        .search-container.expanded .image-search-text {
-            opacity: 1;
-        }
-
-        .search-container.expanded .search-input::placeholder {
-            opacity: 0;
         }
 
         /* 右上角快捷鍵 */
@@ -369,10 +337,9 @@
             <div class="date" id="date">2023年1月1日 星期一</div>
         </div>
 
-        <div class="search-container" id="search-container">
-            <div class="search-box" id="search-box">
+        <div class="search-container">
+            <div class="search-box">
                 <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址">
-                <div class="image-search-text" id="image-search-text">使用圖片搜尋</div>
             </div>
         </div>
     </div>
@@ -456,9 +423,6 @@
 
         // 搜尋功能
         const searchInput = document.getElementById('search-input');
-        const searchContainer = document.getElementById('search-container');
-        const searchBox = document.getElementById('search-box');
-        const imageSearchText = document.getElementById('image-search-text');
 
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -472,68 +436,6 @@
                 }
             }
         });
-
-        // 圖片拖放功能
-        let dragCounter = 0;
-
-        searchInput.addEventListener('dragenter', function(e) {
-            e.preventDefault();
-            dragCounter++;
-            if (dragCounter === 1) {
-                searchContainer.classList.add('expanded');
-            }
-        });
-
-        searchInput.addEventListener('dragover', function(e) {
-            e.preventDefault();
-        });
-
-        searchInput.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            dragCounter--;
-            if (dragCounter === 0) {
-                searchContainer.classList.remove('expanded');
-            }
-        });
-
-        searchInput.addEventListener('drop', function(e) {
-            e.preventDefault();
-            dragCounter = 0;
-            searchContainer.classList.remove('expanded');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const file = files[0];
-                if (file.type.startsWith('image/')) {
-                    // 使用 Google Lens 進行圖片搜尋
-                    performImageSearch(file);
-                } else {
-                    alert('請拖放圖片檔案 (JPG, PNG, GIF 等)');
-                }
-            }
-        });
-
-        function performImageSearch(imageFile) {
-            // 創建 FormData
-            const formData = new FormData();
-            formData.append('encoded_image', imageFile);
-            formData.append('image_content', '');
-            
-            // 使用 fetch 上傳圖片到 Google Lens
-            fetch('https://lens.google.com/upload?ep=subb', {
-                method: 'POST',
-                body: formData,
-                mode: 'no-cors'
-            }).then(() => {
-                // 由於 no-cors 模式，我們無法讀取回應
-                // 直接開啟 Google Lens 頁面
-                window.open('https://lens.google.com/upload?ep=subb', '_blank');
-            }).catch(error => {
-                console.error('上傳失敗:', error);
-                // 如果上傳失敗，直接開啟 Google Lens 頁面
-                window.open('https://lens.google.com/upload?ep=subb', '_blank');
-            });
-        }
 
         // 影片控制
         const video = document.getElementById('video-background');
