@@ -133,6 +133,97 @@
             transform: translateY(-2px);
         }
 
+        /* 應用資料夾樣式 */
+        .apps-folder {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 15px;
+            min-width: 200px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .folder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: white;
+        }
+
+        .folder-toggle {
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .app-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .app-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .app-item i {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .app-item span {
+            font-size: 0.7rem;
+            text-align: center;
+        }
+
+        /* 資料夾收合狀態 */
+        .apps-folder.collapsed .apps-grid {
+            display: none;
+        }
+
+        .apps-folder.collapsed .folder-toggle {
+            transform: rotate(-90deg);
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .apps-folder {
+                top: 70px;
+                right: 10px;
+                min-width: 180px;
+            }
+            
+            .apps-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* 齒輪圖標 */
         .settings-gear {
             position: fixed;
@@ -350,6 +441,40 @@
         <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
     </div>
 
+    <!-- Google 應用資料夾 -->
+    <div class="apps-folder">
+        <div class="folder-header">
+            <span>Google 應用</span>
+            <i class="fas fa-chevron-down folder-toggle"></i>
+        </div>
+        <div class="apps-grid">
+            <a href="https://drive.google.com" class="app-item" target="_blank">
+                <i class="fas fa-cloud"></i>
+                <span>雲端硬碟</span>
+            </a>
+            <a href="https://maps.google.com" class="app-item" target="_blank">
+                <i class="fas fa-map"></i>
+                <span>地圖</span>
+            </a>
+            <a href="https://calendar.google.com" class="app-item" target="_blank">
+                <i class="fas fa-calendar"></i>
+                <span>日曆</span>
+            </a>
+            <a href="https://photos.google.com" class="app-item" target="_blank">
+                <i class="fas fa-images"></i>
+                <span>相簿</span>
+            </a>
+            <a href="https://keep.google.com" class="app-item" target="_blank">
+                <i class="fas fa-sticky-note"></i>
+                <span>Keep</span>
+            </a>
+            <a href="https://contacts.google.com" class="app-item" target="_blank">
+                <i class="fas fa-address-book"></i>
+                <span>通訊錄</span>
+            </a>
+        </div>
+    </div>
+
     <!-- 齒輪設定圖標 -->
     <div class="settings-gear" id="settings-gear">
         ⚙️
@@ -434,6 +559,18 @@
                         window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
                     }
                 }
+            }
+        });
+
+        // 應用資料夾收合功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const folderToggle = document.querySelector('.folder-toggle');
+            const appsFolder = document.querySelector('.apps-folder');
+            
+            if (folderToggle && appsFolder) {
+                folderToggle.addEventListener('click', function() {
+                    appsFolder.classList.toggle('collapsed');
+                });
             }
         });
 
