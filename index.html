@@ -1,0 +1,62 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4背景新標籤頁</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <video id="video-background" autoplay muted loop>
+        <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4" type="video/mp4">
+    </video>
+    <div class="overlay"></div>
+
+    <div class="time-container">
+        <div class="clock" id="clock">00:00:00</div>
+        <div class="date" id="date">2023年1月1日 星期二</div>
+    </div>
+
+    <div class="search-container">
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="請在Google欄輸入網址">
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="control-btn" id="play-pause-btn">
+            <i class="fas fa-pause"></i>
+        </button>
+        <button class="control-btn" id="mute-btn">
+            <i class="fas fa-volume-up"></i>
+        </button>
+        <button class="control-btn" id="video-select-btn">
+            <i class="fas fa-video"></i>
+        </button>
+    </div>
+
+    <div class="video-selector" id="video-selector">
+        <div class="video-options">
+            <h3>選擇背景視頻</h3>
+            <div class="video-option" data-video="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4">
+                <div class="video-thumbnail"></div>
+                <span>雲朵</span>
+            </div>
+            <div class="video-option" data-video="https://assets.mixkit.co/videos/preview/mixkit-sea-waves-crashing-on-the-rocks-1088-large.mp4">
+                <div class="video-thumbnail"></div>
+                <span>海浪</span>
+            </div>
+            <div class="video-option" data-video="https://assets.mixkit.co/videos/preview/mixkit-stars-in-the-sky-1183-large.mp4">
+                <div class="video-thumbnail"></div>
+                <span>星空</span>
+            </div>
+            <button class="close-selector" id="close-selector">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
