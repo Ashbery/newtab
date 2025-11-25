@@ -128,7 +128,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
-        .video-selector {
+        .video-upload-container {
             position: fixed;
             top: 0;
             left: 0;
@@ -141,50 +141,68 @@
             z-index: 100;
         }
 
-        .video-options {
+        .upload-box {
             background: rgba(255, 255, 255, 0.95);
             padding: 30px;
             border-radius: 12px;
             position: relative;
-            min-width: 300px;
+            min-width: 350px;
             color: #333;
-        }
-
-        .video-options h3 {
-            margin-bottom: 20px;
             text-align: center;
+        }
+
+        .upload-box h3 {
+            margin-bottom: 20px;
             color: #333;
         }
 
-        .video-option {
-            display: flex;
-            align-items: center;
+        .file-input-wrapper {
+            margin: 20px 0;
+        }
+
+        .file-input {
+            width: 100%;
             padding: 12px;
-            margin: 8px 0;
-            background: rgba(0, 0, 0, 0.05);
+            border: 2px dashed #ccc;
             border-radius: 8px;
+            background: #f8f9fa;
             cursor: pointer;
             transition: all 0.3s ease;
         }
 
-        .video-option:hover {
-            background: rgba(0, 0, 0, 0.1);
+        .file-input:hover {
+            border-color: #4a6cf7;
+            background: #f0f4ff;
         }
 
-        .video-thumbnail {
-            width: 40px;
-            height: 30px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-            margin-right: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            color: #666;
+        .file-input:focus {
+            outline: none;
+            border-color: #4a6cf7;
         }
 
-        .close-selector {
+        .upload-btn {
+            background: #4a6cf7;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .upload-btn:hover {
+            background: #3a5ce5;
+        }
+
+        .upload-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .close-upload {
             position: absolute;
             top: 15px;
             right: 15px;
@@ -196,8 +214,31 @@
             padding: 5px;
         }
 
-        .close-selector:hover {
+        .close-upload:hover {
             color: #333;
+        }
+
+        .current-video {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e8f4fd;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: #155724;
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 0.9rem;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: #4a6cf7;
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -228,34 +269,40 @@
             <i class="fas fa-volume-up"></i>
             <span>靜音</span>
         </button>
-        <button class="control-btn" id="video-select-btn">
-            <i class="fas fa-video"></i>
-            <span>更換背景</span>
+        <button class="control-btn" id="upload-video-btn">
+            <i class="fas fa-upload"></i>
+            <span>上傳背景</span>
         </button>
     </div>
 
-    <div class="video-selector" id="video-selector">
-        <div class="video-options">
-            <h3>選擇背景影片</h3>
-            <div class="video-option" data-video="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4">
-                <div class="video-thumbnail">雲朵</div>
-                <span>天空雲朵</span>
-            </div>
-            <div class="video-option" data-video="https://assets.mixkit.co/videos/preview/mixkit-sea-waves-crashing-on-the-rocks-1088-large.mp4">
-                <div class="video-thumbnail">海浪</div>
-                <span>海洋波浪</span>
-            </div>
-            <div class="video-option" data-video="https://assets.mixkit.co/videos/preview/mixkit-stars-in-the-sky-1183-large.mp4">
-                <div class="video-thumbnail">星空</div>
-                <span>夜晚星空</span>
-            </div>
-            <div class="video-option" data-video="https://assets.mixkit.co/videos/preview/mixkit-trees-in-a-forest-1180-large.mp4">
-                <div class="video-thumbnail">森林</div>
-                <span>森林景色</span>
-            </div>
-            <button class="close-selector" id="close-selector">
+    <div class="video-upload-container" id="video-upload-container">
+        <div class="upload-box">
+            <button class="close-upload" id="close-upload">
                 <i class="fas fa-times"></i>
             </button>
+            <h3>上傳自訂背景影片</h3>
+            
+            <div class="file-input-wrapper">
+                <input type="file" id="video-file" accept="video/mp4" class="file-input">
+                <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
+                    支援 MP4 格式影片
+                </div>
+            </div>
+
+            <div style="margin: 20px 0; text-align: center; color: #666;">
+                — 或 —
+            </div>
+
+            <div>
+                <input type="url" id="video-url" class="url-input" placeholder="輸入影片網址 (MP4)">
+                <button id="load-url-btn" class="upload-btn">載入網址影片</button>
+            </div>
+
+            <button id="confirm-upload" class="upload-btn" disabled>確認設定</button>
+
+            <div class="current-video" id="current-video-info" style="display: none;">
+                目前使用: <span id="current-video-name">預設影片</span>
+            </div>
         </div>
     </div>
 
@@ -294,7 +341,9 @@
 
         // 影片控制
         const video = document.getElementById('video-background');
-        const videoSelector = document.getElementById('video-selector');
+        const uploadContainer = document.getElementById('video-upload-container');
+        let selectedFile = null;
+        let selectedVideoUrl = '';
 
         // 播放/暫停
         document.getElementById('play-pause-btn').addEventListener('click', function() {
@@ -315,34 +364,95 @@
                 '<i class="fas fa-volume-up"></i><span>靜音</span>';
         });
 
-        // 影片選擇
-        document.getElementById('video-select-btn').addEventListener('click', function() {
-            videoSelector.style.display = 'flex';
+        // 上傳影片介面
+        document.getElementById('upload-video-btn').addEventListener('click', function() {
+            uploadContainer.style.display = 'flex';
         });
 
-        document.getElementById('close-selector').addEventListener('click', function() {
-            videoSelector.style.display = 'none';
+        document.getElementById('close-upload').addEventListener('click', function() {
+            uploadContainer.style.display = 'none';
         });
 
-        // 選擇影片
-        document.querySelectorAll('.video-option').forEach(option => {
-            option.addEventListener('click', function() {
-                const videoUrl = this.getAttribute('data-video');
-                video.src = videoUrl;
+        // 檔案選擇
+        document.getElementById('video-file').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            selectedVideoUrl = '';
+            document.getElementById('video-url').value = '';
+            
+            if (selectedFile && selectedFile.type === 'video/mp4') {
+                document.getElementById('confirm-upload').disabled = false;
+            } else {
+                document.getElementById('confirm-upload').disabled = true;
+                alert('請選擇 MP4 格式的影片檔案');
+            }
+        });
+
+        // 網址載入
+        document.getElementById('load-url-btn').addEventListener('click', function() {
+            const url = document.getElementById('video-url').value.trim();
+            if (url) {
+                selectedVideoUrl = url;
+                selectedFile = null;
+                document.getElementById('video-file').value = '';
+                document.getElementById('confirm-upload').disabled = false;
+            } else {
+                alert('請輸入影片網址');
+            }
+        });
+
+        // 確認設定
+        document.getElementById('confirm-upload').addEventListener('click', function() {
+            if (selectedFile) {
+                // 上傳本地檔案
+                const videoURL = URL.createObjectURL(selectedFile);
+                video.src = videoURL;
                 video.play();
-                videoSelector.style.display = 'none';
                 
-                // 儲存選擇
-                localStorage.setItem('selectedVideo', videoUrl);
-            });
+                // 儲存到本地儲存
+                localStorage.setItem('customVideo', videoURL);
+                localStorage.setItem('videoSource', 'file');
+                localStorage.setItem('videoName', selectedFile.name);
+                
+                updateCurrentVideoInfo(selectedFile.name);
+                
+            } else if (selectedVideoUrl) {
+                // 使用網址影片
+                video.src = selectedVideoUrl;
+                video.play();
+                
+                // 儲存到本地儲存
+                localStorage.setItem('customVideo', selectedVideoUrl);
+                localStorage.setItem('videoSource', 'url');
+                localStorage.setItem('videoName', '自訂網址影片');
+                
+                updateCurrentVideoInfo('自訂網址影片');
+            }
+            
+            uploadContainer.style.display = 'none';
+            // 重置表單
+            document.getElementById('video-file').value = '';
+            document.getElementById('video-url').value = '';
+            document.getElementById('confirm-upload').disabled = true;
+            selectedFile = null;
+            selectedVideoUrl = '';
         });
+
+        function updateCurrentVideoInfo(name) {
+            document.getElementById('current-video-info').style.display = 'block';
+            document.getElementById('current-video-name').textContent = name;
+        }
 
         // 載入儲存的影片
         window.addEventListener('DOMContentLoaded', function() {
-            const savedVideo = localStorage.getItem('selectedVideo');
+            const savedVideo = localStorage.getItem('customVideo');
+            const videoSource = localStorage.getItem('videoSource');
+            const videoName = localStorage.getItem('videoName');
+            
             if (savedVideo) {
                 video.src = savedVideo;
+                updateCurrentVideoInfo(videoName || '自訂影片');
             }
+            
             video.play();
             
             // 聚焦搜尋框
