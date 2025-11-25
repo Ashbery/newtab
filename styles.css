@@ -176,3 +176,40 @@ body {
     cursor: pointer;
     font-size: 1.2rem;
 }
+.header-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    z-index: 10;
+    display: flex;
+    align-items: center; /* 改回置中對齊 */
+    gap: 40px;
+}
+
+.time-container {
+    flex-shrink: 0;
+    min-width: 200px;
+}
+
+.search-container {
+    flex: 1;
+    max-width: 600px;
+    /* 移除 margin-top */
+}
+
+.search-input {
+    width: 100%;
+    padding: 15px 20px; /* 增加上下 padding 恢復原來高度 */
+    border: none;
+    border-radius: 25px;
+    background: rgba(255, 255, 255, 0.15);
+    font-size: 1rem;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    outline: none;
+    text-align: left;
+    height: auto; /* 確保高度自動調整 */
+}
