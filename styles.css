@@ -234,7 +234,7 @@ body {
     transform: rotate(-90deg);
 }
 
-/* ===== 最終修改的齒輪圖標 - 再縮小30%，無背景無陰影 ===== */
+/* ===== 修正的齒輪圖標 - 放大40%，白色，無背景無陰影 ===== */
 .settings-gear {
     position: fixed;
     bottom: 20px;
@@ -242,8 +242,8 @@ body {
     z-index: 10;
     cursor: pointer;
     transition: all 0.3s ease;
-    width: 14px; /* 再縮小30%，從20px縮小到14px */
-    height: 14px;
+    width: 28px; /* 放大40%，從20px放大到28px */
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -253,8 +253,8 @@ body {
 }
 
 .settings-gear i {
-    font-size: 14px; /* 再縮小30%，從20px縮小到14px */
-    color: rgba(255, 255, 255, 0.8); /* 半透明白色，與搜尋欄風格一致 */
+    font-size: 28px; /* 放大40%，從20px放大到28px */
+    color: white; /* 純白色 */
     transition: all 0.3s ease;
     text-shadow: none;
     filter: none;
@@ -262,21 +262,21 @@ body {
 
 .settings-gear:hover i {
     transform: rotate(90deg);
-    color: rgba(255, 255, 255, 1); /* 懸停時變為不透明白色 */
+    color: rgba(255, 255, 255, 0.8); /* 懸停時變為半透明 */
 }
 
-/* ===== 修改設定選單為透明毛玻璃效果 ===== */
+/* ===== 修正設定選單為透明毛玻璃效果 ===== */
 .settings-menu {
     position: fixed;
-    bottom: 45px; /* 調整位置，避免與齒輪重疊 */
+    bottom: 60px; /* 調整位置，避免與齒輪重疊 */
     right: 20px;
-    background: rgba(255, 255, 255, 0.15); /* 與搜尋欄相同的透明背景 */
-    backdrop-filter: blur(10px); /* 毛玻璃效果 */
-    -webkit-backdrop-filter: blur(10px); /* Safari 支援 */
-    border: 1px solid rgba(255, 255, 255, 0.3); /* 與搜尋欄相同的邊框 */
+    background: rgba(255, 255, 255, 0.15) !important; /* 強制使用透明背景 */
+    backdrop-filter: blur(10px) !important; /* 強制毛玻璃效果 */
+    -webkit-backdrop-filter: blur(10px) !important; /* Safari 支援 */
+    border: 1px solid rgba(255, 255, 255, 0.3) !important; /* 強制邊框 */
     border-radius: 12px;
     padding: 15px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); /* 保留陰影以增強可讀性 */
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
     z-index: 100;
     display: none;
     min-width: 200px;
@@ -299,7 +299,7 @@ body {
     display: flex;
     align-items: center;
     padding: 12px 15px;
-    color: white; /* 白色文字 */
+    color: white !important; /* 強制白色文字 */
     text-decoration: none;
     border-radius: 8px;
     cursor: pointer;
@@ -308,7 +308,7 @@ body {
 }
 
 .menu-item:hover {
-    background: rgba(255, 255, 255, 0.1); /* 懸停時輕微白色背景 */
+    background: rgba(255, 255, 255, 0.1) !important; /* 懸停時輕微白色背景 */
 }
 
 .menu-item:last-child {
@@ -319,13 +319,13 @@ body {
     width: 20px;
     margin-right: 10px;
     font-size: 1rem;
-    color: rgba(255, 255, 255, 0.9); /* 圖標顏色 */
+    color: rgba(255, 255, 255, 0.9) !important; /* 強制圖標顏色 */
 }
 
 .menu-item span {
     font-size: 0.9rem;
     font-weight: 500;
-    color: white; /* 確保文字為白色 */
+    color: white !important; /* 強制文字為白色 */
 }
 
 /* 影片上傳容器 */
@@ -475,18 +475,18 @@ body {
     }
     
     .settings-gear {
-        width: 12px;
-        height: 12px;
+        width: 24px;
+        height: 24px;
         bottom: 15px;
         right: 15px;
     }
     
     .settings-gear i {
-        font-size: 12px;
+        font-size: 24px;
     }
     
     .settings-menu {
-        bottom: 40px;
+        bottom: 50px;
         right: 15px;
         min-width: 180px;
     }
