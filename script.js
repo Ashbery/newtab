@@ -59,7 +59,7 @@ class UltraFastVideoSystem {
 
     init() {
         this.optimizeVideoElement();
-        this.startInstantLoad();
+        this.startUltraFastLoad();
     }
 
     optimizeVideoElement() {
@@ -72,79 +72,62 @@ class UltraFastVideoSystem {
         }
     }
 
-    async startInstantLoad() {
+    async startUltraFastLoad() {
         const startTime = performance.now();
         console.log('🚀 啟動極速影片載入...');
 
-        // 並行嘗試所有載入方式
-        const loadPromises = [
-            this.tryLocalStorageUrl(),
-            this.tryExtensionCache(),
-            this.loadDefaultVideo()
-        ];
-
-        try {
-            const result = await Promise.race(loadPromises.map(p => 
-                p.then(value => ({ success: true, value }))
-                   .catch(error => ({ success: false, error }))
-            ));
-
-            const loadTime = performance.now() - startTime;
-
-            if (result.success) {
-                console.log(`✅ 極速載入成功: ${loadTime.toFixed(2)}ms - ${result.value}`);
-                this.performance.recordEvent('load_success', { 
-                    source: result.value, 
-                    loadTime: loadTime 
-                });
-            } else {
-                console.log(`⚠️ 載入完成: ${loadTime.toFixed(2)}ms`);
-                this.performance.recordEvent('load_complete', { loadTime });
+        if (window.extensionHelper) {
+            try {
+                const result = await window.extensionHelper.loadVideoUltraFast();
+                
+                if (result.success) {
+                    // 設定影片來源
+                    if (result.type === 'url' || result.type === 'blob') {
+                        this.video.src = result.data;
+                    } else if (result.type === 'base64') {
+                        this.video.src = result.data;
+                    }
+                    
+                    // 立即播放
+                    await this.playVideo();
+                    
+                    const loadTime = performance.now() - startTime;
+                    console.log(`✅ 極速載入成功: ${loadTime.toFixed(2)}ms - ${result.source}`);
+                    
+                    updateCurrentVideoInfo(this.getVideoName(result));
+                    this.showLoadPerformance(loadTime, result.source);
+                    
+                } else {
+                    console.log('⚠️ 極速載入無結果，使用預設影片');
+                    this.loadDefaultVideo();
+                }
+            } catch (error) {
+                console.error('❌ 極速載入失敗:', error);
+                this.loadDefaultVideo();
             }
-        } catch (error) {
-            console.error('❌ 載入錯誤:', error);
+        } else {
+            console.log('ℹ️ 無擴充功能，使用預設影片');
+            this.loadDefaultVideo();
         }
     }
 
-    async tryLocalStorageUrl() {
-        const videoUrl = localStorage.getItem('videoUrl');
-        if (videoUrl) {
-            this.video.src = videoUrl;
-            await this.playVideo();
-            updateCurrentVideoInfo('自訂網址影片');
-            return 'localStorage';
+    getVideoName(result) {
+        switch (result.source) {
+            case 'memory_blob':
+            case 'indexed_db':
+            case 'localstorage_url':
+                return '自訂影片';
+            case 'extension_url_cache':
+                return '網址影片';
+            case 'extension_cloud_cache':
+                return '雲端影片';
+            case 'extension_base64_cache':
+                return '本地影片';
+            case 'default':
+                return '預設影片';
+            default:
+                return '影片';
         }
-        throw new Error('No localStorage video');
-    }
-
-    async tryExtensionCache() {
-        if (!window.extensionHelper) {
-            throw new Error('No extension helper');
-        }
-
-        const result = await window.extensionHelper.loadVideoInstant();
-        if (result.success) {
-            if (result.type === 'url') {
-                this.video.src = result.url;
-            } else if (result.type === 'base64') {
-                this.video.src = result.data;
-            } else if (result.type === 'cloud') {
-                console.log('☁️ 雲端影片需進一步處理');
-                // 保持原有雲端影片處理邏輯
-            }
-            
-            updateCurrentVideoInfo(result.name || '自訂影片');
-            await this.playVideo();
-            return `extension_${result.source}`;
-        }
-        throw new Error('Extension load failed');
-    }
-
-    async loadDefaultVideo() {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        updateCurrentVideoInfo('預設影片');
-        await this.playVideo();
-        return 'default';
     }
 
     async playVideo() {
@@ -152,6 +135,35 @@ class UltraFastVideoSystem {
             await this.video.play();
         } catch (error) {
             console.log('⏸️ 自動播放被阻止，但影片已載入');
+        }
+    }
+
+    loadDefaultVideo() {
+        updateCurrentVideoInfo('預設影片');
+        this.video.play().catch(() => {});
+    }
+
+    showLoadPerformance(loadTime, source) {
+        // 可選：顯示載入效能資訊
+        if (loadTime > 50) { // 只顯示較慢的載入
+            const perfElement = document.createElement('div');
+            perfElement.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                background: rgba(0,0,0,0.8);
+                color: #0f0;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-family: monospace;
+                z-index: 10000;
+                pointer-events: none;
+            `;
+            perfElement.textContent = `載入: ${loadTime.toFixed(0)}ms (${source})`;
+            document.body.appendChild(perfElement);
+            
+            setTimeout(() => perfElement.remove(), 2000);
         }
     }
 }
@@ -162,18 +174,15 @@ class PerformanceTracker {
     }
 
     recordEvent(name, data = {}) {
-        const event = {
+        this.events.push({
             name,
             timestamp: performance.now(),
             data
-        };
-        this.events.push(event);
+        });
     }
 }
 
-// ==================== 原有功能保持不變 ====================
-
-// Google API 設定管理
+// ==================== Google API 設定管理 ====================
 class GoogleAPIConfig {
     constructor() {
         this.clientId = localStorage.getItem('google_client_id');
@@ -383,6 +392,8 @@ class GoogleAPIConfig {
     }
 }
 
+// ==================== 工具函數 ====================
+
 // 顯示上傳狀態
 function showUploadStatus(message, type = 'info') {
     uploadStatus.textContent = message;
@@ -408,9 +419,15 @@ function hideProgress() {
 }
 
 function updateCurrentVideoInfo(name) {
-    document.getElementById('current-video-info').style.display = 'block';
-    document.getElementById('current-video-name').textContent = name;
+    const infoElement = document.getElementById('current-video-info');
+    const nameElement = document.getElementById('current-video-name');
+    if (infoElement && nameElement) {
+        infoElement.style.display = 'block';
+        nameElement.textContent = name;
+    }
 }
+
+// ==================== Google 相關事件處理 ====================
 
 // Google 登入按鈕點擊
 googleLoginBtn.addEventListener('click', function(e) {
@@ -509,6 +526,8 @@ async function openGoogleDrivePicker() {
         btn.innerHTML = '<i class="fab fa-google-drive"></i> Google Drive';
     }
 }
+
+// ==================== 影片控制功能 ====================
 
 // 齒輪點擊事件
 settingsGear.addEventListener('click', function(e) {
@@ -612,7 +631,9 @@ function resetUploadForm() {
     confirmBtn.disabled = true;
 }
 
-// 確認設定
+// ==================== 極速儲存功能 ====================
+
+// 確認設定 - 使用極速儲存
 document.getElementById('confirm-upload').addEventListener('click', async function() {
     const confirmBtn = this;
     confirmBtn.disabled = true;
@@ -624,33 +645,61 @@ document.getElementById('confirm-upload').addEventListener('click', async functi
         let videoName;
 
         if (selectedVideoUrl) {
-            // 網址影片
+            // 網址影片 - 極速儲存
             videoUrl = selectedVideoUrl;
             videoName = '自訂網址影片';
             localStorage.setItem('videoUrl', selectedVideoUrl);
-            console.log('✅ 使用網址影片');
+            
+            // 儲存到擴充功能
+            if (window.extensionHelper) {
+                await new Promise((resolve, reject) => {
+                    window.postMessage({
+                        type: 'FROM_PAGE',
+                        action: 'saveVideoUrl',
+                        url: selectedVideoUrl
+                    }, '*');
+
+                    const messageHandler = (event) => {
+                        if (event.source !== window) return;
+                        if (event.data.type === 'FROM_EXTENSION' && event.data.action === 'saveVideoUrl') {
+                            window.removeEventListener('message', messageHandler);
+                            if (event.data.success) {
+                                resolve();
+                            } else {
+                                reject(new Error(event.data.error));
+                            }
+                        }
+                    };
+                    window.addEventListener('message', messageHandler);
+
+                    setTimeout(() => {
+                        window.removeEventListener('message', messageHandler);
+                        resolve(); // 即使超時也繼續
+                    }, 3000);
+                });
+            }
+            console.log('✅ 網址影片設定完成');
             
         } else if (selectedFile) {
-            // 本地檔案 - 建立 Blob URL
-            videoUrl = URL.createObjectURL(selectedFile);
+            // 本地檔案 - 使用極速儲存
             videoName = selectedFile.name;
-            console.log('✅ 使用 Blob URL');
             
-            // 非同步保存到擴充功能
             if (window.extensionHelper) {
-                setTimeout(() => {
-                    window.extensionHelper.saveVideo(selectedFile)
-                        .then(result => {
-                            console.log('✅ 背景保存成功');
-                        })
-                        .catch(error => {
-                            console.log('⚠️ 背景保存失敗:', error.message);
-                        });
-                }, 1000);
+                try {
+                    const result = await window.extensionHelper.saveVideoUltraFast(selectedFile);
+                    videoUrl = result.blobUrl;
+                    console.log('✅ 極速儲存完成');
+                } catch (error) {
+                    console.log('❌ 極速儲存失敗，降級到 Blob URL:', error);
+                    videoUrl = URL.createObjectURL(selectedFile);
+                }
+            } else {
+                // 無擴充功能，使用 Blob URL
+                videoUrl = URL.createObjectURL(selectedFile);
             }
             
         } else if (cloudVideoUrl) {
-            // 雲端影片處理
+            // 雲端影片處理（保持原有邏輯）
             console.log('開始載入 Google Drive 影片...');
             
             const response = await fetch(cloudVideoUrl, {
@@ -701,6 +750,8 @@ document.getElementById('confirm-upload').addEventListener('click', async functi
     }
 });
 
+// ==================== 影片錯誤處理 ====================
+
 // 影片錯誤處理
 video.addEventListener('error', function() {
     console.error('❌ 影片載入失敗，使用預設影片');
@@ -730,6 +781,8 @@ document.querySelectorAll('.video-option').forEach(option => {
     });
 });
 
+// ==================== 頁面初始化 ====================
+
 // 頁面載入 - 使用極速載入系統
 window.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 頁面開始載入...');
@@ -740,7 +793,11 @@ window.addEventListener('DOMContentLoaded', function() {
     // 啟動極速影片系統
     new UltraFastVideoSystem();
     
-    document.getElementById('search-input').focus();
+    // 聚焦搜索框
+    setTimeout(() => {
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.focus();
+    }, 500);
 });
 
 // 清理 blob URL
