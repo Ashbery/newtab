@@ -223,11 +223,10 @@
             right: 20px;
             z-index: 10;
             cursor: pointer;
-            font-size: 1.6rem; /* 尺寸縮小20% */
+            font-size: 1.6rem;
             color: white;
             transition: all 0.3s ease;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            /* 移除背景和邊框 */
             background: none;
             backdrop-filter: none;
             border: none;
@@ -243,7 +242,6 @@
         .settings-gear:hover {
             transform: rotate(90deg);
             opacity: 1;
-            /* 移除懸停時的背景效果 */
             background: none;
             border-color: transparent;
         }
@@ -1055,10 +1053,10 @@
                                 const doc = data[google.picker.Response.DOCUMENTS][0];
                                 const fileId = doc[google.picker.Document.ID];
                                 
-                                console.log('選擇的檔案資訊:', doc);
+                                console.log('選擇的檔案:', doc);
                                 
-                                // 使用 Google Drive API 直接串流 URL - 修改這裡！
-                                const videoUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${googleUser.accessToken}`;
+                                // 使用 Google Drive API URL
+                                const videoUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
                                 
                                 console.log('生成的影片 URL:', videoUrl);
                                 
@@ -1066,7 +1064,7 @@
                                     url: videoUrl,
                                     name: doc.name,
                                     id: fileId,
-                                    mimeType: doc.mimeType
+                                    accessToken: googleUser.accessToken
                                 });
                             } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
                                 reject(new Error('用戶取消選擇'));
@@ -1109,7 +1107,6 @@
             uploadStatus.classList.add(type);
             uploadStatus.style.display = 'block';
             
-            // 3秒後自動隱藏
             setTimeout(() => {
                 uploadStatus.style.display = 'none';
             }, 3000);
@@ -1132,14 +1129,11 @@
             e.stopPropagation();
             if (googleConfig && googleConfig.isConfigured()) {
                 if (googleUser && !googleConfig.isTokenExpired()) {
-                    // 已登入，顯示選單
                     googleLoginMenu.style.display = googleLoginMenu.style.display === 'block' ? 'none' : 'block';
                 } else {
-                    // 未登入或 token 過期，直接請求授權
                     googleConfig.requestAuth();
                 }
             } else {
-                // 未設定 API，顯示設定畫面
                 showAPISetupPrompt();
             }
         });
@@ -1175,7 +1169,6 @@
         // 顯示 API 設定提示
         function showAPISetupPrompt() {
             apiSetupContainer.style.display = 'flex';
-            // 載入已儲存的用戶端 ID
             if (googleConfig) {
                 const savedClientId = googleConfig.getClientId();
                 if (savedClientId) {
@@ -1217,7 +1210,6 @@
                 selectedFile = null;
                 selectedVideoUrl = '';
                 
-                // 啟用確認按鈕
                 document.getElementById('confirm-upload').disabled = false;
                 document.getElementById('file-info').textContent = `已選擇: ${driveFile.name}`;
                 showUploadStatus('Google Drive 影片選擇成功！', 'success');
@@ -1280,7 +1272,6 @@
             document.getElementById('video-url').value = '';
             
             if (selectedFile) {
-                // 檢查檔案類型和大小
                 if (selectedFile.type !== 'video/mp4') {
                     showUploadStatus('請選擇 MP4 格式的影片檔案', 'error');
                     resetUploadForm();
@@ -1333,7 +1324,7 @@
             confirmBtn.disabled = true;
         }
 
-        // 確認設定
+        // 確認設定 - 修改為使用 fetch 載入 Google Drive 影片
         document.getElementById('confirm-upload').addEventListener('click', async function() {
             const confirmBtn = this;
             confirmBtn.disabled = true;
@@ -1345,15 +1336,30 @@
                 let videoName;
 
                 if (cloudVideoUrl) {
-                    // 使用雲端影片
-                    videoUrl = cloudVideoUrl;
+                    // 使用雲端影片 - 使用 fetch 載入
+                    console.log('開始載入 Google Drive 影片...');
+                    
+                    const response = await fetch(cloudVideoUrl, {
+                        headers: {
+                            'Authorization': `Bearer ${googleUser.accessToken}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const blob = await response.blob();
+                    videoUrl = URL.createObjectURL(blob);
                     videoName = 'Google Drive 影片';
+                    
+                    console.log('✅ 影片載入成功，大小:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
                     
                     // 保存到擴充功能
                     if (window.extensionHelper) {
                         try {
                             await window.extensionHelper.saveCloudVideo(cloudVideoUrl, 'Google Drive 影片');
-                            console.log('雲端影片已保存到擴充功能');
+                            console.log('雲端影片資訊已保存到擴充功能');
                         } catch (error) {
                             console.log('擴充功能保存失敗:', error);
                         }
@@ -1430,7 +1436,7 @@
             document.getElementById('current-video-name').textContent = name;
         }
 
-        // 智慧載入影片
+        // 智慧載入影片 - 支援 Google Drive fetch 載入
         async function loadVideo() {
             // 1. 優先從擴充功能載入
             if (window.extensionHelper) {
@@ -1439,21 +1445,33 @@
                     console.log('從擴充功能載入資料:', savedData);
                     
                     // 優先載入雲端影片
-                    if (savedData.cloudVideo) {
+                    if (savedData.cloudVideo && googleUser && googleUser.accessToken) {
                         try {
-                            video.src = savedData.cloudVideo.url;
-                            updateCurrentVideoInfo(savedData.cloudVideo.name || '雲端影片');
-                            console.log('從擴充功能載入雲端影片');
-                            return true;
+                            console.log('嘗試載入 Google Drive 影片...');
+                            const response = await fetch(savedData.cloudVideo.url, {
+                                headers: {
+                                    'Authorization': `Bearer ${googleUser.accessToken}`
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const blob = await response.blob();
+                                const blobUrl = URL.createObjectURL(blob);
+                                video.src = blobUrl;
+                                updateCurrentVideoInfo(savedData.cloudVideo.name || '雲端影片');
+                                console.log('✅ 從擴充功能載入雲端影片成功');
+                                return true;
+                            } else {
+                                console.warn('Google Drive 影片載入失敗，狀態碼:', response.status);
+                            }
                         } catch (error) {
-                            console.warn('擴充功能雲端影片載入失敗:', error);
+                            console.warn('Google Drive 影片載入失敗:', error);
                         }
                     }
                     
                     // 其次載入本地影片
                     if (savedData.customVideo) {
                         try {
-                            // 處理壓縮的資料
                             let videoData = savedData.customVideo;
                             if (!videoData.startsWith('data:')) {
                                 videoData = `data:video/mp4;base64,${videoData}`;
@@ -1473,12 +1491,25 @@
 
             // 2. 嘗試載入本地儲存的雲端影片
             const cloudVideo = loadCloudVideoInfo();
-            if (cloudVideo && cloudVideo.url) {
+            if (cloudVideo && cloudVideo.url && googleUser && googleUser.accessToken) {
                 try {
-                    video.src = cloudVideo.url;
-                    updateCurrentVideoInfo(cloudVideo.name || '雲端影片');
-                    console.log('從本地儲存載入雲端影片');
-                    return true;
+                    console.log('嘗試從本地儲存載入 Google Drive 影片...');
+                    const response = await fetch(cloudVideo.url, {
+                        headers: {
+                            'Authorization': `Bearer ${googleUser.accessToken}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        video.src = blobUrl;
+                        updateCurrentVideoInfo(cloudVideo.name || '雲端影片');
+                        console.log('✅ 從本地儲存載入雲端影片成功');
+                        return true;
+                    } else {
+                        console.warn('本地儲存影片載入失敗，狀態碼:', response.status);
+                    }
                 } catch (error) {
                     console.warn('本地雲端影片載入失敗:', error);
                 }
