@@ -103,6 +103,12 @@
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
         }
 
+        /* 當有建議列顯示時，搜尋框底部變為直角 */
+        .search-box.active .search-input {
+            border-radius: 25px 25px 0 0;
+            border-bottom: none;
+        }
+
         .search-input::placeholder {
             color: rgba(255, 255, 255, 0.8);
             text-align: left;
