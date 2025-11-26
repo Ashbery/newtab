@@ -92,7 +92,7 @@ body {
     text-align: left;
 }
 
-/* 搜尋建議樣式 - 改進版本 */
+/* 搜尋建議樣式 - 完全修復版本 */
 .search-suggestions {
     position: absolute;
     top: 100%;
