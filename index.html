@@ -7,8 +7,6 @@
     
     <!-- 使用相同目錄的 favicon.ico -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <!-- 引入外部 CSS -->
-     <link rel="stylesheet" href="styles.css">
     <style>
         * {
             margin: 0;
@@ -74,10 +72,6 @@
             transition: all 0.3s ease;
         }
 
-        .search-box.expanded {
-            z-index: 1000;
-        }
-
         .search-input {
             width: 100%;
             padding: 15px 20px;
@@ -91,10 +85,13 @@
             transition: all 0.3s ease;
             outline: none;
             text-align: left;
+            /* 禁用瀏覽器自動填充樣式 */
+            autocomplete: "off";
+            -webkit-autocomplete: "off";
         }
 
-        .search-box.expanded .search-input {
-            border-radius: 25px 25px 0 0;
+        /* 搜尋框獲得焦點時的樣式 */
+        .search-input:focus {
             background: rgba(255, 255, 255, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.6);
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
@@ -120,9 +117,10 @@
             transition: all 0.3s ease;
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-top: none;
+            z-index: 100;
         }
 
-        .search-box.expanded .suggestions-container {
+        .search-box.active .suggestions-container {
             max-height: 300px;
             opacity: 1;
         }
@@ -510,7 +508,7 @@
 
         <div class="search-container">
             <div class="search-box" id="search-box">
-                <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址">
+                <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址" autocomplete="off">
                 <div class="suggestions-container" id="suggestions-container">
                     <div class="suggestions-list" id="suggestions-list">
                         <!-- 搜尋建議將在這裡動態生成 -->
@@ -670,18 +668,16 @@
         let searchTimeout;
         let currentSuggestions = [];
 
-        // 點擊搜尋框時展開
+        // 點擊搜尋框時不展開，僅添加焦點樣式
         searchInput.addEventListener('focus', function() {
-            searchBox.classList.add('expanded');
-            if (searchInput.value.trim()) {
-                fetchSuggestions(searchInput.value.trim());
-            }
+            // 不展開搜尋框，只顯示焦點樣式
+            // 搜尋框會保持原本的樣式，不顯示建議區域
         });
 
-        // 點擊頁面其他地方時收起
+        // 點擊頁面其他地方時關閉建議
         document.addEventListener('click', function(event) {
             if (!searchBox.contains(event.target)) {
-                searchBox.classList.remove('expanded');
+                searchBox.classList.remove('active');
             }
         });
 
@@ -693,13 +689,17 @@
             clearTimeout(searchTimeout);
             
             if (query) {
+                // 當有輸入時才展開搜尋框
+                searchBox.classList.add('active');
+                
                 // 設定新的計時器，避免過於頻繁的請求
                 searchTimeout = setTimeout(() => {
                     fetchSuggestions(query);
                 }, 300);
             } else {
-                // 如果沒有輸入，清空建議
+                // 如果沒有輸入，清空建議並收起搜尋框
                 clearSuggestions();
+                searchBox.classList.remove('active');
             }
         });
 
