@@ -121,15 +121,21 @@
             transition: all 0.2s ease;
             padding: 5px;
             border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .clear-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.9);
+            /* 移除背景，只改變圖標顏色 */
+            background: none;
+            color: rgba(255, 255, 255, 1);
         }
 
         .search-box.has-text .clear-btn {
-            display: block;
+            display: flex;
         }
 
         /* 搜尋建議容器 */
