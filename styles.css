@@ -84,6 +84,7 @@ body {
     background: rgba(255, 255, 255, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    border-radius: 25px 25px 0 0;
 }
 
 .search-input::placeholder {
@@ -91,7 +92,7 @@ body {
     text-align: left;
 }
 
-/* 搜尋建議樣式 */
+/* 搜尋建議樣式 - 改進版本 */
 .search-suggestions {
     position: absolute;
     top: 100%;
@@ -107,6 +108,14 @@ body {
     z-index: 1000;
     display: none;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.search-suggestions.visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .suggestion-item {
@@ -127,20 +136,6 @@ body {
 
 .suggestion-item:last-child {
     border-bottom: none;
-}
-
-/* 確保搜尋框容器有相對定位 */
-.search-box {
-    position: relative;
-}
-
-/* 調整搜尋框圓角，當有建議時顯示不同的圓角 */
-.search-input:focus {
-    border-radius: 25px 25px 0 0;
-}
-
-.search-input:focus + .search-suggestions {
-    border-radius: 0 0 25px 25px;
 }
 
 /* 右上角快捷鍵 */
