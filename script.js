@@ -20,6 +20,7 @@ setInterval(updateClock, 1000);
 const searchInput = document.getElementById('search-input');
 let suggestionsContainer = null;
 let isSuggestionsVisible = false;
+let lastQuery = '';
 
 // 創建建議容器
 function createSuggestionsContainer() {
@@ -38,52 +39,59 @@ function createSuggestionsContainer() {
     }
 }
 
-// 顯示搜尋建議 - 改進版本
+// 顯示搜尋建議 - 完全修復版本
 function showSuggestions(query) {
     if (!suggestionsContainer) {
         createSuggestionsContainer();
     }
     
+    // 如果查詢為空，隱藏建議
     if (!query) {
         hideSuggestions();
+        lastQuery = '';
         return;
     }
+    
+    // 如果查詢與上次相同，不進行任何操作
+    if (query === lastQuery) {
+        return;
+    }
+    
+    lastQuery = query;
     
     // 模擬搜尋建議（實際應用中應該從API獲取）
     const suggestions = getSearchSuggestions(query);
     
     if (suggestions.length > 0) {
-        suggestionsContainer.innerHTML = '';
+        // 使用文檔片段批量更新DOM
+        const fragment = document.createDocumentFragment();
         suggestions.forEach(suggestion => {
             const item = document.createElement('div');
             item.className = 'suggestion-item';
             item.textContent = suggestion;
-            suggestionsContainer.appendChild(item);
+            fragment.appendChild(item);
         });
         
-        // 使用平滑顯示效果，避免閃爍
+        // 清空並重新填充建議容器
+        suggestionsContainer.innerHTML = '';
+        suggestionsContainer.appendChild(fragment);
+        
+        // 顯示建議容器（如果尚未顯示）
         if (!isSuggestionsVisible) {
             suggestionsContainer.style.display = 'block';
-            // 使用requestAnimationFrame確保DOM更新後再添加動畫類
-            requestAnimationFrame(() => {
-                suggestionsContainer.classList.add('visible');
-                isSuggestionsVisible = true;
-            });
+            isSuggestionsVisible = true;
         }
     } else {
         hideSuggestions();
     }
 }
 
-// 隱藏建議列表 - 改進版本
+// 隱藏建議列表
 function hideSuggestions() {
     if (suggestionsContainer && isSuggestionsVisible) {
-        suggestionsContainer.classList.remove('visible');
-        // 等待動畫完成後再隱藏
-        setTimeout(() => {
-            suggestionsContainer.style.display = 'none';
-            isSuggestionsVisible = false;
-        }, 200);
+        suggestionsContainer.style.display = 'none';
+        isSuggestionsVisible = false;
+        lastQuery = '';
     }
 }
 
@@ -104,7 +112,7 @@ function getSearchSuggestions(query) {
     return sampleSuggestions.slice(0, 5); // 只顯示前5個建議
 }
 
-// 改進的輸入事件處理 - 修復閃爍問題
+// 改進的輸入事件處理 - 完全修復閃爍問題
 let inputTimeout;
 searchInput.addEventListener('input', function(e) {
     const query = this.value.trim();
@@ -112,15 +120,10 @@ searchInput.addEventListener('input', function(e) {
     // 清除之前的定時器
     clearTimeout(inputTimeout);
     
-    // 立即顯示建議列表，避免延遲
-    if (query && !isSuggestionsVisible) {
-        showSuggestions(query);
-    }
-    
     // 設定新的定時器，避免過於頻繁的更新
     inputTimeout = setTimeout(() => {
         showSuggestions(query);
-    }, 50); // 減少延遲時間
+    }, 50);
 });
 
 // 焦點事件
