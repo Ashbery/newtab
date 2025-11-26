@@ -129,7 +129,6 @@
             border-radius: 50%;
             width: 24px;
             height: 24px;
-            display: flex;
             align-items: center;
             justify-content: center;
         }
@@ -160,11 +159,14 @@
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-top: none;
             z-index: 100;
+            transform: translateY(-10px);
         }
 
         .search-box.active .suggestions-container {
             max-height: 300px;
             opacity: 1;
+            transform: translateY(0);
+            transition: all 0.3s ease 0.1s; /* 延遲出現，讓搜尋框先變形 */
         }
 
         /* 自定義滾動條 */
