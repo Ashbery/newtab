@@ -18,216 +18,160 @@ setInterval(updateClock, 1000);
 
 // 搜尋功能
 const searchInput = document.getElementById('search-input');
-const suggestionsContainer = document.getElementById('search-suggestions');
+let suggestionsContainer = null;
 
-// 搜尋歷史和熱門搜尋
-let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
-const popularSearches = [
-    'YouTube', 'Gmail', 'Google Maps', '天氣', '新聞',
-    'Facebook', 'Instagram', 'Twitter', 'Netflix', 'Spotify'
-];
+// 創建建議容器
+function createSuggestionsContainer() {
+    if (!suggestionsContainer) {
+        suggestionsContainer = document.createElement('div');
+        suggestionsContainer.className = 'search-suggestions';
+        searchInput.parentNode.appendChild(suggestionsContainer);
+        
+        // 點擊建議項目的處理
+        suggestionsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('suggestion-item')) {
+                searchInput.value = e.target.textContent;
+                suggestionsContainer.style.display = 'none';
+                // 可以選擇是否自動搜尋
+                // performSearch(searchInput.value);
+            }
+        });
+    }
+}
 
 // 顯示搜尋建議
 function showSuggestions(query) {
-    suggestionsContainer.innerHTML = '';
+    if (!suggestionsContainer) {
+        createSuggestionsContainer();
+    }
     
-    if (!query.trim()) {
-        // 如果沒有輸入，顯示搜尋歷史和熱門搜尋
-        showDefaultSuggestions();
+    if (!query) {
+        suggestionsContainer.style.display = 'none';
         return;
     }
     
-    // 模擬 Google 搜尋建議 API
-    const mockSuggestions = generateMockSuggestions(query);
+    // 模擬搜尋建議（實際應用中應該從API獲取）
+    const suggestions = getSearchSuggestions(query);
     
-    mockSuggestions.forEach((suggestion, index) => {
-        const suggestionElement = document.createElement('div');
-        suggestionElement.className = 'suggestion-item';
-        suggestionElement.innerHTML = `
-            <div class="suggestion-icon">
-                <i class="fas fa-search"></i>
-            </div>
-            <div class="suggestion-text">${suggestion}</div>
-            ${index === 0 ? '<div class="suggestion-shortcut">Enter</div>' : ''}
-        `;
-        
-        suggestionElement.addEventListener('click', () => {
-            searchInput.value = suggestion;
-            performSearch(suggestion);
+    if (suggestions.length > 0) {
+        suggestionsContainer.innerHTML = '';
+        suggestions.forEach(suggestion => {
+            const item = document.createElement('div');
+            item.className = 'suggestion-item';
+            item.textContent = suggestion;
+            suggestionsContainer.appendChild(item);
         });
-        
-        suggestionsContainer.appendChild(suggestionElement);
-    });
-    
-    suggestionsContainer.style.display = 'block';
-}
-
-// 顯示預設建議（搜尋歷史和熱門搜尋）
-function showDefaultSuggestions() {
-    // 顯示搜尋歷史（最多5個）
-    if (searchHistory.length > 0) {
-        const historyTitle = document.createElement('div');
-        historyTitle.className = 'suggestion-item';
-        historyTitle.innerHTML = `
-            <div class="suggestion-icon">
-                <i class="fas fa-history"></i>
-            </div>
-            <div class="suggestion-text" style="font-weight: 500; color: #5f6368;">搜尋記錄</div>
-        `;
-        suggestionsContainer.appendChild(historyTitle);
-        
-        searchHistory.slice(0, 5).forEach(item => {
-            const suggestionElement = document.createElement('div');
-            suggestionElement.className = 'suggestion-item';
-            suggestionElement.innerHTML = `
-                <div class="suggestion-icon">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div class="suggestion-text">${item}</div>
-            `;
-            
-            suggestionElement.addEventListener('click', () => {
-                searchInput.value = item;
-                performSearch(item);
-            });
-            
-            suggestionsContainer.appendChild(suggestionElement);
-        });
+        suggestionsContainer.style.display = 'block';
+    } else {
+        suggestionsContainer.style.display = 'none';
     }
-    
-    // 顯示熱門搜尋
-    const popularTitle = document.createElement('div');
-    popularTitle.className = 'suggestion-item';
-    popularTitle.innerHTML = `
-        <div class="suggestion-icon">
-            <i class="fas fa-fire"></i>
-        </div>
-        <div class="suggestion-text" style="font-weight: 500; color: #5f6368;">熱門搜尋</div>
-    `;
-    suggestionsContainer.appendChild(popularTitle);
-    
-    popularSearches.forEach(item => {
-        const suggestionElement = document.createElement('div');
-        suggestionElement.className = 'suggestion-item';
-        suggestionElement.innerHTML = `
-            <div class="suggestion-icon">
-                <i class="fas fa-search"></i>
-            </div>
-            <div class="suggestion-text">${item}</div>
-        `;
-        
-        suggestionElement.addEventListener('click', () => {
-            searchInput.value = item;
-            performSearch(item);
-        });
-        
-        suggestionsContainer.appendChild(suggestionElement);
-    });
-    
-    suggestionsContainer.style.display = 'block';
 }
 
-// 生成模擬搜尋建議
-function generateMockSuggestions(query) {
-    const baseSuggestions = [
-        `${query} 是什麼`,
+// 模擬獲取搜尋建議
+function getSearchSuggestions(query) {
+    // 這裡可以替換為實際的搜尋建議API
+    const sampleSuggestions = [
         `${query} 教學`,
-        `${query} 價格`,
-        `${query} 評價`,
         `${query} 下載`,
-        `${query} 線上`,
+        `${query} 是什麼`,
+        `${query} 價格`,
         `${query} 台灣`,
-        `${query} 2024`
+        `${query} 2024`,
+        `${query} 使用方法`,
+        `${query} 推薦`
     ];
     
-    // 根據查詢長度返回不同數量的建議
-    const count = Math.min(8, Math.max(3, 10 - query.length));
-    return baseSuggestions.slice(0, count);
+    return sampleSuggestions.slice(0, 5); // 只顯示前5個建議
 }
 
-// 執行搜尋
-function performSearch(query) {
-    if (!query.trim()) return;
-    
-    // 添加到搜尋歷史
-    addToSearchHistory(query);
-    
-    // 隱藏建議
-    suggestionsContainer.style.display = 'none';
-    
-    // 執行搜尋
-    if (query.includes('.') || query.includes('://')) {
-        window.location.href = query.includes('://') ? query : 'https://' + query;
-    } else {
-        window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    }
-}
-
-// 添加到搜尋歷史
-function addToSearchHistory(query) {
-    // 移除重複項目
-    searchHistory = searchHistory.filter(item => item !== query);
-    // 添加到開頭
-    searchHistory.unshift(query);
-    // 限制歷史記錄數量
-    searchHistory = searchHistory.slice(0, 10);
-    // 儲存到本地儲存
-    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
-}
-
-// 搜尋輸入事件監聽
-let debounceTimer;
+// 改進的輸入事件處理
+let inputTimeout;
 searchInput.addEventListener('input', function(e) {
     const query = this.value.trim();
     
-    // 防抖處理
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
+    // 清除之前的定時器
+    clearTimeout(inputTimeout);
+    
+    // 設定新的定時器，避免過於頻繁的更新
+    inputTimeout = setTimeout(() => {
         showSuggestions(query);
-    }, 200);
+    }, 100); // 100毫秒延遲
 });
 
-// 搜尋按鍵事件
-searchInput.addEventListener('keydown', function(e) {
-    const suggestions = suggestionsContainer.querySelectorAll('.suggestion-item');
-    const activeSuggestion = suggestionsContainer.querySelector('.suggestion-item.active');
-    
-    if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (!activeSuggestion) {
-            suggestions[0]?.classList.add('active');
-        } else {
-            const nextIndex = Array.from(suggestions).indexOf(activeSuggestion) + 1;
-            if (nextIndex < suggestions.length) {
-                activeSuggestion.classList.remove('active');
-                suggestions[nextIndex].classList.add('active');
-                searchInput.value = suggestions[nextIndex].querySelector('.suggestion-text').textContent;
-            }
-        }
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (activeSuggestion) {
-            const prevIndex = Array.from(suggestions).indexOf(activeSuggestion) - 1;
-            if (prevIndex >= 0) {
-                activeSuggestion.classList.remove('active');
-                suggestions[prevIndex].classList.add('active');
-                searchInput.value = suggestions[prevIndex].querySelector('.suggestion-text').textContent;
-            }
-        }
-    } else if (e.key === 'Enter') {
-        const query = activeSuggestion ? 
-            activeSuggestion.querySelector('.suggestion-text').textContent : 
-            this.value.trim();
-        if (query) {
-            performSearch(query);
-        }
+// 焦點事件
+searchInput.addEventListener('focus', function() {
+    const query = this.value.trim();
+    if (query) {
+        showSuggestions(query);
     }
 });
 
-// 點擊頁面其他地方隱藏建議
+// 點擊頁面其他地方時隱藏建議
 document.addEventListener('click', function(e) {
-    if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+    if (!searchInput.contains(e.target) && suggestionsContainer && !suggestionsContainer.contains(e.target)) {
         suggestionsContainer.style.display = 'none';
+    }
+});
+
+// 鍵盤導航
+searchInput.addEventListener('keydown', function(e) {
+    if (!suggestionsContainer || suggestionsContainer.style.display === 'none') {
+        return;
+    }
+    
+    const items = suggestionsContainer.querySelectorAll('.suggestion-item');
+    if (items.length === 0) return;
+    
+    let currentIndex = -1;
+    items.forEach((item, index) => {
+        if (item.classList.contains('selected')) {
+            currentIndex = index;
+            item.classList.remove('selected');
+        }
+    });
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            currentIndex = (currentIndex + 1) % items.length;
+            items[currentIndex].classList.add('selected');
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            currentIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
+            items[currentIndex].classList.add('selected');
+            break;
+        case 'Enter':
+            if (currentIndex >= 0) {
+                e.preventDefault();
+                searchInput.value = items[currentIndex].textContent;
+                suggestionsContainer.style.display = 'none';
+            }
+            break;
+        case 'Escape':
+            suggestionsContainer.style.display = 'none';
+            break;
+    }
+});
+
+// 修改現有的搜尋功能
+function performSearch(query) {
+    if (query) {
+        if (query.includes('.') || query.includes('://')) {
+            window.location.href = query.includes('://') ? query : 'https://' + query;
+        } else {
+            window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+        }
+    }
+}
+
+searchInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        const query = this.value.trim();
+        if (suggestionsContainer) {
+            suggestionsContainer.style.display = 'none';
+        }
+        performSearch(query);
     }
 });
 
@@ -436,6 +380,8 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         settingsMenu.style.display = 'none';
         uploadContainer.style.display = 'none';
-        suggestionsContainer.style.display = 'none';
+        if (suggestionsContainer) {
+            suggestionsContainer.style.display = 'none';
+        }
     }
 });
