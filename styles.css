@@ -75,16 +75,20 @@ body {
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
     outline: none;
     text-align: left;
+}
+
+/* 移除搜索框圆角动画，直接设置圆角 */
+.search-input.suggestions-visible {
+    border-radius: 25px 25px 0 0;
 }
 
 .search-input:focus {
     background: rgba(255, 255, 255, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-    border-radius: 25px 25px 0 0;
 }
 
 .search-input::placeholder {
