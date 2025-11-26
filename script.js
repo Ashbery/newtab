@@ -18,17 +18,216 @@ setInterval(updateClock, 1000);
 
 // 搜尋功能
 const searchInput = document.getElementById('search-input');
+const suggestionsContainer = document.getElementById('search-suggestions');
 
-searchInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        const query = this.value.trim();
-        if (query) {
-            if (query.includes('.') || query.includes('://')) {
-                window.location.href = query.includes('://') ? query : 'https://' + query;
-            } else {
-                window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+// 搜尋歷史和熱門搜尋
+let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+const popularSearches = [
+    'YouTube', 'Gmail', 'Google Maps', '天氣', '新聞',
+    'Facebook', 'Instagram', 'Twitter', 'Netflix', 'Spotify'
+];
+
+// 顯示搜尋建議
+function showSuggestions(query) {
+    suggestionsContainer.innerHTML = '';
+    
+    if (!query.trim()) {
+        // 如果沒有輸入，顯示搜尋歷史和熱門搜尋
+        showDefaultSuggestions();
+        return;
+    }
+    
+    // 模擬 Google 搜尋建議 API
+    const mockSuggestions = generateMockSuggestions(query);
+    
+    mockSuggestions.forEach((suggestion, index) => {
+        const suggestionElement = document.createElement('div');
+        suggestionElement.className = 'suggestion-item';
+        suggestionElement.innerHTML = `
+            <div class="suggestion-icon">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="suggestion-text">${suggestion}</div>
+            ${index === 0 ? '<div class="suggestion-shortcut">Enter</div>' : ''}
+        `;
+        
+        suggestionElement.addEventListener('click', () => {
+            searchInput.value = suggestion;
+            performSearch(suggestion);
+        });
+        
+        suggestionsContainer.appendChild(suggestionElement);
+    });
+    
+    suggestionsContainer.style.display = 'block';
+}
+
+// 顯示預設建議（搜尋歷史和熱門搜尋）
+function showDefaultSuggestions() {
+    // 顯示搜尋歷史（最多5個）
+    if (searchHistory.length > 0) {
+        const historyTitle = document.createElement('div');
+        historyTitle.className = 'suggestion-item';
+        historyTitle.innerHTML = `
+            <div class="suggestion-icon">
+                <i class="fas fa-history"></i>
+            </div>
+            <div class="suggestion-text" style="font-weight: 500; color: #5f6368;">搜尋記錄</div>
+        `;
+        suggestionsContainer.appendChild(historyTitle);
+        
+        searchHistory.slice(0, 5).forEach(item => {
+            const suggestionElement = document.createElement('div');
+            suggestionElement.className = 'suggestion-item';
+            suggestionElement.innerHTML = `
+                <div class="suggestion-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="suggestion-text">${item}</div>
+            `;
+            
+            suggestionElement.addEventListener('click', () => {
+                searchInput.value = item;
+                performSearch(item);
+            });
+            
+            suggestionsContainer.appendChild(suggestionElement);
+        });
+    }
+    
+    // 顯示熱門搜尋
+    const popularTitle = document.createElement('div');
+    popularTitle.className = 'suggestion-item';
+    popularTitle.innerHTML = `
+        <div class="suggestion-icon">
+            <i class="fas fa-fire"></i>
+        </div>
+        <div class="suggestion-text" style="font-weight: 500; color: #5f6368;">熱門搜尋</div>
+    `;
+    suggestionsContainer.appendChild(popularTitle);
+    
+    popularSearches.forEach(item => {
+        const suggestionElement = document.createElement('div');
+        suggestionElement.className = 'suggestion-item';
+        suggestionElement.innerHTML = `
+            <div class="suggestion-icon">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="suggestion-text">${item}</div>
+        `;
+        
+        suggestionElement.addEventListener('click', () => {
+            searchInput.value = item;
+            performSearch(item);
+        });
+        
+        suggestionsContainer.appendChild(suggestionElement);
+    });
+    
+    suggestionsContainer.style.display = 'block';
+}
+
+// 生成模擬搜尋建議
+function generateMockSuggestions(query) {
+    const baseSuggestions = [
+        `${query} 是什麼`,
+        `${query} 教學`,
+        `${query} 價格`,
+        `${query} 評價`,
+        `${query} 下載`,
+        `${query} 線上`,
+        `${query} 台灣`,
+        `${query} 2024`
+    ];
+    
+    // 根據查詢長度返回不同數量的建議
+    const count = Math.min(8, Math.max(3, 10 - query.length));
+    return baseSuggestions.slice(0, count);
+}
+
+// 執行搜尋
+function performSearch(query) {
+    if (!query.trim()) return;
+    
+    // 添加到搜尋歷史
+    addToSearchHistory(query);
+    
+    // 隱藏建議
+    suggestionsContainer.style.display = 'none';
+    
+    // 執行搜尋
+    if (query.includes('.') || query.includes('://')) {
+        window.location.href = query.includes('://') ? query : 'https://' + query;
+    } else {
+        window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    }
+}
+
+// 添加到搜尋歷史
+function addToSearchHistory(query) {
+    // 移除重複項目
+    searchHistory = searchHistory.filter(item => item !== query);
+    // 添加到開頭
+    searchHistory.unshift(query);
+    // 限制歷史記錄數量
+    searchHistory = searchHistory.slice(0, 10);
+    // 儲存到本地儲存
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+}
+
+// 搜尋輸入事件監聽
+let debounceTimer;
+searchInput.addEventListener('input', function(e) {
+    const query = this.value.trim();
+    
+    // 防抖處理
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        showSuggestions(query);
+    }, 200);
+});
+
+// 搜尋按鍵事件
+searchInput.addEventListener('keydown', function(e) {
+    const suggestions = suggestionsContainer.querySelectorAll('.suggestion-item');
+    const activeSuggestion = suggestionsContainer.querySelector('.suggestion-item.active');
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!activeSuggestion) {
+            suggestions[0]?.classList.add('active');
+        } else {
+            const nextIndex = Array.from(suggestions).indexOf(activeSuggestion) + 1;
+            if (nextIndex < suggestions.length) {
+                activeSuggestion.classList.remove('active');
+                suggestions[nextIndex].classList.add('active');
+                searchInput.value = suggestions[nextIndex].querySelector('.suggestion-text').textContent;
             }
         }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (activeSuggestion) {
+            const prevIndex = Array.from(suggestions).indexOf(activeSuggestion) - 1;
+            if (prevIndex >= 0) {
+                activeSuggestion.classList.remove('active');
+                suggestions[prevIndex].classList.add('active');
+                searchInput.value = suggestions[prevIndex].querySelector('.suggestion-text').textContent;
+            }
+        }
+    } else if (e.key === 'Enter') {
+        const query = activeSuggestion ? 
+            activeSuggestion.querySelector('.suggestion-text').textContent : 
+            this.value.trim();
+        if (query) {
+            performSearch(query);
+        }
+    }
+});
+
+// 點擊頁面其他地方隱藏建議
+document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+        suggestionsContainer.style.display = 'none';
     }
 });
 
@@ -237,5 +436,6 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         settingsMenu.style.display = 'none';
         uploadContainer.style.display = 'none';
+        suggestionsContainer.style.display = 'none';
     }
 });
