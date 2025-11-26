@@ -59,7 +59,6 @@ body {
 .search-container {
     flex: 1;
     max-width: 600px;
-    position: relative;
 }
 
 .search-box {
@@ -92,7 +91,7 @@ body {
     text-align: left;
 }
 
-/* ===== 新增：搜尋預測下拉選單 ===== */
+/* 搜尋建議樣式 */
 .search-suggestions {
     position: absolute;
     top: 100%;
@@ -100,60 +99,48 @@ body {
     right: 0;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
-    border-radius: 0 0 20px 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
-    display: none;
-    max-height: 300px;
-    overflow-y: auto;
-    margin-top: 5px;
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-top: none;
+    border-radius: 0 0 25px 25px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
 .suggestion-item {
-    display: flex;
-    align-items: center;
     padding: 12px 20px;
     color: #333;
-    text-decoration: none;
     cursor: pointer;
     transition: all 0.2s ease;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 0.95rem;
+    text-align: left;
 }
 
-.suggestion-item:hover {
-    background: rgba(0, 0, 0, 0.05);
+.suggestion-item:hover,
+.suggestion-item.selected {
+    background: rgba(74, 108, 247, 0.1);
+    color: #4a6cf7;
 }
 
 .suggestion-item:last-child {
     border-bottom: none;
 }
 
-.suggestion-icon {
-    margin-right: 12px;
-    color: #5f6368;
-    font-size: 0.9rem;
-    width: 16px;
-    text-align: center;
+/* 確保搜尋框容器有相對定位 */
+.search-box {
+    position: relative;
 }
 
-.suggestion-text {
-    flex: 1;
-    font-size: 0.95rem;
-    color: #333;
+/* 調整搜尋框圓角，當有建議時顯示不同的圓角 */
+.search-input:focus {
+    border-radius: 25px 25px 0 0;
 }
 
-.suggestion-shortcut {
-    color: #5f6368;
-    font-size: 0.8rem;
-    margin-left: 8px;
-    opacity: 0.7;
-}
-
-/* 搜尋框有內容時的下拉選單樣式 */
-.search-box:focus-within .search-suggestions {
-    display: block;
+.search-input:focus + .search-suggestions {
+    border-radius: 0 0 25px 25px;
 }
 
 /* 右上角快捷鍵 */
@@ -555,13 +542,13 @@ body {
         right: 15px;
         min-width: 180px;
     }
-
-    /* 手機版搜尋預測調整 */
+    
     .search-suggestions {
-        margin-top: 3px;
+        max-height: 200px;
     }
     
     .suggestion-item {
         padding: 10px 15px;
+        font-size: 0.9rem;
     }
 }
