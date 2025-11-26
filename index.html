@@ -72,9 +72,15 @@
             transition: all 0.3s ease;
         }
 
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
         .search-input {
             width: 100%;
-            padding: 15px 20px;
+            padding: 15px 50px 15px 20px;
             border: none;
             border-radius: 25px;
             background: rgba(255, 255, 255, 0.15);
@@ -100,6 +106,30 @@
         .search-input::placeholder {
             color: rgba(255, 255, 255, 0.8);
             text-align: left;
+        }
+
+        /* 清除按鈕 */
+        .clear-btn {
+            position: absolute;
+            right: 15px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            font-size: 1rem;
+            display: none;
+            transition: all 0.2s ease;
+            padding: 5px;
+            border-radius: 50%;
+        }
+
+        .clear-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .search-box.has-text .clear-btn {
+            display: block;
         }
 
         /* 搜尋建議容器 */
@@ -508,7 +538,12 @@
 
         <div class="search-container">
             <div class="search-box" id="search-box">
-                <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址" autocomplete="off">
+                <div class="search-input-wrapper">
+                    <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址" autocomplete="off">
+                    <button class="clear-btn" id="clear-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
                 <div class="suggestions-container" id="suggestions-container">
                     <div class="suggestions-list" id="suggestions-list">
                         <!-- 搜尋建議將在這裡動態生成 -->
@@ -662,11 +697,30 @@
         // 搜尋功能
         const searchInput = document.getElementById('search-input');
         const searchBox = document.getElementById('search-box');
+        const clearBtn = document.getElementById('clear-btn');
         const suggestionsContainer = document.getElementById('suggestions-container');
         const suggestionsList = document.getElementById('suggestions-list');
         
         let searchTimeout;
         let currentSuggestions = [];
+
+        // 清除按鈕功能
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            searchInput.focus();
+            updateClearButton();
+            clearSuggestions();
+            searchBox.classList.remove('active');
+        });
+
+        // 更新清除按鈕顯示狀態
+        function updateClearButton() {
+            if (searchInput.value.trim()) {
+                searchBox.classList.add('has-text');
+            } else {
+                searchBox.classList.remove('has-text');
+            }
+        }
 
         // 點擊搜尋框時不展開，僅添加焦點樣式
         searchInput.addEventListener('focus', function() {
@@ -684,6 +738,9 @@
         // 輸入時獲取搜尋建議
         searchInput.addEventListener('input', function() {
             const query = this.value.trim();
+            
+            // 更新清除按鈕顯示狀態
+            updateClearButton();
             
             // 清除之前的計時器
             clearTimeout(searchTimeout);
