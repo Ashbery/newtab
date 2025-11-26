@@ -52,13 +52,6 @@ function showSuggestions(query) {
         return;
     }
     
-    // 如果查詢與上次相同，不進行任何操作
-    if (query === lastQuery) {
-        return;
-    }
-    
-    lastQuery = query;
-    
     // 模擬搜尋建議（實際應用中應該從API獲取）
     const suggestions = getSearchSuggestions(query);
     
