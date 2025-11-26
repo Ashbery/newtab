@@ -69,7 +69,7 @@
 
         .search-box {
             position: relative;
-            transition: all 0.3s ease;
+            transition: all 0.15s ease; /* 更快的過渡 */
         }
 
         .search-input-wrapper {
@@ -88,7 +88,7 @@
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.3);
             backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
+            transition: all 0.15s ease; /* 更快的過渡 */
             outline: none;
             text-align: left;
             /* 禁用瀏覽器自動填充樣式 */
@@ -124,7 +124,7 @@
             cursor: pointer;
             font-size: 1rem;
             display: none;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease; /* 更快的過渡 */
             padding: 5px;
             border-radius: 50%;
             width: 24px;
@@ -155,18 +155,17 @@
             overflow: hidden;
             max-height: 0;
             opacity: 0;
-            transition: all 0.3s ease;
+            transition: all 0.15s ease; /* 更快的過渡 */
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-top: none;
             z-index: 100;
-            transform: translateY(-10px);
+            transform: translateY(-5px);
         }
 
         .search-box.active .suggestions-container {
             max-height: 300px;
             opacity: 1;
             transform: translateY(0);
-            transition: all 0.3s ease 0.1s; /* 延遲出現，讓搜尋框先變形 */
         }
 
         /* 自定義滾動條 */
@@ -199,7 +198,7 @@
             cursor: pointer;
             display: flex;
             align-items: center;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease; /* 更快的過渡 */
         }
 
         .suggestion-item:hover {
@@ -215,13 +214,6 @@
         .suggestion-text {
             font-size: 0.95rem;
             color: rgba(255, 255, 255, 0.9);
-        }
-
-        .loading-suggestions {
-            padding: 12px 20px;
-            text-align: center;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
         }
 
         /* 右上角快捷鍵 */
@@ -766,7 +758,7 @@
                 // 設定新的計時器，避免過於頻繁的請求
                 searchTimeout = setTimeout(() => {
                     fetchSuggestions(query);
-                }, 300);
+                }, 200); // 縮短延遲時間
             } else {
                 // 如果沒有輸入，清空建議並收起搜尋框
                 clearSuggestions();
@@ -776,8 +768,8 @@
 
         // 使用Google搜尋建議API
         function fetchSuggestions(query) {
-            // 顯示載入狀態
-            suggestionsList.innerHTML = '<div class="loading-suggestions">載入中...</div>';
+            // 不再顯示載入狀態，直接清空建議列表
+            suggestionsList.innerHTML = '';
             
             // 使用JSONP方式獲取Google搜尋建議
             const script = document.createElement('script');
@@ -810,10 +802,8 @@
                     
                     suggestionsList.appendChild(suggestionItem);
                 });
-            } else {
-                // 如果沒有建議，顯示提示
-                suggestionsList.innerHTML = '<div class="loading-suggestions">沒有找到相關搜尋建議</div>';
             }
+            // 如果沒有建議，也不顯示任何提示
         };
 
         // 清空搜尋建議
