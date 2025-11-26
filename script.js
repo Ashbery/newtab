@@ -20,7 +20,6 @@ setInterval(updateClock, 1000);
 const searchInput = document.getElementById('search-input');
 let suggestionsContainer = null;
 let isSuggestionsVisible = false;
-let lastQuery = '';
 
 // 創建建議容器
 function createSuggestionsContainer() {
@@ -48,7 +47,6 @@ function showSuggestions(query) {
     // 如果查詢為空，隱藏建議
     if (!query) {
         hideSuggestions();
-        lastQuery = '';
         return;
     }
     
@@ -73,6 +71,8 @@ function showSuggestions(query) {
         if (!isSuggestionsVisible) {
             suggestionsContainer.style.display = 'block';
             isSuggestionsVisible = true;
+            // 添加類以修改搜索框圓角
+            searchInput.classList.add('suggestions-visible');
         }
     } else {
         hideSuggestions();
@@ -84,7 +84,8 @@ function hideSuggestions() {
     if (suggestionsContainer && isSuggestionsVisible) {
         suggestionsContainer.style.display = 'none';
         isSuggestionsVisible = false;
-        lastQuery = '';
+        // 移除類以恢復搜索框圓角
+        searchInput.classList.remove('suggestions-visible');
     }
 }
 
