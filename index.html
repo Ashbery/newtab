@@ -713,6 +713,7 @@
         
         let searchTimeout;
         let currentSuggestions = [];
+        let isActive = false; // 追蹤搜尋框是否處於活躍狀態
 
         // 清除按鈕功能
         clearBtn.addEventListener('click', function() {
@@ -720,7 +721,12 @@
             searchInput.focus();
             updateClearButton();
             clearSuggestions();
-            searchBox.classList.remove('active');
+            
+            // 只有在輸入框為空時才關閉建議列
+            if (!searchInput.value.trim()) {
+                searchBox.classList.remove('active');
+                isActive = false;
+            }
         });
 
         // 更新清除按鈕顯示狀態
@@ -734,14 +740,21 @@
 
         // 點擊搜尋框時不展開，僅添加焦點樣式
         searchInput.addEventListener('focus', function() {
-            // 不展開搜尋框，只顯示焦點樣式
-            // 搜尋框會保持原本的樣式，不顯示建議區域
+            // 如果已經有內容，保持建議列開啟
+            if (searchInput.value.trim()) {
+                searchBox.classList.add('active');
+                isActive = true;
+            }
         });
 
         // 點擊頁面其他地方時關閉建議
         document.addEventListener('click', function(event) {
             if (!searchBox.contains(event.target)) {
-                searchBox.classList.remove('active');
+                // 只有在輸入框為空時才關閉建議列
+                if (!searchInput.value.trim()) {
+                    searchBox.classList.remove('active');
+                    isActive = false;
+                }
             }
         });
 
@@ -756,17 +769,21 @@
             clearTimeout(searchTimeout);
             
             if (query) {
-                // 當有輸入時才展開搜尋框
-                searchBox.classList.add('active');
+                // 第一次輸入時才添加active類，後續輸入保持active狀態
+                if (!isActive) {
+                    searchBox.classList.add('active');
+                    isActive = true;
+                }
                 
                 // 設定新的計時器，避免過於頻繁的請求
                 searchTimeout = setTimeout(() => {
                     fetchSuggestions(query);
-                }, 200); // 縮短延遲時間
+                }, 200);
             } else {
                 // 如果沒有輸入，清空建議並收起搜尋框
                 clearSuggestions();
                 searchBox.classList.remove('active');
+                isActive = false;
             }
         });
 
