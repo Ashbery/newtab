@@ -69,7 +69,6 @@
 
         .search-box {
             position: relative;
-            transition: all 0.15s ease; /* 更快的過渡 */
         }
 
         .search-input-wrapper {
@@ -88,7 +87,7 @@
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.3);
             backdrop-filter: blur(10px);
-            transition: all 0.15s ease; /* 更快的過渡 */
+            transition: all 0.15s ease;
             outline: none;
             text-align: left;
             /* 禁用瀏覽器自動填充樣式 */
@@ -103,10 +102,12 @@
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
         }
 
-        /* 當有建議列顯示時，搜尋框底部變為直角 */
+        /* 當有建議列顯示時，搜尋框底部變為直角 - 無過渡動畫 */
         .search-box.active .search-input {
             border-radius: 25px 25px 0 0;
             border-bottom: none;
+            /* 移除圓角變化的過渡效果 */
+            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .search-input::placeholder {
@@ -124,7 +125,7 @@
             cursor: pointer;
             font-size: 1rem;
             display: none;
-            transition: all 0.15s ease; /* 更快的過渡 */
+            transition: all 0.15s ease;
             padding: 5px;
             border-radius: 50%;
             width: 24px;
@@ -155,7 +156,7 @@
             overflow: hidden;
             max-height: 0;
             opacity: 0;
-            transition: all 0.15s ease; /* 更快的過渡 */
+            transition: all 0.15s ease;
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-top: none;
             z-index: 100;
@@ -198,7 +199,7 @@
             cursor: pointer;
             display: flex;
             align-items: center;
-            transition: all 0.15s ease; /* 更快的過渡 */
+            transition: all 0.15s ease;
         }
 
         .suggestion-item:hover {
@@ -357,19 +358,20 @@
             color: rgba(255, 255, 255, 0.8);
         }
 
-        /* 設定選單 */
+        /* 設定選單 - 修復為透明毛玻璃效果 */
         .settings-menu {
             position: fixed;
             bottom: 70px;
             right: 20px;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.15) !important;
+            backdrop-filter: blur(10px) !important;
             border-radius: 12px;
             padding: 15px;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
             z-index: 100;
             display: none;
             min-width: 200px;
-            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
         }
 
         .settings-menu::after {
@@ -381,14 +383,14 @@
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 8px solid rgba(255, 255, 255, 0.95);
+            border-top: 8px solid rgba(255, 255, 255, 0.15);
         }
 
         .menu-item {
             display: flex;
             align-items: center;
             padding: 12px 15px;
-            color: #333;
+            color: white !important;
             text-decoration: none;
             border-radius: 8px;
             cursor: pointer;
@@ -397,7 +399,7 @@
         }
 
         .menu-item:hover {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(255, 255, 255, 0.1) !important;
         }
 
         .menu-item:last-child {
@@ -408,11 +410,13 @@
             width: 20px;
             margin-right: 10px;
             font-size: 1rem;
+            color: rgba(255, 255, 255, 0.9) !important;
         }
 
         .menu-item span {
             font-size: 0.9rem;
             font-weight: 500;
+            color: white !important;
         }
 
         .video-upload-container {
