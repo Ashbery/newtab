@@ -71,6 +71,7 @@
 
         .search-box {
             position: relative;
+            width: 100%;
         }
 
         .search-input {
@@ -86,12 +87,14 @@
             transition: all 0.3s ease;
             outline: none;
             text-align: left;
+            box-shadow: none;
         }
 
         .search-input:focus {
             background: rgba(255, 255, 255, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.6);
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            border-radius: 25px 25px 0 0;
         }
 
         .search-input::placeholder {
@@ -99,7 +102,7 @@
             text-align: left;
         }
 
-        /* 搜尋預測下拉選單 */
+        /* 搜尋預測下拉選單 - 修改為搜尋框的延伸 */
         .search-suggestions {
             position: absolute;
             top: 100%;
@@ -107,15 +110,15 @@
             right: 0;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-radius: 0 0 20px 20px;
+            border-radius: 0 0 25px 25px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             z-index: 1000;
             display: none;
             max-height: 300px;
             overflow-y: auto;
-            margin-top: 5px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.6);
             border-top: none;
+            margin-top: -1px; /* 消除間隙 */
         }
 
         .suggestion-item {
@@ -649,8 +652,20 @@
             'Facebook', 'Instagram', 'Twitter', 'Netflix', 'Spotify'
         ];
 
+        // 從 Google 獲取搜尋建議
+        async function fetchGoogleSuggestions(query) {
+            try {
+                const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                return data[1] || []; // Google 建議在陣列的第二個位置
+            } catch (error) {
+                console.error('獲取 Google 建議失敗:', error);
+                return [];
+            }
+        }
+
         // 顯示搜尋建議
-        function showSuggestions(query) {
+        async function showSuggestions(query) {
             suggestionsContainer.innerHTML = '';
             
             if (!query.trim()) {
@@ -659,10 +674,37 @@
                 return;
             }
             
-            // 模擬 Google 搜尋建議 API
-            const mockSuggestions = generateMockSuggestions(query);
+            // 顯示載入中提示
+            const loadingElement = document.createElement('div');
+            loadingElement.className = 'suggestion-item';
+            loadingElement.innerHTML = `
+                <div class="suggestion-icon">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <div class="suggestion-text">載入中...</div>
+            `;
+            suggestionsContainer.appendChild(loadingElement);
+            suggestionsContainer.style.display = 'block';
             
-            mockSuggestions.forEach((suggestion, index) => {
+            // 從 Google 獲取建議
+            const googleSuggestions = await fetchGoogleSuggestions(query);
+            
+            // 清除載入提示
+            suggestionsContainer.innerHTML = '';
+            
+            if (googleSuggestions.length === 0) {
+                // 如果沒有 Google 建議，顯示本地生成的建議
+                const mockSuggestions = generateMockSuggestions(query);
+                displaySuggestions(mockSuggestions);
+            } else {
+                // 顯示 Google 建議
+                displaySuggestions(googleSuggestions);
+            }
+        }
+
+        // 顯示建議列表
+        function displaySuggestions(suggestions) {
+            suggestions.forEach((suggestion, index) => {
                 const suggestionElement = document.createElement('div');
                 suggestionElement.className = 'suggestion-item';
                 suggestionElement.innerHTML = `
@@ -686,6 +728,12 @@
 
         // 顯示預設建議（搜尋歷史和熱門搜尋）
         function showDefaultSuggestions() {
+            // 確保搜尋框沒有焦點時隱藏建議
+            if (document.activeElement !== searchInput) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            
             // 顯示搜尋歷史（最多5個）
             if (searchHistory.length > 0) {
                 const historyTitle = document.createElement('div');
@@ -749,7 +797,7 @@
             suggestionsContainer.style.display = 'block';
         }
 
-        // 生成模擬搜尋建議
+        // 生成模擬搜尋建議（備用）
         function generateMockSuggestions(query) {
             const baseSuggestions = [
                 `${query} 是什麼`,
@@ -776,6 +824,9 @@
             
             // 隱藏建議
             suggestionsContainer.style.display = 'none';
+            
+            // 恢復搜尋框的圓角
+            searchInput.style.borderRadius = '25px';
             
             // 執行搜尋
             if (query.includes('.') || query.includes('://')) {
@@ -806,6 +857,24 @@
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
                 showSuggestions(query);
+            }, 300);
+        });
+
+        // 搜尋框焦點事件
+        searchInput.addEventListener('focus', function() {
+            const query = this.value.trim();
+            if (!query) {
+                showDefaultSuggestions();
+            }
+        });
+
+        // 搜尋框失去焦點事件
+        searchInput.addEventListener('blur', function() {
+            // 延遲隱藏建議，以便點擊建議項目的時間
+            setTimeout(() => {
+                suggestionsContainer.style.display = 'none';
+                // 恢復搜尋框的圓角
+                searchInput.style.borderRadius = '25px';
             }, 200);
         });
 
@@ -843,6 +912,10 @@
                 if (query) {
                     performSearch(query);
                 }
+            } else if (e.key === 'Escape') {
+                suggestionsContainer.style.display = 'none';
+                // 恢復搜尋框的圓角
+                searchInput.style.borderRadius = '25px';
             }
         });
 
@@ -850,6 +923,8 @@
         document.addEventListener('click', function(e) {
             if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
                 suggestionsContainer.style.display = 'none';
+                // 恢復搜尋框的圓角
+                searchInput.style.borderRadius = '25px';
             }
         });
 
