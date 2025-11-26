@@ -8,7 +8,7 @@
     <!-- 使用相同目錄的 favicon.ico -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <!-- 引入外部 CSS -->
-    <link rel="stylesheet" href="styles.css">
+     <link rel="stylesheet" href="styles.css">
     <style>
         * {
             margin: 0;
@@ -71,7 +71,11 @@
 
         .search-box {
             position: relative;
-            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .search-box.expanded {
+            z-index: 1000;
         }
 
         .search-input {
@@ -87,14 +91,13 @@
             transition: all 0.3s ease;
             outline: none;
             text-align: left;
-            box-shadow: none;
         }
 
-        .search-input:focus {
+        .search-box.expanded .search-input {
+            border-radius: 25px 25px 0 0;
             background: rgba(255, 255, 255, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.6);
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-            border-radius: 25px 25px 0 0;
         }
 
         .search-input::placeholder {
@@ -102,67 +105,81 @@
             text-align: left;
         }
 
-        /* 搜尋預測下拉選單 - 修改為搜尋框的延伸 */
-        .search-suggestions {
+        /* 搜尋建議容器 */
+        .suggestions-container {
             position: absolute;
             top: 100%;
             left: 0;
             right: 0;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
             border-radius: 0 0 25px 25px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            z-index: 1000;
-            display: none;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-top: none;
+        }
+
+        .search-box.expanded .suggestions-container {
+            max-height: 300px;
+            opacity: 1;
+        }
+
+        /* 自定義滾動條 */
+        .suggestions-list {
             max-height: 300px;
             overflow-y: auto;
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            border-top: none;
-            margin-top: -1px; /* 消除間隙 */
+            padding: 10px 0;
+        }
+
+        .suggestions-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .suggestions-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .suggestions-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        .suggestions-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
 
         .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
             display: flex;
             align-items: center;
-            padding: 12px 20px;
-            color: #333;
-            text-decoration: none;
-            cursor: pointer;
             transition: all 0.2s ease;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
 
         .suggestion-item:hover {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        .suggestion-item.active {
-            background: rgba(0, 0, 0, 0.1);
-        }
-
-        .suggestion-item:last-child {
-            border-bottom: none;
-        }
-
-        .suggestion-icon {
+        .suggestion-item i {
             margin-right: 12px;
-            color: #5f6368;
+            color: rgba(255, 255, 255, 0.7);
             font-size: 0.9rem;
-            width: 16px;
-            text-align: center;
         }
 
         .suggestion-text {
-            flex: 1;
             font-size: 0.95rem;
-            color: #333;
+            color: rgba(255, 255, 255, 0.9);
         }
 
-        .suggestion-shortcut {
-            color: #5f6368;
-            font-size: 0.8rem;
-            margin-left: 8px;
-            opacity: 0.7;
+        .loading-suggestions {
+            padding: 12px 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
         }
 
         /* 右上角快捷鍵 */
@@ -492,10 +509,13 @@
         </div>
 
         <div class="search-container">
-            <div class="search-box">
-                <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址" autocomplete="off">
-                <!-- 搜尋預測容器 -->
-                <div class="search-suggestions" id="search-suggestions"></div>
+            <div class="search-box" id="search-box">
+                <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址">
+                <div class="suggestions-container" id="suggestions-container">
+                    <div class="suggestions-list" id="suggestions-list">
+                        <!-- 搜尋建議將在這裡動態生成 -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -643,192 +663,96 @@
 
         // 搜尋功能
         const searchInput = document.getElementById('search-input');
-        const suggestionsContainer = document.getElementById('search-suggestions');
+        const searchBox = document.getElementById('search-box');
+        const suggestionsContainer = document.getElementById('suggestions-container');
+        const suggestionsList = document.getElementById('suggestions-list');
+        
+        let searchTimeout;
+        let currentSuggestions = [];
 
-        // 搜尋歷史和熱門搜尋
-        let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
-        const popularSearches = [
-            'YouTube', 'Gmail', 'Google Maps', '天氣', '新聞',
-            'Facebook', 'Instagram', 'Twitter', 'Netflix', 'Spotify'
-        ];
-
-        // 從 Google 獲取搜尋建議
-        async function fetchGoogleSuggestions(query) {
-            try {
-                const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query)}`);
-                const data = await response.json();
-                return data[1] || []; // Google 建議在陣列的第二個位置
-            } catch (error) {
-                console.error('獲取 Google 建議失敗:', error);
-                return [];
+        // 點擊搜尋框時展開
+        searchInput.addEventListener('focus', function() {
+            searchBox.classList.add('expanded');
+            if (searchInput.value.trim()) {
+                fetchSuggestions(searchInput.value.trim());
             }
-        }
+        });
 
-        // 顯示搜尋建議
-        async function showSuggestions(query) {
-            suggestionsContainer.innerHTML = '';
-            
-            if (!query.trim()) {
-                // 如果沒有輸入，顯示搜尋歷史和熱門搜尋
-                showDefaultSuggestions();
-                return;
+        // 點擊頁面其他地方時收起
+        document.addEventListener('click', function(event) {
+            if (!searchBox.contains(event.target)) {
+                searchBox.classList.remove('expanded');
             }
+        });
+
+        // 輸入時獲取搜尋建議
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim();
             
-            // 顯示載入中提示
-            const loadingElement = document.createElement('div');
-            loadingElement.className = 'suggestion-item';
-            loadingElement.innerHTML = `
-                <div class="suggestion-icon">
-                    <i class="fas fa-spinner fa-spin"></i>
-                </div>
-                <div class="suggestion-text">載入中...</div>
-            `;
-            suggestionsContainer.appendChild(loadingElement);
-            suggestionsContainer.style.display = 'block';
+            // 清除之前的計時器
+            clearTimeout(searchTimeout);
             
-            // 從 Google 獲取建議
-            const googleSuggestions = await fetchGoogleSuggestions(query);
-            
-            // 清除載入提示
-            suggestionsContainer.innerHTML = '';
-            
-            if (googleSuggestions.length === 0) {
-                // 如果沒有 Google 建議，顯示本地生成的建議
-                const mockSuggestions = generateMockSuggestions(query);
-                displaySuggestions(mockSuggestions);
+            if (query) {
+                // 設定新的計時器，避免過於頻繁的請求
+                searchTimeout = setTimeout(() => {
+                    fetchSuggestions(query);
+                }, 300);
             } else {
-                // 顯示 Google 建議
-                displaySuggestions(googleSuggestions);
+                // 如果沒有輸入，清空建議
+                clearSuggestions();
             }
+        });
+
+        // 使用Google搜尋建議API
+        function fetchSuggestions(query) {
+            // 顯示載入狀態
+            suggestionsList.innerHTML = '<div class="loading-suggestions">載入中...</div>';
+            
+            // 使用JSONP方式獲取Google搜尋建議
+            const script = document.createElement('script');
+            script.src = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}&callback=handleSuggestions`;
+            document.head.appendChild(script);
         }
 
-        // 顯示建議列表
-        function displaySuggestions(suggestions) {
-            suggestions.forEach((suggestion, index) => {
-                const suggestionElement = document.createElement('div');
-                suggestionElement.className = 'suggestion-item';
-                suggestionElement.innerHTML = `
-                    <div class="suggestion-icon">
+        // 處理Google搜尋建議回調
+        window.handleSuggestions = function(data) {
+            // 移除載入中的提示
+            suggestionsList.innerHTML = '';
+            
+            if (data && data[1] && data[1].length > 0) {
+                currentSuggestions = data[1];
+                
+                // 顯示建議
+                currentSuggestions.forEach((suggestion, index) => {
+                    const suggestionItem = document.createElement('div');
+                    suggestionItem.className = 'suggestion-item';
+                    suggestionItem.innerHTML = `
                         <i class="fas fa-search"></i>
-                    </div>
-                    <div class="suggestion-text">${suggestion}</div>
-                    ${index === 0 ? '<div class="suggestion-shortcut">Enter</div>' : ''}
-                `;
-                
-                suggestionElement.addEventListener('click', () => {
-                    searchInput.value = suggestion;
-                    performSearch(suggestion);
-                });
-                
-                suggestionsContainer.appendChild(suggestionElement);
-            });
-            
-            suggestionsContainer.style.display = 'block';
-        }
-
-        // 顯示預設建議（搜尋歷史和熱門搜尋）
-        function showDefaultSuggestions() {
-            // 確保搜尋框沒有焦點時隱藏建議
-            if (document.activeElement !== searchInput) {
-                suggestionsContainer.style.display = 'none';
-                return;
-            }
-            
-            // 顯示搜尋歷史（最多5個）
-            if (searchHistory.length > 0) {
-                const historyTitle = document.createElement('div');
-                historyTitle.className = 'suggestion-item';
-                historyTitle.innerHTML = `
-                    <div class="suggestion-icon">
-                        <i class="fas fa-history"></i>
-                    </div>
-                    <div class="suggestion-text" style="font-weight: 500; color: #5f6368;">搜尋記錄</div>
-                `;
-                suggestionsContainer.appendChild(historyTitle);
-                
-                searchHistory.slice(0, 5).forEach(item => {
-                    const suggestionElement = document.createElement('div');
-                    suggestionElement.className = 'suggestion-item';
-                    suggestionElement.innerHTML = `
-                        <div class="suggestion-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <div class="suggestion-text">${item}</div>
+                        <span class="suggestion-text">${suggestion}</span>
                     `;
                     
-                    suggestionElement.addEventListener('click', () => {
-                        searchInput.value = item;
-                        performSearch(item);
+                    // 點擊建議時執行搜尋
+                    suggestionItem.addEventListener('click', function() {
+                        searchInput.value = suggestion;
+                        performSearch(suggestion);
                     });
                     
-                    suggestionsContainer.appendChild(suggestionElement);
+                    suggestionsList.appendChild(suggestionItem);
                 });
+            } else {
+                // 如果沒有建議，顯示提示
+                suggestionsList.innerHTML = '<div class="loading-suggestions">沒有找到相關搜尋建議</div>';
             }
-            
-            // 顯示熱門搜尋
-            const popularTitle = document.createElement('div');
-            popularTitle.className = 'suggestion-item';
-            popularTitle.innerHTML = `
-                <div class="suggestion-icon">
-                    <i class="fas fa-fire"></i>
-                </div>
-                <div class="suggestion-text" style="font-weight: 500; color: #5f6368;">熱門搜尋</div>
-            `;
-            suggestionsContainer.appendChild(popularTitle);
-            
-            popularSearches.forEach(item => {
-                const suggestionElement = document.createElement('div');
-                suggestionElement.className = 'suggestion-item';
-                suggestionElement.innerHTML = `
-                    <div class="suggestion-icon">
-                        <i class="fas fa-search"></i>
-                    </div>
-                    <div class="suggestion-text">${item}</div>
-                `;
-                
-                suggestionElement.addEventListener('click', () => {
-                    searchInput.value = item;
-                    performSearch(item);
-                });
-                
-                suggestionsContainer.appendChild(suggestionElement);
-            });
-            
-            suggestionsContainer.style.display = 'block';
-        }
+        };
 
-        // 生成模擬搜尋建議（備用）
-        function generateMockSuggestions(query) {
-            const baseSuggestions = [
-                `${query} 是什麼`,
-                `${query} 教學`,
-                `${query} 價格`,
-                `${query} 評價`,
-                `${query} 下載`,
-                `${query} 線上`,
-                `${query} 台灣`,
-                `${query} 2024`
-            ];
-            
-            // 根據查詢長度返回不同數量的建議
-            const count = Math.min(8, Math.max(3, 10 - query.length));
-            return baseSuggestions.slice(0, count);
+        // 清空搜尋建議
+        function clearSuggestions() {
+            suggestionsList.innerHTML = '';
+            currentSuggestions = [];
         }
 
         // 執行搜尋
         function performSearch(query) {
-            if (!query.trim()) return;
-            
-            // 添加到搜尋歷史
-            addToSearchHistory(query);
-            
-            // 隱藏建議
-            suggestionsContainer.style.display = 'none';
-            
-            // 恢復搜尋框的圓角
-            searchInput.style.borderRadius = '25px';
-            
-            // 執行搜尋
             if (query.includes('.') || query.includes('://')) {
                 window.location.href = query.includes('://') ? query : 'https://' + query;
             } else {
@@ -836,95 +760,13 @@
             }
         }
 
-        // 添加到搜尋歷史
-        function addToSearchHistory(query) {
-            // 移除重複項目
-            searchHistory = searchHistory.filter(item => item !== query);
-            // 添加到開頭
-            searchHistory.unshift(query);
-            // 限制歷史記錄數量
-            searchHistory = searchHistory.slice(0, 10);
-            // 儲存到本地儲存
-            localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
-        }
-
-        // 搜尋輸入事件監聽
-        let debounceTimer;
-        searchInput.addEventListener('input', function(e) {
-            const query = this.value.trim();
-            
-            // 防抖處理
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                showSuggestions(query);
-            }, 300);
-        });
-
-        // 搜尋框焦點事件
-        searchInput.addEventListener('focus', function() {
-            const query = this.value.trim();
-            if (!query) {
-                showDefaultSuggestions();
-            }
-        });
-
-        // 搜尋框失去焦點事件
-        searchInput.addEventListener('blur', function() {
-            // 延遲隱藏建議，以便點擊建議項目的時間
-            setTimeout(() => {
-                suggestionsContainer.style.display = 'none';
-                // 恢復搜尋框的圓角
-                searchInput.style.borderRadius = '25px';
-            }, 200);
-        });
-
-        // 搜尋按鍵事件
-        searchInput.addEventListener('keydown', function(e) {
-            const suggestions = suggestionsContainer.querySelectorAll('.suggestion-item');
-            const activeSuggestion = suggestionsContainer.querySelector('.suggestion-item.active');
-            
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (!activeSuggestion) {
-                    suggestions[0]?.classList.add('active');
-                } else {
-                    const nextIndex = Array.from(suggestions).indexOf(activeSuggestion) + 1;
-                    if (nextIndex < suggestions.length) {
-                        activeSuggestion.classList.remove('active');
-                        suggestions[nextIndex].classList.add('active');
-                        searchInput.value = suggestions[nextIndex].querySelector('.suggestion-text').textContent;
-                    }
-                }
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (activeSuggestion) {
-                    const prevIndex = Array.from(suggestions).indexOf(activeSuggestion) - 1;
-                    if (prevIndex >= 0) {
-                        activeSuggestion.classList.remove('active');
-                        suggestions[prevIndex].classList.add('active');
-                        searchInput.value = suggestions[prevIndex].querySelector('.suggestion-text').textContent;
-                    }
-                }
-            } else if (e.key === 'Enter') {
-                const query = activeSuggestion ? 
-                    activeSuggestion.querySelector('.suggestion-text').textContent : 
-                    this.value.trim();
+        // 按Enter執行搜尋
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const query = this.value.trim();
                 if (query) {
                     performSearch(query);
                 }
-            } else if (e.key === 'Escape') {
-                suggestionsContainer.style.display = 'none';
-                // 恢復搜尋框的圓角
-                searchInput.style.borderRadius = '25px';
-            }
-        });
-
-        // 點擊頁面其他地方隱藏建議
-        document.addEventListener('click', function(e) {
-            if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
-                suggestionsContainer.style.display = 'none';
-                // 恢復搜尋框的圓角
-                searchInput.style.borderRadius = '25px';
             }
         });
 
