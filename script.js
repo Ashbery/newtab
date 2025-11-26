@@ -19,6 +19,7 @@ setInterval(updateClock, 1000);
 // 搜尋功能
 const searchInput = document.getElementById('search-input');
 let suggestionsContainer = null;
+let isSuggestionsVisible = false;
 
 // 創建建議容器
 function createSuggestionsContainer() {
@@ -31,22 +32,20 @@ function createSuggestionsContainer() {
         suggestionsContainer.addEventListener('click', function(e) {
             if (e.target.classList.contains('suggestion-item')) {
                 searchInput.value = e.target.textContent;
-                suggestionsContainer.style.display = 'none';
-                // 可以選擇是否自動搜尋
-                // performSearch(searchInput.value);
+                hideSuggestions();
             }
         });
     }
 }
 
-// 顯示搜尋建議
+// 顯示搜尋建議 - 改進版本
 function showSuggestions(query) {
     if (!suggestionsContainer) {
         createSuggestionsContainer();
     }
     
     if (!query) {
-        suggestionsContainer.style.display = 'none';
+        hideSuggestions();
         return;
     }
     
@@ -61,9 +60,30 @@ function showSuggestions(query) {
             item.textContent = suggestion;
             suggestionsContainer.appendChild(item);
         });
-        suggestionsContainer.style.display = 'block';
+        
+        // 使用平滑顯示效果，避免閃爍
+        if (!isSuggestionsVisible) {
+            suggestionsContainer.style.display = 'block';
+            // 使用requestAnimationFrame確保DOM更新後再添加動畫類
+            requestAnimationFrame(() => {
+                suggestionsContainer.classList.add('visible');
+                isSuggestionsVisible = true;
+            });
+        }
     } else {
-        suggestionsContainer.style.display = 'none';
+        hideSuggestions();
+    }
+}
+
+// 隱藏建議列表 - 改進版本
+function hideSuggestions() {
+    if (suggestionsContainer && isSuggestionsVisible) {
+        suggestionsContainer.classList.remove('visible');
+        // 等待動畫完成後再隱藏
+        setTimeout(() => {
+            suggestionsContainer.style.display = 'none';
+            isSuggestionsVisible = false;
+        }, 200);
     }
 }
 
@@ -84,7 +104,7 @@ function getSearchSuggestions(query) {
     return sampleSuggestions.slice(0, 5); // 只顯示前5個建議
 }
 
-// 改進的輸入事件處理
+// 改進的輸入事件處理 - 修復閃爍問題
 let inputTimeout;
 searchInput.addEventListener('input', function(e) {
     const query = this.value.trim();
@@ -92,10 +112,15 @@ searchInput.addEventListener('input', function(e) {
     // 清除之前的定時器
     clearTimeout(inputTimeout);
     
+    // 立即顯示建議列表，避免延遲
+    if (query && !isSuggestionsVisible) {
+        showSuggestions(query);
+    }
+    
     // 設定新的定時器，避免過於頻繁的更新
     inputTimeout = setTimeout(() => {
         showSuggestions(query);
-    }, 100); // 100毫秒延遲
+    }, 50); // 減少延遲時間
 });
 
 // 焦點事件
@@ -109,13 +134,13 @@ searchInput.addEventListener('focus', function() {
 // 點擊頁面其他地方時隱藏建議
 document.addEventListener('click', function(e) {
     if (!searchInput.contains(e.target) && suggestionsContainer && !suggestionsContainer.contains(e.target)) {
-        suggestionsContainer.style.display = 'none';
+        hideSuggestions();
     }
 });
 
 // 鍵盤導航
 searchInput.addEventListener('keydown', function(e) {
-    if (!suggestionsContainer || suggestionsContainer.style.display === 'none') {
+    if (!suggestionsContainer || !isSuggestionsVisible) {
         return;
     }
     
@@ -145,11 +170,11 @@ searchInput.addEventListener('keydown', function(e) {
             if (currentIndex >= 0) {
                 e.preventDefault();
                 searchInput.value = items[currentIndex].textContent;
-                suggestionsContainer.style.display = 'none';
+                hideSuggestions();
             }
             break;
         case 'Escape':
-            suggestionsContainer.style.display = 'none';
+            hideSuggestions();
             break;
     }
 });
@@ -168,9 +193,7 @@ function performSearch(query) {
 searchInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         const query = this.value.trim();
-        if (suggestionsContainer) {
-            suggestionsContainer.style.display = 'none';
-        }
+        hideSuggestions();
         performSearch(query);
     }
 });
@@ -381,7 +404,7 @@ document.addEventListener('keydown', function(e) {
         settingsMenu.style.display = 'none';
         uploadContainer.style.display = 'none';
         if (suggestionsContainer) {
-            suggestionsContainer.style.display = 'none';
+            hideSuggestions();
         }
     }
 });
