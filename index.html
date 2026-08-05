@@ -1947,6 +1947,102 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             return /\.(jpe?g|png|gif|webp|bmp)(\?.*)?$/i.test(url) || /[?&](format|type)=image/i.test(url);
         }
 
+        /**
+         * IndexedDB 背景媒體快取（參考新分頁擴充插件 helper.js）
+         * 本機檔案的 blob: URL 刷新後會失效，必須把 File/Blob 存進 IDB 才能還原
+         */
+        const BG_DB_NAME = 'NewtabBackgroundDB';
+        const BG_STORE = 'media';
+        const BG_KEY = 'cached_background';
+        let bgDb = null;
+        let bgDbInitPromise = null;
+
+        function initBackgroundDB() {
+            if (bgDb) return Promise.resolve(bgDb);
+            if (bgDbInitPromise) return bgDbInitPromise;
+
+            bgDbInitPromise = new Promise(function(resolve, reject) {
+                try {
+                    const req = indexedDB.open(BG_DB_NAME, 1);
+                    req.onerror = function() {
+                        bgDbInitPromise = null;
+                        reject(req.error);
+                    };
+                    req.onsuccess = function() {
+                        bgDb = req.result;
+                        resolve(bgDb);
+                    };
+                    req.onupgradeneeded = function(event) {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains(BG_STORE)) {
+                            db.createObjectStore(BG_STORE);
+                        }
+                    };
+                } catch (err) {
+                    bgDbInitPromise = null;
+                    reject(err);
+                }
+            });
+            return bgDbInitPromise;
+        }
+
+        function saveBackgroundBlob(blob) {
+            return initBackgroundDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    const tx = db.transaction([BG_STORE], 'readwrite');
+                    const store = tx.objectStore(BG_STORE);
+                    const req = store.put(blob, BG_KEY);
+                    req.onsuccess = function() { resolve(); };
+                    req.onerror = function() { reject(req.error); };
+                });
+            });
+        }
+
+        function loadBackgroundBlob() {
+            return initBackgroundDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    const tx = db.transaction([BG_STORE], 'readonly');
+                    const store = tx.objectStore(BG_STORE);
+                    const req = store.get(BG_KEY);
+                    req.onsuccess = function() { resolve(req.result || null); };
+                    req.onerror = function() { reject(req.error); };
+                });
+            });
+        }
+
+        function clearBackgroundBlob() {
+            return initBackgroundDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    const tx = db.transaction([BG_STORE], 'readwrite');
+                    const store = tx.objectStore(BG_STORE);
+                    const req = store.delete(BG_KEY);
+                    req.onsuccess = function() { resolve(); };
+                    req.onerror = function() { reject(req.error); };
+                });
+            }).catch(function() {});
+        }
+
+        function writeBgMeta(meta) {
+            localStorage.setItem('bgType', meta.type || 'video');
+            localStorage.setItem('bgSource', meta.source || 'url');
+            localStorage.setItem('bgName', meta.name || '');
+            // 僅網址可寫進 localStorage；本機檔改存 IDB
+            if (meta.source === 'url' && meta.url) {
+                localStorage.setItem('customBackground', meta.url);
+                localStorage.setItem('customVideo', meta.url);
+            } else {
+                localStorage.removeItem('customBackground');
+                localStorage.removeItem('customVideo');
+            }
+            localStorage.setItem('videoSource', meta.source || 'url');
+            localStorage.setItem('videoName', meta.name || '');
+            if (meta.source === 'file') {
+                localStorage.setItem('hasIdbBackground', 'true');
+            } else {
+                localStorage.removeItem('hasIdbBackground');
+            }
+        }
+
         function revokePreviousObjectUrl() {
             if (objectUrlToRevoke) {
                 URL.revokeObjectURL(objectUrlToRevoke);
@@ -1966,17 +2062,31 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             video.style.display = 'block';
             video.src = src;
             video.load();
+            video.muted = true;
+            video.loop = true;
             video.play().catch(function() {});
 
             if (persistMeta) {
-                localStorage.setItem('customBackground', src);
-                localStorage.setItem('bgType', 'video');
-                localStorage.setItem('bgSource', persistMeta.source || 'url');
-                localStorage.setItem('bgName', name || '自訂影片');
-                // 相容舊鍵
-                localStorage.setItem('customVideo', src);
-                localStorage.setItem('videoSource', persistMeta.source || 'url');
-                localStorage.setItem('videoName', name || '自訂影片');
+                if (persistMeta.source === 'url') {
+                    clearBackgroundBlob();
+                    writeBgMeta({
+                        type: 'video',
+                        source: 'url',
+                        name: name || '自訂網址影片',
+                        url: src
+                    });
+                } else if (persistMeta.source === 'file' && persistMeta.blob) {
+                    // 立即顯示，背景寫入 IDB
+                    writeBgMeta({
+                        type: 'video',
+                        source: 'file',
+                        name: name || '自訂影片'
+                    });
+                    saveBackgroundBlob(persistMeta.blob).catch(function(err) {
+                        console.warn('背景影片儲存失敗:', err);
+                        alert('影片已套用，但無法寫入本機快取（瀏覽器儲存可能已滿）。重新整理後可能需重新上傳。');
+                    });
+                }
             }
 
             updateCurrentBgInfo(name || '自訂影片');
@@ -1998,14 +2108,72 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             imageBg.style.backgroundImage = `url("${src.replace(/"/g, '\\"')}")`;
 
             if (persistMeta) {
-                localStorage.setItem('customBackground', src);
-                localStorage.setItem('bgType', 'image');
-                localStorage.setItem('bgSource', persistMeta.source || 'url');
-                localStorage.setItem('bgName', name || '自訂圖片');
-                localStorage.removeItem('customVideo');
+                if (persistMeta.source === 'url') {
+                    clearBackgroundBlob();
+                    writeBgMeta({
+                        type: 'image',
+                        source: 'url',
+                        name: name || '自訂網址圖片',
+                        url: src
+                    });
+                } else if (persistMeta.source === 'file' && persistMeta.blob) {
+                    writeBgMeta({
+                        type: 'image',
+                        source: 'file',
+                        name: name || '自訂圖片'
+                    });
+                    saveBackgroundBlob(persistMeta.blob).catch(function(err) {
+                        console.warn('背景圖片儲存失敗:', err);
+                        alert('圖片已套用，但無法寫入本機快取。重新整理後可能需重新上傳。');
+                    });
+                }
             }
 
             updateCurrentBgInfo(name || '自訂圖片');
+            updateMediaControlsState();
+        }
+
+        async function restoreSavedBackground() {
+            const bgType = localStorage.getItem('bgType') || 'video';
+            const bgSource = localStorage.getItem('bgSource') || localStorage.getItem('videoSource') || '';
+            const bgName = localStorage.getItem('bgName') || localStorage.getItem('videoName') || '';
+            const savedUrl = localStorage.getItem('customBackground') || localStorage.getItem('customVideo') || '';
+            const hasIdb = localStorage.getItem('hasIdbBackground') === 'true' || bgSource === 'file' || bgSource === 'extension';
+
+            try {
+                // 1) 本機檔案：從 IndexedDB 還原
+                if (hasIdb || bgSource === 'file') {
+                    const blob = await loadBackgroundBlob();
+                    if (blob) {
+                        const objectUrl = URL.createObjectURL(blob);
+                        const isImg = (blob.type && blob.type.startsWith('image/')) || bgType === 'image';
+                        if (isImg) {
+                            setImageBackground(objectUrl, bgName || '自訂圖片', null);
+                        } else {
+                            setVideoBackground(objectUrl, bgName || '自訂影片', null);
+                        }
+                        return;
+                    }
+                }
+
+                // 2) 網址背景
+                if (savedUrl && !savedUrl.startsWith('blob:')) {
+                    if (bgType === 'image' || isImageUrl(savedUrl)) {
+                        setImageBackground(savedUrl, bgName || '自訂網址圖片', null);
+                    } else {
+                        setVideoBackground(savedUrl, bgName || '自訂網址影片', null);
+                    }
+                    return;
+                }
+            } catch (err) {
+                console.warn('還原背景失敗:', err);
+            }
+
+            // 3) 預設
+            currentBgType = 'video';
+            video.style.display = 'block';
+            imageBg.style.display = 'none';
+            video.play().catch(function() {});
             updateMediaControlsState();
         }
 
@@ -2207,10 +2375,11 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
         confirmUploadBtn.addEventListener('click', function() {
             if (selectedFile) {
                 const objectUrl = URL.createObjectURL(selectedFile);
+                const meta = { source: 'file', blob: selectedFile };
                 if (selectedKind === 'image') {
-                    setImageBackground(objectUrl, selectedFile.name, { source: 'file' });
+                    setImageBackground(objectUrl, selectedFile.name, meta);
                 } else {
-                    setVideoBackground(objectUrl, selectedFile.name, { source: 'file' });
+                    setVideoBackground(objectUrl, selectedFile.name, meta);
                 }
             } else if (selectedUrl) {
                 const kind = selectedKind || (isImageUrl(selectedUrl) ? 'image' : 'video');
@@ -2225,31 +2394,14 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             resetUploadForm();
         });
 
-        // 載入儲存的背景
+        // 載入儲存的背景（IndexedDB 本機檔 + localStorage 網址）
         window.addEventListener('DOMContentLoaded', function() {
-            const savedBg = localStorage.getItem('customBackground') || localStorage.getItem('customVideo');
-            const bgType = localStorage.getItem('bgType') || 'video';
-            const bgName = localStorage.getItem('bgName') || localStorage.getItem('videoName');
-
-            if (savedBg && !savedBg.startsWith('blob:')) {
-                // blob URL 重新整理後失效，略過
-                if (bgType === 'image' || isImageUrl(savedBg)) {
-                    setImageBackground(savedBg, bgName || '自訂圖片', null);
-                    updateCurrentBgInfo(bgName || '自訂圖片');
-                } else {
-                    setVideoBackground(savedBg, bgName || '自訂影片', null);
-                    updateCurrentBgInfo(bgName || '自訂影片');
-                }
-            } else {
-                currentBgType = 'video';
-                video.style.display = 'block';
-                imageBg.style.display = 'none';
-                video.play().catch(function() {});
-                updateMediaControlsState();
-            }
-
-            // 聚焦搜尋框
-            searchInput.focus();
+            initBackgroundDB()
+                .then(function() { return restoreSavedBackground(); })
+                .catch(function() { return restoreSavedBackground(); })
+                .finally(function() {
+                    searchInput.focus();
+                });
         });
     </script>
 </body>
