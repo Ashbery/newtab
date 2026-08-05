@@ -43,6 +43,8 @@
             --gear-size: clamp(38px, 1.8vw + 26px, 52px);
             --apps-panel-top: clamp(52px, 4vw + 36px, 72px);
             --ease-layout: 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+            /* 由 nachoneko-assets.js 注入 data URI，無需 assets/ 資料夾 */
+            --nacho-wallpaper: none;
         }
 
         * {
@@ -575,9 +577,13 @@
             top: var(--apps-panel-top);
             right: var(--edge);
             z-index: 100;
-            background:
+            background-color: rgba(28, 30, 38, 0.82);
+            background-image:
                 linear-gradient(160deg, rgba(20, 24, 32, 0.55), rgba(28, 34, 48, 0.62)),
-                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat;
+                var(--nacho-wallpaper);
+            background-size: auto, cover;
+            background-position: 0 0, right center;
+            background-repeat: no-repeat;
             backdrop-filter: blur(6px);
             -webkit-backdrop-filter: blur(6px);
             border-radius: 18px;
@@ -749,9 +755,13 @@
             position: fixed;
             bottom: calc(var(--edge-bottom) + var(--gear-size) + 12px);
             right: var(--edge);
-            background:
+            background-color: rgba(28, 30, 38, 0.82) !important;
+            background-image:
                 linear-gradient(160deg, rgba(20, 24, 32, 0.55), rgba(28, 34, 48, 0.62)),
-                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat !important;
+                var(--nacho-wallpaper) !important;
+            background-size: auto, cover !important;
+            background-position: 0 0, right center !important;
+            background-repeat: no-repeat !important;
             backdrop-filter: blur(6px) !important;
             -webkit-backdrop-filter: blur(6px) !important;
             border-radius: 14px;
@@ -839,9 +849,13 @@
             overflow: auto;
             text-align: left;
             color: #1a1a1a;
-            background:
+            background-color: rgba(255, 255, 255, 0.2);
+            background-image:
                 linear-gradient(160deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.22)),
-                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat;
+                var(--nacho-wallpaper);
+            background-size: auto, cover;
+            background-position: 0 0, right center;
+            background-repeat: no-repeat;
             border-radius: 14px;
             border: 1px solid rgba(255, 255, 255, 0.45);
             box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
@@ -961,10 +975,14 @@
         }
 
         .upload-box {
-            /* wallpaper 為主，僅薄遮罩；表單區再加可讀底 */
-            background:
+            /* wallpaper 為主（由 --nacho-wallpaper / nachoneko-assets.js 注入） */
+            background-color: rgba(255, 255, 255, 0.2);
+            background-image:
                 linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.18)),
-                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat;
+                var(--nacho-wallpaper);
+            background-size: auto, cover;
+            background-position: 0 0, right center;
+            background-repeat: no-repeat;
             padding: 30px;
             border-radius: 12px;
             position: relative;
@@ -1278,72 +1296,72 @@
     <!-- 右上快捷列：Elgato Nachoneko Icon Pack -->
     <div class="quick-links">
         <a href="https://www.google.com/imghp" class="quick-link" title="Google 圖片">
-            <img class="ql-icon" src="assets/nachoneko/icons/on_icon_12.png" alt="" width="28" height="28" decoding="async">
+            <img class="ql-icon" data-nacho-icon="on_icon_12" alt="" width="28" height="28" decoding="async">
             <span>圖片</span>
         </a>
         <a href="https://mail.google.com" class="quick-link" title="Gmail">
-            <img class="ql-icon" src="assets/nachoneko/icons/on_icon_13.png" alt="" width="28" height="28" decoding="async">
+            <img class="ql-icon" data-nacho-icon="on_icon_13" alt="" width="28" height="28" decoding="async">
             <span>Gmail</span>
         </a>
         <button type="button" class="apps-trigger" id="apps-trigger" aria-label="應用程式" title="應用程式" aria-expanded="false">
-            <img class="apps-grid-icon" src="assets/nachoneko/icons/on_icon_11.png" alt="" width="34" height="34" decoding="async">
+            <img class="apps-grid-icon" data-nacho-icon="on_icon_11" alt="" width="34" height="34" decoding="async">
         </button>
     </div>
 
-    <!-- 應用選單：Nachoneko Stream Deck icons -->
+    <!-- 應用選單：Nachoneko 圖標（由 nachoneko-assets.js data URI 注入） -->
     <div class="google-apps-folder" id="google-apps-folder">
         <div class="apps-grid-3x3">
             <a href="https://mail.google.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_01.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_01" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">Gmail</div>
             </a>
             <a href="https://www.google.com/imghp" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_03.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_03" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">圖片</div>
             </a>
             <a href="https://maps.google.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_08.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_08" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">地圖</div>
             </a>
             <a href="https://www.youtube.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_02.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_02" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">YouTube</div>
             </a>
             <a href="https://play.google.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_05.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_05" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">Play</div>
             </a>
             <a href="https://news.google.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_06.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_06" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">新聞</div>
             </a>
             <a href="https://drive.google.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_07.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_07" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">雲端硬碟</div>
             </a>
             <a href="https://calendar.google.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_04.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_04" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">日曆</div>
             </a>
             <a href="https://translate.google.com" class="google-app-item">
                 <div class="google-app-icon" aria-hidden="true">
-                    <img src="assets/nachoneko/icons/on_icon_09.png" alt="" width="44" height="44" decoding="async">
+                    <img data-nacho-icon="on_icon_09" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">翻譯</div>
             </a>
@@ -1352,25 +1370,25 @@
 
     <!-- 設定：Nachoneko pack 圖標 -->
     <button type="button" class="settings-gear" id="settings-gear" aria-label="設定" title="設定">
-        <img class="gear-icon" src="assets/nachoneko/icons/pack-icon.png" alt="" width="48" height="48" decoding="async">
+        <img class="gear-icon" data-nacho-icon="pack-icon" alt="" width="48" height="48" decoding="async">
     </button>
 
     <!-- 設定選單 -->
     <div class="settings-menu" id="settings-menu">
         <div class="menu-item" id="about-page-btn">
-            <img class="menu-icon" src="assets/nachoneko/icons/pack-icon.png" alt="" width="22" height="22" decoding="async">
+            <img class="menu-icon" data-nacho-icon="pack-icon" alt="" width="22" height="22" decoding="async">
             <span>關於此分頁</span>
         </div>
         <div class="menu-item" id="play-pause-btn">
-            <img class="menu-icon" src="assets/nachoneko/icons/on_icon_14.png" alt="" width="22" height="22" decoding="async">
+            <img class="menu-icon" data-nacho-icon="on_icon_14" alt="" width="22" height="22" decoding="async">
             <span>播放/暫停</span>
         </div>
         <div class="menu-item" id="mute-btn">
-            <img class="menu-icon" src="assets/nachoneko/icons/on_icon_15.png" alt="" width="22" height="22" decoding="async">
+            <img class="menu-icon" data-nacho-icon="on_icon_15" alt="" width="22" height="22" decoding="async">
             <span>靜音/取消靜音</span>
         </div>
         <div class="menu-item" id="upload-video-btn">
-            <img class="menu-icon" src="assets/nachoneko/icons/on_icon_10.png" alt="" width="22" height="22" decoding="async">
+            <img class="menu-icon" data-nacho-icon="on_icon_10" alt="" width="22" height="22" decoding="async">
             <span>上傳背景</span>
         </div>
     </div>
@@ -1427,9 +1445,9 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
 
                 <p class="about-note">
-                    完整授權原文見專案內
-                    <code>assets/nachoneko/LICENSE.txt</code>。
-                    本「關於」頁面旨在保留署名與授權資訊，以符合 MIT 條款並避免著作權爭議。
+                    圖標與壁紙以 base64 內嵌於
+                    <code>nachoneko-assets.js</code>（無需上傳 assets 資料夾）。
+                    本「關於」頁面保留署名與 MIT 授權資訊，以符合授權條款。
                 </p>
             </div>
         </div>
@@ -1467,6 +1485,8 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
         </div>
     </div>
 
+    <!-- Nachoneko 圖標／壁紙 data URI（可單獨上傳 GitHub，無需 assets/） -->
+    <script src="nachoneko-assets.js"></script>
     <script>
         // 時鐘功能（上午/下午與時間同一行）
         function updateClock() {
@@ -1980,10 +2000,18 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             if (currentBgType !== 'video') return;
             if (video.paused) {
                 video.play();
-                this.innerHTML = '<img class="menu-icon" src="assets/nachoneko/icons/on_icon_14.png" alt="" width="22" height="22"><span>暫停影片</span>';
+                this.innerHTML = '<img class="menu-icon" data-nacho-icon="on_icon_14" alt="" width="22" height="22"><span>暫停影片</span>';
             } else {
                 video.pause();
-                this.innerHTML = '<img class="menu-icon" src="assets/nachoneko/icons/off_icon_02.png" alt="" width="22" height="22"><span>播放影片</span>';
+                this.innerHTML = '<img class="menu-icon" data-nacho-icon="off_icon_02" alt="" width="22" height="22"><span>播放影片</span>';
+            }
+            if (window.NACHONEKO_ASSETS && typeof window.NACHONEKO_ASSETS.applyIcons === 'function') {
+                window.NACHONEKO_ASSETS.applyIcons(this);
+            } else if (window.NACHONEKO_ASSETS && window.NACHONEKO_ASSETS.icons) {
+                this.querySelectorAll('[data-nacho-icon]').forEach(function (el) {
+                    var k = el.getAttribute('data-nacho-icon');
+                    if (k && window.NACHONEKO_ASSETS.icons[k]) el.src = window.NACHONEKO_ASSETS.icons[k];
+                });
             }
             closeSettingsMenu();
         });
@@ -1993,8 +2021,14 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             if (currentBgType !== 'video') return;
             video.muted = !video.muted;
             this.innerHTML = video.muted
-                ? '<img class="menu-icon" src="assets/nachoneko/icons/off_icon_01.png" alt="" width="22" height="22"><span>取消靜音</span>'
-                : '<img class="menu-icon" src="assets/nachoneko/icons/on_icon_15.png" alt="" width="22" height="22"><span>靜音影片</span>';
+                ? '<img class="menu-icon" data-nacho-icon="off_icon_01" alt="" width="22" height="22"><span>取消靜音</span>'
+                : '<img class="menu-icon" data-nacho-icon="on_icon_15" alt="" width="22" height="22"><span>靜音影片</span>';
+            if (window.NACHONEKO_ASSETS && window.NACHONEKO_ASSETS.icons) {
+                this.querySelectorAll('[data-nacho-icon]').forEach(function (el) {
+                    var k = el.getAttribute('data-nacho-icon');
+                    if (k && window.NACHONEKO_ASSETS.icons[k]) el.src = window.NACHONEKO_ASSETS.icons[k];
+                });
+            }
             closeSettingsMenu();
         });
 

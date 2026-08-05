@@ -21,21 +21,26 @@ python -m http.server 8080
 
 ```
 newtab/
-├── index.html          # 主頁（樣式與邏輯內嵌）
+├── index.html              # 主頁（樣式與邏輯內嵌）
+├── nachoneko-assets.js     # ★ 圖標+壁紙 base64 內嵌（建議上傳此檔）
 ├── favicon.ico
-├── .nojekyll           # GitHub Pages 略過 Jekyll
-├── assets/
-│   └── nachoneko/      # Elgato × Nachoneko 圖標與壁紙（MIT）
-│       ├── icons/      # PNG 圖標（144×144）
-│       ├── wallpaper.png
-│       ├── LICENSE.txt
-│       ├── README.md
-│       └── manifest.json
-├── script.js           # 舊版拆分（主頁未引用）
-└── styles.css          # 舊版拆分（主頁未引用）
+├── .nojekyll               # GitHub Pages 略過 Jekyll
+├── assets/nachoneko/       # 原始 PNG（可選；本機開發用，不必推 GitHub）
+├── script.js               # 舊版拆分（主頁未引用）
+└── styles.css              # 舊版拆分（主頁未引用）
 ```
 
-資源路徑皆為**相對路徑**（如 `assets/nachoneko/icons/on_icon_01.png`），推上 GitHub 後可直接被 Pages 讀取。
+### 為什麼不用 `assets/` 資料夾？
+
+部分環境（sparse checkout、工具限制等）會導致 **二進位資料夾推不上去**。  
+因此改為：
+
+| 方式 | 說明 |
+|------|------|
+| **推薦** | 只上傳 `nachoneko-assets.js`（約 1MB 文字檔，GitHub 可正常讀） |
+| 可選 | 保留本機 `assets/nachoneko/` 方便日後重產 JS |
+
+`index.html` 透過 `data-nacho-icon` + CSS 變數 `--nacho-wallpaper` 使用內嵌圖。
 
 ## Nachoneko 素材（授權）
 
@@ -52,20 +57,23 @@ newtab/
 
 ```bash
 git checkout master   # 若目前為 detached HEAD
-git add index.html assets/ .gitattributes .gitignore README.md
+# 推薦：不依賴 assets/ 資料夾
+git add index.html nachoneko-assets.js favicon.ico .nojekyll .gitattributes .gitignore README.md
 git status
-git commit -m "Add Nachoneko assets and responsive new tab UI"
+git commit -m "Embed Nachoneko assets for GitHub-friendly deploy"
 git push origin master
 ```
+
+若本機仍有 `assets/` 且能上傳，可一併 `git add assets/`，但**線上執行不需要**該資料夾。
 
 ### 注意
 
 | 項目 | 說明 |
 |------|------|
-| 圖檔 | `.png` / `.ico` 已在 `.gitattributes` 標為 `binary`，避免換行破壞檔案 |
-| 體積 | 圖標合計很小；`wallpaper.png` 約 660KB，無需 Git LFS |
+| 圖檔替代 | `nachoneko-assets.js` 為文字，避開 assets 上傳問題 |
+| 體積 | `nachoneko-assets.js` 約 1MB（含壁紙 base64） |
 | Pages | 根目錄需有 `.nojekyll`（已包含） |
-| 路徑 | 請勿改成 Windows 絕對路徑 |
+| 重產資源 | 本機有 `assets/nachoneko/` 時可再跑產生腳本更新 JS |
 
 ## 功能摘要
 
