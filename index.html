@@ -7,11 +7,18 @@
 
     <!-- 使用相同目錄的 favicon.ico -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <!--
+      字體靈感：甘城なつき / Nachoneko（@amsrntk3 · YouTube Nachoneko_dayo）
+      全站字體：Yomogi（手寫可愛）· Font Awesome 圖示除外
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Yusei+Magic&family=Kiwi+Maru:wght@400;500&family=M+PLUS+Rounded+1c:wght@400;500;700&family=Noto+Sans+TC:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         /*
-         * Nachoneko（甘城なつき）靈感配色
-         * 銀灰髮 · 水色瞳 · 黑貓 mascot（三眼）· 肉球 / 貓耳
-         * 圖標為原創 SVG，非官方立繪素材
+         * Nachoneko（甘城なつき）靈感配色與字體
+         * 銀灰髮 · 水色瞳 · 淡粉 · 軟圓角 · 黑貓 mascot 氛圍
+         * 圖標／字體皆為風格致敬，非官方立繪或品牌素材
          */
         :root {
             --nacho-silver: #C8CDD6;
@@ -22,37 +29,65 @@
             --nacho-black: #2A2A32;
             --nacho-soft: #F4F6FA;
             --nacho-pink: #F7C6D8;
+            --nacho-pink-deep: #E8A0B8;
             --nacho-glow: rgba(107, 182, 232, 0.45);
 
-            /* 響應式 layout tokens（隨視窗平滑縮放） */
+            /* 全站可愛字（時計／日期／搜尋／建議／捷徑／選單） */
+            --font-display: 'Yomogi', 'Yusei Magic', 'Kiwi Maru', 'M PLUS Rounded 1c', 'Noto Sans TC', system-ui, sans-serif;
+            --font-ui: var(--font-display);
+
+            /* 響應式 layout tokens */
             --edge: clamp(10px, 1.5vw + 4px, 28px);
             --edge-bottom: clamp(12px, 1.2vw + 8px, 24px);
-            --header-gap: clamp(12px, 2.2vw, 40px);
-            --clock-fs: clamp(1.35rem, 0.85rem + 2.4vw, 2.75rem);
-            --date-fs: clamp(0.68rem, 0.58rem + 0.4vw, 0.9rem);
-            --time-block-w: clamp(9.5rem, 6rem + 14vw, 21rem);
-            --search-h: clamp(42px, 2.2vw + 32px, 56px);
-            --search-fs: clamp(0.875rem, 0.78rem + 0.4vw, 1.05rem);
-            --search-max: clamp(240px, 28vw + 200px, 640px);
+            --header-gap: clamp(10px, 1.8vw, 28px);
+            --clock-fs: clamp(1.6rem, 0.95rem + 2.6vw, 2.9rem);
+            --date-fs: clamp(0.78rem, 0.68rem + 0.4vw, 0.98rem);
+            --search-h: clamp(44px, 2.2vw + 34px, 56px);
+            --search-fs: clamp(0.9rem, 0.8rem + 0.4vw, 1.08rem);
+            --search-max: clamp(200px, 36vw + 120px, 620px);
+            --search-min: 11.5rem;
             --search-pad-x: clamp(14px, 1.2vw + 8px, 22px);
-            --search-radius: clamp(18px, 1.2vw + 12px, 28px);
+            --search-radius: clamp(22px, 1.4vw + 14px, 999px);
+            /* 右上捷徑預留寬，避免與搜尋重疊 */
+            --quick-reserve: clamp(7.25rem, 5.5rem + 6vw, 11.5rem);
             --ql-gap: clamp(2px, 0.4vw, 8px);
             --ql-fs: clamp(0.78rem, 0.7rem + 0.3vw, 0.95rem);
             --ql-icon: clamp(22px, 1.2vw + 14px, 30px);
             --apps-btn: clamp(34px, 1.5vw + 24px, 44px);
             --gear-size: clamp(28px, 1.1vw + 18px, 36px);
-            /* 圖示 + 底下文字列高，選單從其下方展開 */
             --apps-panel-top: calc(var(--edge) + var(--apps-btn) * 0.8 + 1.5rem + 8px);
             --ease-layout: 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-            /* 由 nachoneko-assets.js 注入 data URI，無需 assets/ 資料夾 */
             --nacho-wallpaper: none;
+            /* 更透的平面底（仍可讀、無 3D 凸面） */
+            --nacho-surface: rgba(20, 24, 34, 0.22);
+            --nacho-surface-hover: rgba(28, 34, 48, 0.32);
+            --nacho-border: rgba(200, 205, 214, 0.22);
+            --nacho-border-focus: rgba(154, 208, 245, 0.5);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--font-display);
+        }
+
+        /* Font Awesome 圖示保留原字體（勿被全站可愛字蓋掉） */
+        .fas,
+        .far,
+        .fab,
+        .fa,
+        .fa-solid,
+        .fa-regular,
+        .fa-brands,
+        [class^="fa-"],
+        [class*=" fa-"] {
+            font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands' !important;
+        }
+
+        .fas,
+        .fa-solid {
+            font-weight: 900;
         }
 
         body {
@@ -77,7 +112,7 @@
             -ms-user-select: text;
         }
 
-        .video-background,
+        #video-background,
         #image-background {
             position: fixed;
             top: 0;
@@ -88,29 +123,6 @@
             z-index: -1;
         }
 
-        /* 雙緩衝：一層顯示、一層待命，切換時淡入接近無縫 */
-        .video-background {
-            opacity: 0;
-            transition: opacity 0.08s linear;
-            pointer-events: none;
-            background: #000;
-        }
-
-        .video-background.is-active {
-            opacity: 1;
-            z-index: -1;
-        }
-
-        .video-background.is-standby {
-            opacity: 0;
-            z-index: -2;
-        }
-
-        .video-background.is-hidden {
-            display: none !important;
-            opacity: 0;
-        }
-
         #image-background {
             display: none;
             background-position: center;
@@ -118,135 +130,329 @@
             background-repeat: no-repeat;
         }
 
+        /*
+         * Header：時鐘 + 搜尋同一 flex 流（非 fixed 假間距）
+         * 搜尋可縮短；寬度不足時 wrap 下移，避免與時鐘／右上捷徑重疊
+         */
         .header-container {
             position: fixed;
             top: var(--edge);
             left: var(--edge);
-            right: var(--edge);
+            right: calc(var(--edge) + var(--quick-reserve));
             z-index: 10;
             display: flex;
+            flex-wrap: wrap;
             align-items: flex-start;
             gap: var(--header-gap);
-            transition: top var(--ease-layout), left var(--ease-layout), right var(--ease-layout), gap var(--ease-layout);
+            transition:
+                top var(--ease-layout),
+                left var(--ease-layout),
+                right var(--ease-layout),
+                gap var(--ease-layout);
         }
 
-        /* 時間固定左上角；寬度隨解析度縮放 */
+        /* 時鐘：固定尺寸毛玻璃框（不隨秒數／光效位移） */
         .time-container {
-            position: fixed;
-            top: var(--edge);
-            left: var(--edge);
+            position: relative;
             z-index: 11;
-            flex-shrink: 0;
+            flex: 0 0 auto;
             width: auto;
-            max-width: min(var(--time-block-w), calc(100vw - var(--edge) * 2));
+            max-width: 100%;
             min-width: 0;
             white-space: nowrap;
-            transition: top var(--ease-layout), left var(--ease-layout);
+        }
+
+        .clock-glass {
+            position: relative;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: clamp(2px, 0.35vw, 6px);
+            padding: clamp(10px, 0.9vw + 6px, 14px) clamp(14px, 1.2vw + 8px, 22px);
+            border-radius: clamp(14px, 1.2vw + 8px, 18px);
+            background: var(--nacho-surface);
+            border: 1px solid rgba(154, 208, 245, 0.28);
+            /* 固定光暈，不做動畫（避免看起來在動） */
+            box-shadow:
+                0 0 18px rgba(107, 182, 232, 0.1),
+                0 0 24px rgba(247, 198, 216, 0.06);
+            backdrop-filter: blur(10px) saturate(1.1);
+            -webkit-backdrop-filter: blur(10px) saturate(1.1);
+            overflow: hidden;
+            animation: none;
+            /* 避免內容變換撐動外框 */
+            contain: layout style;
+        }
+
+        .clock-glass::before,
+        .clock-glass::after {
+            content: none;
+            display: none;
         }
 
         .clock {
+            position: relative;
+            z-index: 1;
+            font-family: var(--font-display);
             font-size: var(--clock-fs);
-            font-weight: 300;
-            margin-bottom: clamp(2px, 0.3vw, 6px);
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            /* Yomogi 僅 Regular */
+            font-weight: 400;
+            margin: 0;
             font-variant-numeric: tabular-nums;
+            font-feature-settings: 'tnum' 1;
             line-height: 1.15;
             white-space: nowrap;
-            letter-spacing: 0.02em;
+            letter-spacing: 0.06em;
+            color: #F4F6FA;
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
             transition: font-size var(--ease-layout);
         }
 
+        /* 數字：固定寬度，秒數變更不撐動外框 */
+        .clock .clock-digit {
+            display: inline-block;
+            font-family: var(--font-display);
+            font-weight: 400;
+            width: 0.72em;
+            min-width: 0.72em;
+            text-align: center;
+            color: #F4F6FA;
+            -webkit-text-fill-color: #F4F6FA;
+            filter: none;
+            /* 僅光影呼吸，不位移／縮放 */
+            animation: clock-digit-glow 4s ease-in-out infinite;
+        }
+
+        .clock .clock-digit.is-tick {
+            animation: clock-digit-tick 0.35s ease-out;
+        }
+
+        @keyframes clock-digit-glow {
+            0%, 100% {
+                text-shadow:
+                    0 0 10px rgba(154, 208, 245, 0.22),
+                    0 1px 6px rgba(0, 0, 0, 0.28);
+            }
+            50% {
+                text-shadow:
+                    0 0 16px rgba(154, 208, 245, 0.4),
+                    0 0 20px rgba(247, 198, 216, 0.16),
+                    0 1px 6px rgba(0, 0, 0, 0.22);
+            }
+        }
+
+        /* 秒數變色閃一下，不 translate／scale（避免外框晃） */
+        @keyframes clock-digit-tick {
+            0%, 100% {
+                color: #F4F6FA;
+                -webkit-text-fill-color: #F4F6FA;
+            }
+            40% {
+                color: var(--nacho-eye-bright);
+                -webkit-text-fill-color: var(--nacho-eye-bright);
+            }
+        }
+
+        /* 冒號：固定寬 + 柔閃 */
+        .clock .clock-sep {
+            display: inline-block;
+            font-family: var(--font-display);
+            width: 0.36em;
+            min-width: 0.36em;
+            margin: 0;
+            text-align: center;
+            font-weight: 400;
+            letter-spacing: 0;
+            color: var(--nacho-eye-bright);
+            -webkit-text-fill-color: var(--nacho-eye-bright);
+            text-shadow: 0 0 10px rgba(154, 208, 245, 0.55);
+            animation: clock-sep-pulse 1s ease-in-out infinite;
+        }
+
+        /* 上午／下午：固定佔位，避免 1／2 字寬差異（時制已 2 位） */
+        .clock .clock-period {
+            display: inline-block;
+            font-family: var(--font-display);
+            font-size: 0.48em;
+            font-weight: 400;
+            letter-spacing: 0.06em;
+            vertical-align: 0.28em;
+            margin-right: 0.35em;
+            min-width: 2.6em;
+            text-align: center;
+            color: var(--nacho-pink);
+            -webkit-text-fill-color: var(--nacho-pink);
+            text-shadow: 0 0 8px rgba(247, 198, 216, 0.35);
+            animation: clock-period-glow 3.2s ease-in-out infinite;
+        }
+
+        @keyframes clock-sep-pulse {
+            0%, 100% {
+                opacity: 1;
+                text-shadow:
+                    0 0 10px rgba(154, 208, 245, 0.65),
+                    0 0 16px rgba(247, 198, 216, 0.2);
+            }
+            50% {
+                opacity: 0.22;
+                text-shadow: 0 0 4px rgba(154, 208, 245, 0.15);
+            }
+        }
+
+        @keyframes clock-period-glow {
+            0%, 100% {
+                opacity: 0.9;
+                text-shadow: 0 0 6px rgba(247, 198, 216, 0.25);
+            }
+            50% {
+                opacity: 1;
+                text-shadow:
+                    0 0 12px rgba(247, 198, 216, 0.48),
+                    0 0 16px rgba(154, 208, 245, 0.12);
+            }
+        }
+
+        /* 日期：與時鐘同一可愛字體 */
         .date {
+            position: relative;
+            z-index: 1;
+            font-family: var(--font-display);
             font-size: var(--date-fs);
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-            line-height: 1.3;
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            color: rgba(200, 205, 214, 0.95);
+            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+            line-height: 1.45;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 100%;
+            max-width: min(100%, 26rem);
             transition: font-size var(--ease-layout);
         }
 
+        /* 搜尋：可縮、可長；空間不足 wrap 整列下移 */
         .search-container {
-            flex: 1 1 auto;
-            width: min(var(--search-max), 100%);
-            max-width: min(
-                var(--search-max),
-                calc(100vw - var(--time-block-w) - clamp(120px, 18vw, 260px) - var(--edge) * 2 - var(--header-gap))
-            );
             position: relative;
-            /* 避開左側時間區，寬度連動解析度 */
-            margin-left: calc(var(--time-block-w) + var(--header-gap) - var(--edge));
+            flex: 1 1 var(--search-min);
+            min-width: min(var(--search-min), 100%);
+            max-width: min(var(--search-max), 100%);
+            width: auto;
+            margin-left: 0;
             transition:
-                margin var(--ease-layout),
                 max-width var(--ease-layout),
-                width var(--ease-layout);
+                min-width var(--ease-layout),
+                flex-basis var(--ease-layout);
         }
 
-        /* 搜尋框與建議列共用同一圓角外殼，展開時整體自然長高 */
+        /* 搜尋框：更透平面膠囊 */
         .search-box {
             position: relative;
             z-index: 100;
+            width: 100%;
             border-radius: var(--search-radius);
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
+            background: var(--nacho-surface);
+            border: 1px solid var(--nacho-border);
+            backdrop-filter: blur(10px) saturate(1.08);
+            -webkit-backdrop-filter: blur(10px) saturate(1.08);
             overflow: hidden;
-            box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+            box-shadow: none;
             transition:
-                background 0.35s ease,
-                border-color 0.35s ease,
-                box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                background 0.25s ease,
+                border-color 0.25s ease,
+                box-shadow 0.25s ease,
                 border-radius var(--ease-layout);
         }
 
+        .search-box::before {
+            content: none;
+            display: none;
+        }
+
         .search-box:focus-within {
-            background: rgba(255, 255, 255, 0.22);
-            border-color: rgba(255, 255, 255, 0.55);
-            box-shadow: 0 0 22px rgba(255, 255, 255, 0.16);
+            background: var(--nacho-surface-hover);
+            border-color: var(--nacho-border-focus);
+            box-shadow: 0 0 16px rgba(107, 182, 232, 0.12);
         }
 
         .search-box.active {
-            background: rgba(255, 255, 255, 0.18);
-            border-color: rgba(255, 255, 255, 0.45);
-            box-shadow:
-                0 0 24px rgba(255, 255, 255, 0.1),
-                0 18px 40px rgba(0, 0, 0, 0.28);
-        }
-
-        .search-input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-            height: var(--search-h);
-            z-index: 2;
-            transition: height var(--ease-layout);
+            border-radius: clamp(16px, 1vw + 10px, 20px) clamp(16px, 1vw + 10px, 20px) 14px 14px;
+            background: var(--nacho-surface-hover);
+            border-color: rgba(154, 208, 245, 0.38);
+            box-shadow: 0 0 14px rgba(107, 182, 232, 0.1);
         }
 
         /*
-         * 垂直置中：line-height 等於框高 + 左右 padding only
-         * 中文字體在 Windows 常略偏上，用 1px padding-top 做光學校正
+         * 搜尋列置中（修正 CJK／Windows 偏上）
+         * 輸入框鋪滿列高，line-height = 列高；圖示／清除鈕 absolute 垂直置中
          */
+        .search-input-wrapper {
+            position: relative;
+            display: block;
+            height: var(--search-h);
+            min-height: var(--search-h);
+            z-index: 2;
+            transition: height var(--ease-layout), min-height var(--ease-layout);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: var(--search-pad-x);
+            top: 50%;
+            /* 與輸入字同一光學下移，對齊框心 */
+            transform: translateY(calc(-50% + 0.12em));
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1em;
+            height: 1em;
+            margin: 0;
+            padding: 0;
+            font-size: clamp(0.8rem, 0.72rem + 0.25vw, 0.95rem);
+            line-height: 1;
+            text-align: center;
+            color: var(--nacho-eye-bright);
+            opacity: 0.8;
+            pointer-events: none;
+            transition: color 0.2s ease, opacity 0.2s ease;
+        }
+
+        .search-box:focus-within .search-icon {
+            color: var(--nacho-pink);
+            opacity: 0.95;
+        }
+
         .search-input {
             display: block;
             width: 100%;
-            height: var(--search-h);
+            height: 100%;
             margin: 0;
             border: none;
             border-radius: 0;
             background: transparent;
+            /* 與時鐘／日期同一可愛字體 */
+            font-family: var(--font-display);
             font-size: var(--search-fs);
-            line-height: var(--search-h);
-            color: white;
+            font-weight: 400;
+            letter-spacing: 0.03em;
+            color: #F4F6FA;
             outline: none;
             text-align: left;
             box-sizing: border-box;
             appearance: none;
             -webkit-appearance: none;
-            /* 左右留白；上下用 line-height 置中，略加 top 校正 CJK */
-            padding: 1px calc(var(--search-pad-x) + 28px) 0 var(--search-pad-x);
-            transition: height var(--ease-layout), font-size var(--ease-layout), padding var(--ease-layout), line-height var(--ease-layout);
+            /*
+             * 垂直置中：固定列高 + 等量 padding + line-height:normal
+             * （line-height=高度 對 CJK 常會視覺偏上）
+             * 上下 padding 各半：文字盒落在幾何中心
+             */
+            line-height: normal;
+            /* 上下對稱空白 = (列高 − 字高) / 2；再把 0.14em 從上挪到下，矯正 CJK 偏上 */
+            padding-top: calc((var(--search-h) - 1.25em) / 2 + 0.14em);
+            padding-right: calc(var(--search-pad-x) + 1.75rem);
+            padding-bottom: calc((var(--search-h) - 1.25em) / 2 - 0.14em);
+            padding-left: calc(var(--search-pad-x) + 1.45rem);
+            transition: font-size var(--ease-layout), height var(--ease-layout), padding var(--ease-layout);
         }
 
         .search-input:focus {
@@ -255,41 +461,40 @@
         }
 
         .search-input::placeholder {
-            color: rgba(255, 255, 255, 0.8);
+            font-family: var(--font-display);
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            color: rgba(200, 205, 214, 0.78);
             opacity: 1;
-            font-size: var(--search-fs);
-            line-height: var(--search-h);
+            font-size: inherit;
+            line-height: normal;
             position: static;
-            top: auto;
             transform: none;
-            vertical-align: middle;
         }
 
         .search-input::-webkit-input-placeholder {
             opacity: 1;
-            line-height: var(--search-h);
-            position: static;
-            top: auto;
-            transform: none;
+            line-height: normal;
         }
 
         .search-input::-moz-placeholder {
             opacity: 1;
-            line-height: var(--search-h);
+            line-height: normal;
         }
 
-        /* 清除按鈕 */
+        /* 清除鈕：列內垂直／靠右置中 */
         .clear-btn {
             position: absolute;
-            top: 0;
-            bottom: 0;
-            right: clamp(10px, 1vw + 6px, 16px);
-            margin: auto 0;
-            background: none;
+            right: var(--search-pad-x);
+            top: 50%;
+            transform: translateY(calc(-50% + 0.12em));
+            z-index: 2;
+            margin: 0;
+            background: transparent;
             border: none;
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(244, 246, 250, 0.65);
             cursor: pointer;
-            font-size: var(--search-fs);
+            font-size: 0.78rem;
             display: none;
             transition: color 0.15s ease;
             padding: 0;
@@ -298,16 +503,17 @@
             height: 24px;
             align-items: center;
             justify-content: center;
-            line-height: 24px;
+            line-height: 1;
         }
 
         .clear-btn:hover {
-            background: none;
-            color: rgba(255, 255, 255, 1);
+            background: transparent;
+            color: #fff;
+            box-shadow: none;
         }
 
         .search-box.has-text .clear-btn {
-            display: flex;
+            display: inline-flex;
         }
 
         /* 建議列：用 grid 0fr→1fr 展開，比 max-height 更順，且銜接無斷層 */
@@ -326,7 +532,7 @@
             grid-template-rows: 1fr;
             opacity: 1;
             pointer-events: auto;
-            border-top-color: rgba(255, 255, 255, 0.12);
+            border-top-color: rgba(154, 208, 245, 0.22);
             transition:
                 grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
                 opacity 0.3s ease 0.04s,
@@ -406,14 +612,14 @@
 
         .suggestion-item:hover,
         .suggestion-item.selected {
-            background: rgba(255, 255, 255, 0.16);
+            background: rgba(107, 182, 232, 0.16);
             transform: translateX(4px);
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+            box-shadow: inset 0 0 0 1px rgba(154, 208, 245, 0.22);
         }
 
         .suggestion-item:active {
             transform: translateX(2px) scale(0.99);
-            background: rgba(255, 255, 255, 0.22);
+            background: rgba(247, 198, 216, 0.14);
         }
 
         .suggestion-icon {
@@ -438,8 +644,10 @@
         }
 
         .suggestion-text {
+            font-family: var(--font-display);
             font-size: 0.95rem;
-            color: rgba(255, 255, 255, 0.88);
+            letter-spacing: 0.02em;
+            color: rgba(244, 246, 250, 0.9);
             line-height: 1.35;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -447,13 +655,13 @@
         }
 
         .suggestion-text .match {
-            color: #fff;
+            color: var(--nacho-eye-bright);
             font-weight: 600;
-            text-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+            text-shadow: 0 0 10px rgba(154, 208, 245, 0.4);
         }
 
         .suggestion-text .rest {
-            color: rgba(255, 255, 255, 0.72);
+            color: rgba(200, 205, 214, 0.78);
             font-weight: 400;
         }
 
@@ -1212,55 +1420,51 @@
             border-color: #4a6cf7;
         }
 
-        /* —— 中等寬度：精簡右上文字、略縮時間占位 —— */
+        /* 中寬：搜尋可縮更短，提早 wrap 下移 */
         @media (max-width: 1100px) {
             :root {
-                --time-block-w: clamp(8.5rem, 5rem + 12vw, 16rem);
+                --search-max: clamp(180px, 32vw + 80px, 480px);
+                --search-min: 10.5rem;
+                --quick-reserve: clamp(7rem, 5rem + 7vw, 10.5rem);
             }
         }
 
         @media (max-width: 900px) {
             :root {
-                --time-block-w: clamp(7.5rem, 4.5rem + 10vw, 13rem);
-                --search-max: clamp(220px, 48vw, 480px);
+                --search-max: clamp(160px, 40vw + 40px, 400px);
+                --search-min: 9.5rem;
+                --header-gap: 12px;
+            }
+
+            /* 同列塞不下時，搜尋整列下移並拉滿可用寬 */
+            .search-container {
+                flex: 1 1 100%;
+                max-width: 100%;
+                min-width: 0;
             }
         }
 
-        /* —— 窄螢幕：時間在上、搜尋置中下排 —— */
         @media (max-width: 720px) {
             :root {
                 --clock-fs: clamp(1.25rem, 0.9rem + 3.5vw, 1.85rem);
                 --date-fs: clamp(0.65rem, 0.55rem + 0.8vw, 0.8rem);
-                --search-max: min(520px, calc(100vw - var(--edge) * 2));
-                --time-block-w: min(100%, calc(100vw - var(--edge) * 2 - 100px));
+                --search-max: 100%;
+                --search-min: 100%;
+                --quick-reserve: clamp(5.5rem, 4rem + 8vw, 8rem);
             }
 
             .header-container {
-                flex-direction: column;
                 align-items: stretch;
-                top: var(--edge);
-                /* 為右上快捷列留空 */
-                padding-right: calc(var(--apps-btn) + 12px);
             }
 
             .time-container {
-                position: relative;
-                top: auto;
-                left: auto;
-                max-width: calc(100% - var(--apps-btn) - 8px);
+                max-width: 100%;
             }
 
             .search-container {
-                margin-left: 0;
-                margin-top: clamp(10px, 2vw, 16px);
+                flex: 1 1 100%;
                 width: 100%;
-                max-width: var(--search-max);
-                align-self: center;
-            }
-
-            .quick-links {
-                top: var(--edge);
-                right: var(--edge);
+                max-width: 100%;
             }
 
             .google-apps-folder {
@@ -1274,11 +1478,16 @@
                 --edge: 10px;
                 --clock-fs: clamp(1.15rem, 4.5vw, 1.5rem);
                 --search-h: 44px;
+                --quick-reserve: 5.25rem;
             }
 
             .date {
                 white-space: normal;
-                max-width: 12rem;
+                max-width: 11rem;
+            }
+
+            .clock-glass {
+                max-width: 100%;
             }
 
             .quick-links {
@@ -1332,11 +1541,11 @@
         @media (min-width: 1600px) {
             :root {
                 --search-max: 680px;
-                --clock-fs: clamp(2.4rem, 1.5rem + 1.2vw, 3rem);
+                --clock-fs: clamp(2.55rem, 1.6rem + 1.3vw, 3.2rem);
             }
         }
 
-        /* 減少動態偏好：關閉版面過渡 */
+        /* 減少動態偏好：關閉版面過渡與時鐘動畫 */
         @media (prefers-reduced-motion: reduce) {
             :root {
                 --ease-layout: 0.01ms;
@@ -1354,28 +1563,48 @@
             .settings-menu {
                 transition: none !important;
             }
+
+            .clock-glass,
+            .clock .clock-digit,
+            .clock .clock-digit.is-tick,
+            .clock .clock-sep,
+            .clock .clock-period {
+                animation: none !important;
+            }
+
+            .clock-glass {
+                box-shadow: none;
+                border-color: var(--nacho-border);
+            }
+
+            .clock .clock-sep {
+                opacity: 1;
+            }
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- 雙緩衝背景影片：同一來源兩路輪流，減少 loop 頭尾卡頓 -->
-    <video id="video-background-a" class="video-background is-active" muted playsinline preload="auto"></video>
-    <video id="video-background-b" class="video-background is-standby" muted playsinline preload="auto"></video>
+    <video id="video-background" autoplay muted loop playsinline preload="auto">
+        <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4" type="video/mp4">
+    </video>
     <div id="image-background" aria-hidden="true"></div>
 
     <div class="header-container">
         <div class="time-container">
-            <div class="clock" id="clock">00:00:00</div>
-            <div class="date" id="date">2023年1月1日 星期一</div>
+            <div class="clock-glass">
+                <div class="clock" id="clock" aria-live="polite"><span class="clock-digit">0</span><span class="clock-digit">0</span><span class="clock-sep">:</span><span class="clock-digit">0</span><span class="clock-digit">0</span><span class="clock-sep">:</span><span class="clock-digit">0</span><span class="clock-digit">0</span></div>
+                <div class="date" id="date">2023年1月1日 星期一</div>
+            </div>
         </div>
 
         <div class="search-container">
             <div class="search-box" id="search-box">
                 <div class="search-input-wrapper">
-                    <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址" autocomplete="off">
-                    <button class="clear-btn" id="clear-btn">
-                        <i class="fas fa-times"></i>
+                    <i class="fas fa-search search-icon" aria-hidden="true"></i>
+                    <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址" autocomplete="off" spellcheck="false">
+                    <button type="button" class="clear-btn" id="clear-btn" aria-label="清除">
+                        <i class="fas fa-times" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div class="suggestions-container" id="suggestions-container">
@@ -1583,11 +1812,22 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
     <!-- Nachoneko 圖標／壁紙 data URI（可單獨上傳 GitHub，無需 assets/） -->
     <script src="nachoneko-assets.js"></script>
     <script>
-        // 時鐘功能（上午/下午與時間同一行）
+        // 時鐘：數字／冒號分層；秒數變更時輕跳
+        let lastClockTime = '';
+
+        function formatClockHtml(timeStr) {
+            return timeStr.replace(/(\d)|(:)|([^:\d]+)/g, (_, digit, sep, rest) => {
+                if (digit) return `<span class="clock-digit">${digit}</span>`;
+                if (sep) return '<span class="clock-sep">:</span>';
+                return `<span class="clock-period">${rest}</span>`;
+            });
+        }
+
         function updateClock() {
             const now = new Date();
+            // hour 固定 2 位，避免「9:xx」→「10:xx」撐動毛玻璃框
             const time = now.toLocaleTimeString('zh-TW', {
-                hour: 'numeric',
+                hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
                 hour12: true
@@ -1599,8 +1839,24 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
                 weekday: 'long'
             });
 
-            document.getElementById('clock').textContent = time;
+            const clockEl = document.getElementById('clock');
+            const prev = lastClockTime;
+            lastClockTime = time;
+            clockEl.innerHTML = formatClockHtml(time);
             document.getElementById('date').textContent = date;
+
+            // 只對變更的數字加 is-tick（通常是秒）；僅變色不位移
+            if (prev && prev !== time) {
+                const prevDigits = prev.replace(/[^\d]/g, '');
+                const nextDigits = time.replace(/[^\d]/g, '');
+                const digitNodes = clockEl.querySelectorAll('.clock-digit');
+                const len = Math.min(prevDigits.length, nextDigits.length, digitNodes.length);
+                for (let i = 0; i < len; i++) {
+                    if (prevDigits[i] !== nextDigits[i]) {
+                        digitNodes[i].classList.add('is-tick');
+                    }
+                }
+            }
         }
 
         updateClock();
@@ -1984,10 +2240,8 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             }
         });
 
-        // 背景控制（影片雙緩衝 / 圖片）
-        const videoA = document.getElementById('video-background-a');
-        const videoB = document.getElementById('video-background-b');
-        const videos = [videoA, videoB];
+        // 背景控制（單一路 loop，避免雙緩衝切換黑閃）
+        const video = document.getElementById('video-background');
         const DEFAULT_VIDEO_SRC = 'https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4';
         const imageBg = document.getElementById('image-background');
         const uploadContainer = document.getElementById('video-upload-container');
@@ -2002,189 +2256,12 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
 
         const MAX_VIDEO_BYTES = 1000 * 1024 * 1024; // 1000MB
         const MAX_IMAGE_BYTES = 50 * 1024 * 1024;  // 圖片 50MB
-        /** 結尾前多少秒啟動另一路，減少接縫 */
-        const DUAL_SWAP_LEAD_SEC = 0.35;
 
         let selectedFile = null;
         let selectedUrl = '';
         let selectedKind = ''; // 'video' | 'image'
         let currentBgType = 'video'; // 'video' | 'image'
         let objectUrlToRevoke = null;
-        let activeVideoIndex = 0;
-        let dualSwapPending = false;
-        let dualUserPaused = false;
-        let currentVideoSrc = '';
-
-        function getActiveVideo() {
-            return videos[activeVideoIndex];
-        }
-
-        function getStandbyVideo() {
-            return videos[1 - activeVideoIndex];
-        }
-
-        function syncVideoClasses() {
-            videos.forEach(function(v, i) {
-                const isActive = i === activeVideoIndex;
-                v.classList.toggle('is-active', isActive && currentBgType === 'video');
-                v.classList.toggle('is-standby', !isActive && currentBgType === 'video');
-                v.classList.toggle('is-hidden', currentBgType !== 'video');
-            });
-        }
-
-        function showVideoLayers() {
-            videos.forEach(function(v) {
-                v.classList.remove('is-hidden');
-                v.style.display = 'block';
-            });
-            syncVideoClasses();
-        }
-
-        function hideVideoLayers() {
-            videos.forEach(function(v) {
-                v.pause();
-                v.classList.add('is-hidden');
-                v.classList.remove('is-active', 'is-standby');
-            });
-        }
-
-        function setBothVideosMuted(muted) {
-            videos.forEach(function(v) { v.muted = muted; });
-        }
-
-        function beginSeamlessSwap() {
-            if (currentBgType !== 'video' || dualUserPaused || dualSwapPending) return;
-            const active = getActiveVideo();
-            const standby = getStandbyVideo();
-            if (!standby.src && !standby.currentSrc) return;
-
-            dualSwapPending = true;
-
-            const finishSwap = function() {
-                // 先讓 standby 可見，再停 active，縮短黑幀
-                activeVideoIndex = 1 - activeVideoIndex;
-                syncVideoClasses();
-                active.pause();
-                try {
-                    active.currentTime = 0;
-                } catch (e) { /* ignore */ }
-                dualSwapPending = false;
-            };
-
-            const startStandby = function() {
-                try {
-                    if (standby.currentTime > 0.05) {
-                        standby.currentTime = 0;
-                    }
-                } catch (e) { /* ignore */ }
-                const playPromise = standby.play();
-                if (playPromise && typeof playPromise.then === 'function') {
-                    playPromise.then(finishSwap).catch(function() {
-                        dualSwapPending = false;
-                        // 後備：單路 loop
-                        try { active.currentTime = 0; } catch (e2) { /* ignore */ }
-                        active.play().catch(function() {});
-                    });
-                } else {
-                    finishSwap();
-                }
-            };
-
-            if (standby.readyState >= 2) {
-                startStandby();
-            } else {
-                standby.addEventListener('canplay', function onCanPlay() {
-                    standby.removeEventListener('canplay', onCanPlay);
-                    startStandby();
-                });
-                standby.load();
-            }
-        }
-
-        function onDualTimeUpdate(e) {
-            if (currentBgType !== 'video' || dualUserPaused) return;
-            const v = e.target;
-            if (v !== getActiveVideo()) return;
-            const dur = v.duration;
-            if (!dur || !isFinite(dur) || dur < 0.5) return;
-            if (dualSwapPending) return;
-            // 避免開播當下就誤觸切換
-            if (v.currentTime < Math.min(0.4, dur * 0.15)) return;
-            const remaining = dur - v.currentTime;
-            if (remaining <= DUAL_SWAP_LEAD_SEC && remaining >= 0) {
-                beginSeamlessSwap();
-            }
-        }
-
-        function onDualEnded(e) {
-            if (currentBgType !== 'video' || dualUserPaused) return;
-            if (e.target !== getActiveVideo()) return;
-            if (!dualSwapPending) {
-                beginSeamlessSwap();
-            }
-        }
-
-        function bindDualBufferEvents() {
-            videos.forEach(function(v) {
-                v.loop = false;
-                v.muted = true;
-                v.playsInline = true;
-                v.addEventListener('timeupdate', onDualTimeUpdate);
-                v.addEventListener('ended', onDualEnded);
-            });
-        }
-
-        function setBothVideosSource(src) {
-            currentVideoSrc = src || '';
-            dualSwapPending = false;
-            dualUserPaused = false;
-            activeVideoIndex = 0;
-
-            videos.forEach(function(v) {
-                v.loop = false;
-                v.muted = true;
-                v.playsInline = true;
-                v.pause();
-                if (src) {
-                    if (v.getAttribute('src') !== src) {
-                        v.setAttribute('src', src);
-                        v.src = src;
-                    }
-                    v.load();
-                } else {
-                    v.removeAttribute('src');
-                    v.load();
-                }
-            });
-
-            showVideoLayers();
-
-            if (!src) return;
-
-            const active = getActiveVideo();
-            const standby = getStandbyVideo();
-
-            const kickoff = function() {
-                try {
-                    active.currentTime = 0;
-                    standby.currentTime = 0;
-                } catch (e) { /* ignore */ }
-                standby.pause();
-                active.play().catch(function() {});
-                syncVideoClasses();
-            };
-
-            if (active.readyState >= 2) {
-                kickoff();
-            } else {
-                active.addEventListener('canplay', function onReady() {
-                    active.removeEventListener('canplay', onReady);
-                    if (currentVideoSrc === src) kickoff();
-                });
-            }
-        }
-
-        bindDualBufferEvents();
 
         function isVideoFile(file) {
             return file && (file.type.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(file.name));
@@ -2310,8 +2387,13 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             currentBgType = 'video';
             imageBg.style.display = 'none';
             imageBg.style.backgroundImage = '';
-            // 雙緩衝：同一來源套到兩路 video，輪流接播
-            setBothVideosSource(src);
+            video.style.display = 'block';
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.src = src;
+            video.load();
+            video.play().catch(function() {});
 
             if (persistMeta) {
                 if (persistMeta.source === 'url') {
@@ -2347,14 +2429,10 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             }
 
             currentBgType = 'image';
-            dualUserPaused = false;
-            dualSwapPending = false;
-            hideVideoLayers();
-            videos.forEach(function(v) {
-                v.removeAttribute('src');
-                try { v.load(); } catch (e) { /* ignore */ }
-            });
-            currentVideoSrc = '';
+            video.pause();
+            video.removeAttribute('src');
+            try { video.load(); } catch (e) { /* ignore */ }
+            video.style.display = 'none';
             imageBg.style.display = 'block';
             imageBg.style.backgroundImage = `url("${src.replace(/"/g, '\\"')}")`;
 
@@ -2420,10 +2498,16 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
                 console.warn('還原背景失敗:', err);
             }
 
-            // 3) 預設雙緩衝雲朵片
+            // 3) 預設影片
             currentBgType = 'video';
             imageBg.style.display = 'none';
-            setBothVideosSource(DEFAULT_VIDEO_SRC);
+            video.style.display = 'block';
+            if (!video.src || video.src.indexOf('mixkit') === -1 && !video.currentSrc) {
+                video.src = DEFAULT_VIDEO_SRC;
+            }
+            video.loop = true;
+            video.muted = true;
+            video.play().catch(function() {});
             updateMediaControlsState();
         }
 
@@ -2498,31 +2582,25 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             }
         }
 
-        // 播放/暫停（雙緩衝：暫停兩路，恢復只播 active）
+        // 播放/暫停（僅影片背景）
         playPauseBtn.addEventListener('click', function() {
             if (currentBgType !== 'video') return;
-            const active = getActiveVideo();
-            if (active.paused || dualUserPaused) {
-                dualUserPaused = false;
-                dualSwapPending = false;
-                active.play().catch(function() {});
+            if (video.paused) {
+                video.play().catch(function() {});
                 this.innerHTML = '<img class="menu-icon" data-nacho-icon="on_icon_14" alt="" width="22" height="22"><span>暫停影片</span>';
             } else {
-                dualUserPaused = true;
-                dualSwapPending = false;
-                videos.forEach(function(v) { v.pause(); });
+                video.pause();
                 this.innerHTML = '<img class="menu-icon" data-nacho-icon="off_icon_02" alt="" width="22" height="22"><span>播放影片</span>';
             }
             refreshMenuIcons(this);
             closeSettingsMenu();
         });
 
-        // 靜音/取消靜音（兩路同步）
+        // 靜音/取消靜音
         muteBtn.addEventListener('click', function() {
             if (currentBgType !== 'video') return;
-            const nextMuted = !getActiveVideo().muted;
-            setBothVideosMuted(nextMuted);
-            this.innerHTML = nextMuted
+            video.muted = !video.muted;
+            this.innerHTML = video.muted
                 ? '<img class="menu-icon" data-nacho-icon="off_icon_01" alt="" width="22" height="22"><span>取消靜音</span>'
                 : '<img class="menu-icon" data-nacho-icon="on_icon_15" alt="" width="22" height="22"><span>靜音影片</span>';
             refreshMenuIcons(this);
