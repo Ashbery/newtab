@@ -40,7 +40,7 @@
             --ql-fs: clamp(0.78rem, 0.7rem + 0.3vw, 0.95rem);
             --ql-icon: clamp(22px, 1.2vw + 14px, 30px);
             --apps-btn: clamp(34px, 1.5vw + 24px, 44px);
-            --gear-size: clamp(38px, 1.8vw + 26px, 52px);
+            --gear-size: clamp(28px, 1.1vw + 18px, 36px);
             --apps-panel-top: clamp(52px, 4vw + 36px, 72px);
             --ease-layout: 0.28s cubic-bezier(0.22, 1, 0.36, 1);
             /* 由 nachoneko-assets.js 注入 data URI，無需 assets/ 資料夾 */
@@ -195,31 +195,34 @@
             position: relative;
             display: flex;
             align-items: center;
-            justify-content: center;
             height: var(--search-h);
             z-index: 2;
             transition: height var(--ease-layout);
         }
 
-        /* 垂直置中：高度與字級隨解析度縮放 */
+        /*
+         * 垂直置中：line-height 等於框高 + 左右 padding only
+         * 中文字體在 Windows 常略偏上，用 1px padding-top 做光學校正
+         */
         .search-input {
             display: block;
             width: 100%;
             height: var(--search-h);
             margin: 0;
-            padding: 0 calc(var(--search-pad-x) + 28px) 0 var(--search-pad-x);
             border: none;
             border-radius: 0;
             background: transparent;
             font-size: var(--search-fs);
-            line-height: 1.25;
+            line-height: var(--search-h);
             color: white;
             outline: none;
             text-align: left;
             box-sizing: border-box;
             appearance: none;
             -webkit-appearance: none;
-            transition: height var(--ease-layout), font-size var(--ease-layout), padding var(--ease-layout);
+            /* 左右留白；上下用 line-height 置中，略加 top 校正 CJK */
+            padding: 1px calc(var(--search-pad-x) + 28px) 0 var(--search-pad-x);
+            transition: height var(--ease-layout), font-size var(--ease-layout), padding var(--ease-layout), line-height var(--ease-layout);
         }
 
         .search-input:focus {
@@ -231,18 +234,24 @@
             color: rgba(255, 255, 255, 0.8);
             opacity: 1;
             font-size: var(--search-fs);
-            position: relative;
-            top: 1px;
+            line-height: var(--search-h);
+            position: static;
+            top: auto;
+            transform: none;
+            vertical-align: middle;
         }
 
         .search-input::-webkit-input-placeholder {
             opacity: 1;
-            position: relative;
-            top: 1px;
+            line-height: var(--search-h);
+            position: static;
+            top: auto;
+            transform: none;
         }
 
         .search-input::-moz-placeholder {
             opacity: 1;
+            line-height: var(--search-h);
         }
 
         /* 清除按鈕 */
@@ -345,13 +354,19 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            opacity: 0;
-            transform: translateY(6px);
+            opacity: 1;
+            transform: none;
             transition:
                 background 0.18s ease,
                 transform 0.18s ease,
                 box-shadow 0.18s ease;
-            animation: suggestionIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        /* 僅首次展開時播放進場；後續換字只更新內容不重播動畫 */
+        .suggestion-item.is-entering {
+            opacity: 0;
+            transform: translateY(6px);
+            animation: suggestionIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
 
         @keyframes suggestionIn {
@@ -571,31 +586,30 @@
             70% { transform: scale(1.05) rotate(3deg); }
         }
 
-        /* 應用選單面板 — Nachoneko wallpaper 背景 */
+        /* 應用選單：壁紙 + 均勻深色遮罩（非側向漸層，避免白邊且字圖可讀） */
         .google-apps-folder {
             position: fixed;
             top: var(--apps-panel-top);
             right: var(--edge);
             z-index: 100;
-            background-color: rgba(28, 30, 38, 0.82);
+            background-color: #1c1e28;
             background-image:
-                linear-gradient(160deg, rgba(20, 24, 32, 0.55), rgba(28, 34, 48, 0.62)),
+                linear-gradient(rgba(18, 20, 30, 0.42), rgba(18, 20, 30, 0.42)),
                 var(--nacho-wallpaper);
-            background-size: auto, cover;
+            background-size: 100% 100%, cover;
             background-position: 0 0, right center;
-            background-repeat: no-repeat;
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
+            background-repeat: no-repeat, no-repeat;
+            background-origin: border-box;
+            background-clip: padding-box;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
             border-radius: 18px;
             padding: clamp(10px, 1vw + 6px, 16px);
-            box-shadow:
-                0 16px 40px rgba(0, 0, 0, 0.45),
-                0 0 0 1px rgba(107, 182, 232, 0.18),
-                0 0 28px rgba(107, 182, 232, 0.08);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
             display: none;
             width: min(320px, calc(100vw - var(--edge) * 2));
             min-width: min(280px, calc(100vw - var(--edge) * 2));
-            border: 1px solid rgba(200, 205, 214, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             animation: appsPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
             overflow: hidden;
             transition: top var(--ease-layout), right var(--ease-layout), width var(--ease-layout);
@@ -626,15 +640,16 @@
             padding: 12px 8px 10px;
             border-radius: 14px;
             text-decoration: none;
-            color: var(--nacho-silver);
+            color: #f0f2f6;
             transition: background 0.18s ease, transform 0.18s ease, color 0.18s ease;
             border: none;
             background: transparent;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
         }
 
         .google-app-item:hover {
-            background: rgba(107, 182, 232, 0.12);
-            color: var(--nacho-soft);
+            background: rgba(0, 0, 0, 0.28);
+            color: #fff;
             transform: translateY(-2px);
         }
 
@@ -643,43 +658,45 @@
         }
 
         .google-app-icon {
-            width: 52px;
-            height: 52px;
-            border-radius: 14px;
-            background: linear-gradient(160deg, rgba(200, 205, 214, 0.14), rgba(107, 182, 232, 0.1));
-            border: 1px solid rgba(200, 205, 214, 0.16);
+            width: 48px;
+            height: 48px;
+            border-radius: 0;
+            background: transparent;
+            border: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+            overflow: visible;
+            transition: transform 0.18s ease;
         }
 
         .google-app-item:hover .google-app-icon {
-            background: linear-gradient(160deg, rgba(154, 208, 245, 0.22), rgba(247, 198, 216, 0.12));
-            transform: scale(1.06);
-            box-shadow: 0 6px 16px rgba(74, 154, 217, 0.28);
+            background: transparent;
+            transform: scale(1.08);
+            box-shadow: none;
         }
 
         .google-app-icon img {
-            width: 44px;
-            height: 44px;
+            width: 48px;
+            height: 48px;
             display: block;
             object-fit: contain;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+        }
+
+        .google-app-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            line-height: 1.2;
+            letter-spacing: 0.01em;
+            color: #f0f2f6;
         }
 
         .google-app-icon svg {
             width: 26px;
             height: 26px;
             display: block;
-        }
-
-        .google-app-label {
-            font-size: 12px;
-            font-weight: 500;
-            text-align: center;
-            line-height: 1.2;
-            letter-spacing: 0.01em;
         }
 
         /* 設定：Elgato Nachoneko pack 圖標 */
@@ -755,15 +772,17 @@
             position: fixed;
             bottom: calc(var(--edge-bottom) + var(--gear-size) + 12px);
             right: var(--edge);
-            background-color: rgba(28, 30, 38, 0.82) !important;
+            background-color: #1c1e28 !important;
             background-image:
-                linear-gradient(160deg, rgba(20, 24, 32, 0.55), rgba(28, 34, 48, 0.62)),
+                linear-gradient(rgba(18, 20, 30, 0.42), rgba(18, 20, 30, 0.42)),
                 var(--nacho-wallpaper) !important;
-            background-size: auto, cover !important;
+            background-size: 100% 100%, cover !important;
             background-position: 0 0, right center !important;
-            background-repeat: no-repeat !important;
-            backdrop-filter: blur(6px) !important;
-            -webkit-backdrop-filter: blur(6px) !important;
+            background-repeat: no-repeat, no-repeat !important;
+            background-origin: border-box !important;
+            background-clip: padding-box !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
             border-radius: 14px;
             padding: 10px;
             box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
@@ -771,7 +790,7 @@
             display: none;
             min-width: min(220px, calc(100vw - var(--edge) * 2));
             max-width: calc(100vw - var(--edge) * 2);
-            border: 1px solid rgba(200, 205, 214, 0.25) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
             overflow: hidden;
             transition: bottom var(--ease-layout), right var(--ease-layout);
         }
@@ -785,7 +804,7 @@
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 8px solid rgba(40, 48, 64, 0.75);
+            border-top: 8px solid #1c1e28;
         }
 
         .menu-item {
@@ -793,17 +812,22 @@
             align-items: center;
             gap: 10px;
             padding: 12px 15px;
-            color: var(--nacho-silver) !important;
+            color: #f0f2f6 !important;
             text-decoration: none;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
             margin-bottom: 5px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
         }
 
         .menu-item:hover {
-            background: rgba(107, 182, 232, 0.12) !important;
-            color: var(--nacho-soft) !important;
+            background: rgba(0, 0, 0, 0.28) !important;
+            color: #fff !important;
+        }
+
+        .menu-item .menu-icon {
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.65));
         }
 
         .menu-item:last-child {
@@ -1524,6 +1548,9 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
         let selectedIndex = -1;
         let latestQuery = '';
         let jsonpScript = null;
+        // 建議列是否已展開過（首次才播進場動畫，換字不再整列重刷）
+        let suggestionsEverOpened = false;
+        let pendingAnimate = false;
 
         function openSuggestions() {
             if (isActive) {
@@ -1542,6 +1569,8 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             searchBox.classList.remove('active');
             isActive = false;
             selectedIndex = -1;
+            suggestionsEverOpened = false;
+            pendingAnimate = false;
             clearSelectedHighlight();
         }
 
@@ -1587,7 +1616,9 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
 
             if (currentSuggestions.length > 0) {
                 openSuggestions();
+                suggestionsEverOpened = true;
             } else {
+                pendingAnimate = true;
                 showSkeleton();
                 openSuggestions();
                 fetchSuggestions(query);
@@ -1606,7 +1637,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             e.preventDefault();
         });
 
-        // 輸入時獲取搜尋建議
+        // 輸入時獲取搜尋建議（已展開時不重播骨架／進場，只更新內容）
         searchInput.addEventListener('input', function() {
             const query = this.value.trim();
             latestQuery = query;
@@ -1616,18 +1647,19 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             clearTimeout(searchTimeout);
 
             if (query) {
-                // 先放骨架再展開，外殼從膠囊形自然長高
-                const wasOpen = isActive;
-                showSkeleton();
+                const wasOpen = isActive && suggestionsEverOpened;
                 if (!wasOpen) {
+                    pendingAnimate = true;
+                    showSkeleton();
                     openSuggestions();
                 } else {
+                    // 保持現有列表，等新結果到再就地更新，避免每字閃爍
                     searchBox.classList.add('active');
                     isActive = true;
                 }
                 searchTimeout = setTimeout(() => {
                     fetchSuggestions(query);
-                }, 180);
+                }, 260);
             } else {
                 clearSuggestions();
                 closeSuggestions();
@@ -1669,15 +1701,71 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             suggestionsList.innerHTML = '';
             for (let i = 0; i < 4; i++) {
                 const item = document.createElement('div');
-                item.className = 'suggestion-item skeleton';
-                // 略晚於面板展開，讓項目跟著「長出來」而不是同時跳出
-                item.style.animationDelay = `${0.08 + i * 0.045}s`;
+                item.className = 'suggestion-item skeleton is-entering';
+                item.style.animationDelay = `${0.06 + i * 0.04}s`;
                 item.innerHTML = `
                     <div class="suggestion-icon"><i class="fas fa-search"></i></div>
                     <div class="skeleton-bar"></div>
                 `;
                 suggestionsList.appendChild(item);
             }
+        }
+
+        function bindSuggestionItem(item, suggestion, index, query) {
+            item.dataset.suggestion = suggestion;
+            item.innerHTML = `
+                <div class="suggestion-icon"><i class="fas fa-search"></i></div>
+                <span class="suggestion-text">${highlightMatch(suggestion, query)}</span>
+            `;
+            item.onmouseenter = function() {
+                selectedIndex = index;
+                updateSelectedHighlight();
+            };
+            item.onclick = function() {
+                searchInput.value = suggestion;
+                performSearch(suggestion);
+            };
+        }
+
+        function renderSuggestions(list, query, animate) {
+            const existing = Array.from(
+                suggestionsList.querySelectorAll('.suggestion-item:not(.skeleton)')
+            );
+
+            // 已有列表：就地更新文字／重用節點，不重播動畫
+            if (!animate && existing.length > 0) {
+                const max = Math.max(existing.length, list.length);
+                for (let i = 0; i < max; i++) {
+                    if (i >= list.length) {
+                        existing[i].remove();
+                        continue;
+                    }
+                    let item = existing[i];
+                    if (!item) {
+                        item = document.createElement('div');
+                        item.className = 'suggestion-item';
+                        suggestionsList.appendChild(item);
+                    }
+                    item.classList.remove('is-entering', 'skeleton', 'selected');
+                    item.style.animationDelay = '';
+                    bindSuggestionItem(item, list[i], i, query);
+                }
+                return;
+            }
+
+            // 首次展開：整批建立（可帶進場）
+            suggestionsList.innerHTML = '';
+            list.forEach((suggestion, index) => {
+                const suggestionItem = document.createElement('div');
+                suggestionItem.className = animate
+                    ? 'suggestion-item is-entering'
+                    : 'suggestion-item';
+                if (animate) {
+                    suggestionItem.style.animationDelay = `${0.04 + index * 0.03}s`;
+                }
+                bindSuggestionItem(suggestionItem, suggestion, index, query);
+                suggestionsList.appendChild(suggestionItem);
+            });
         }
 
         // 使用 Google 搜尋建議 API（JSONP）
@@ -1705,7 +1793,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             jsonpScript.src = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}&callback=${callbackName}`;
             jsonpScript.onerror = function() {
                 delete window[callbackName];
-                if (query === latestQuery) {
+                if (query === latestQuery && !suggestionsEverOpened) {
                     clearSuggestions();
                 }
             };
@@ -1716,37 +1804,23 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             // 忽略過期回應
             if (query !== latestQuery) return;
 
-            suggestionsList.innerHTML = '';
             selectedIndex = -1;
 
             if (data && data[1] && data[1].length > 0) {
                 currentSuggestions = data[1];
+                const shouldAnimate = pendingAnimate || !suggestionsEverOpened;
                 openSuggestions();
-
-                currentSuggestions.forEach((suggestion, index) => {
-                    const suggestionItem = document.createElement('div');
-                    suggestionItem.className = 'suggestion-item';
-                    suggestionItem.style.animationDelay = `${0.06 + index * 0.04}s`;
-                    suggestionItem.innerHTML = `
-                        <div class="suggestion-icon"><i class="fas fa-search"></i></div>
-                        <span class="suggestion-text">${highlightMatch(suggestion, query)}</span>
-                    `;
-
-                    suggestionItem.addEventListener('mouseenter', function() {
-                        selectedIndex = index;
-                        updateSelectedHighlight();
-                    });
-
-                    suggestionItem.addEventListener('click', function() {
-                        searchInput.value = suggestion;
-                        performSearch(suggestion);
-                    });
-
-                    suggestionsList.appendChild(suggestionItem);
-                });
+                renderSuggestions(currentSuggestions, query, shouldAnimate);
+                suggestionsEverOpened = true;
+                pendingAnimate = false;
             } else {
                 currentSuggestions = [];
-                closeSuggestions();
+                if (!suggestionsEverOpened) {
+                    closeSuggestions();
+                } else {
+                    // 已展開但無建議：清空列表但保持框體，避免狂開關
+                    suggestionsList.innerHTML = '';
+                }
             }
         }
 
