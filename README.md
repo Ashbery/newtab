@@ -1,84 +1,153 @@
-# Ashbery 新分頁 (newtab)
+# Ashbery 新分頁
 
-純前端自訂瀏覽器新分頁頁面：時鐘、Google 搜尋建議、快捷應用、可自訂影片／圖片背景。
+把瀏覽器的新分頁，變成你自己的桌面：  
+**即時時間、Google 搜尋、常用捷徑，還能換成自己喜歡的影片或圖片當背景。**
 
-## 線上預覽（GitHub Pages）
+線上試用：  
+**https://ashbery.github.io/newtab/**
 
-若倉庫已開啟 Pages（Settings → Pages → Deploy from branch `master` / root）：
+---
 
-`https://ashbery.github.io/newtab/`
+## 這是什麼？
 
-本機直接開啟 `index.html` 也可使用（部分 Google 建議 API 受 CORS 限制時，建議用本地靜態伺服器或 Pages）。
+一個**不需安裝 App** 的網頁版新分頁。  
+用手機或電腦瀏覽器打開連結就能用；也可以設成瀏覽器首頁，每次開瀏覽器就看到它。
+
+適合：
+
+- 想要漂亮、乾淨的起始頁  
+- 想用自己的影片／壁紙當背景  
+- 想快速搜尋、一鍵開 Gmail、YouTube 等  
+
+---
+
+## 有哪些功能？
+
+| 功能 | 說明 |
+|------|------|
+| 🕐 **時間與日期** | 畫面左上角顯示目前時間（繁體中文） |
+| 🔍 **搜尋** | 輸入關鍵字搜 Google，或直接輸入網址前往 |
+| 💡 **搜尋建議** | 輸入時會出現相關建議，點一下即可搜尋 |
+| 📎 **快捷入口** | 右上角：圖片、Gmail、應用捷徑 |
+| 🎬 **自訂背景** | 可上傳影片或圖片，或貼上網址 |
+| 💾 **會記住設定** | 本機上傳的背景會存在瀏覽器裡，重新整理通常還在 |
+| 📱 **自適應畫面** | 視窗大小改變時，排版會跟著調整 |
+
+### 背景支援格式
+
+- **影片**：MP4、WebM（單檔上限約 1000MB）  
+- **圖片**：JPG、PNG、WebP、GIF  
+
+> 提醒：很大的影片能否成功「記住」，還取決於你的瀏覽器儲存空間。若提示無法寫入快取，重新整理後可能要再選一次檔案。
+
+---
+
+## 怎麼用？
+
+### 方法一：直接打開網頁（最簡單）
+
+1. 用瀏覽器開啟：https://ashbery.github.io/newtab/  
+2. 開始使用即可  
+
+### 方法二：設成瀏覽器首頁
+
+以 Chrome 為例：
+
+1. 右上角 ⋮ → **設定**  
+2. 搜尋「**啟動時**」或「**首頁**」  
+3. 選擇「開啟特定網頁」  
+4. 貼上：`https://ashbery.github.io/newtab/`  
+
+其他瀏覽器步驟類似，找到「首頁／啟動頁」即可。
+
+### 方法三：本機開啟檔案
+
+1. 下載本專案  
+2. 用瀏覽器打開 `index.html`  
+
+若搜尋建議異常，可改用「本機簡易伺服器」（見下方進階），或直接用線上版。
+
+### 怎麼換背景？
+
+1. 點右下角 **設定圖示**  
+2. 選 **上傳背景**  
+3. 選擇本機影片／圖片，或貼上媒體網址  
+4. 確認後套用  
+
+也可在設定裡 **播放／暫停**、**靜音** 背景影片。
+
+### 關於授權說明
+
+設定 → **關於此分頁**  
+可查看圖標與素材的來源、署名與授權資訊。
+
+---
+
+## 畫面說明（大致位置）
+
+```
+┌─────────────────────────────────────────────┐
+│  時間／日期          搜尋列      圖片 Gmail 應用 │
+│                                               │
+│              （全螢幕背景影片／圖片）              │
+│                                               │
+│                                    設定 ⚙️    │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 常見問題
+
+**Q：重新整理後背景不見了？**  
+A：本機檔案是存在瀏覽器本機資料庫。請確認不是無痕模式，且當下有成功儲存。若檔案過大，可能因瀏覽器空間不足而失敗。
+
+**Q：為什麼網址列會顯示 GitHub 網址？**  
+A：這是一般網頁的正常行為，網站無法隱藏瀏覽器網址列。
+
+**Q：可以當 Chrome「新分頁」按鈕的預設頁嗎？**  
+A：瀏覽器通常不允許一般網站直接取代「新分頁」；可用「設成首頁」，或另外用瀏覽器擴充功能做到。
+
+**Q：會不會上傳我的影片到別人的伺服器？**  
+A：本機選的檔案主要存在**你的瀏覽器本機**；用網址當背景時，則會向該網址載入媒體。
+
+---
+
+## 素材與致謝
+
+畫面中的部分圖標與選單壁紙，來自 Elgato 與 **Nachoneko（甘城なつき）** 的免費合作素材包：
+
+- [Nachoneko Icon and Wallpaper Pack](https://www.elgato.com/us/en/s/stream-deck-nachoneko-icon-and-wallpaper-pack)  
+- 繪師／角色：[甘城なつき / Nachoneko（@amsrntk3）](https://x.com/amsrntk3)  
+- 授權方式：**MIT**（可於頁面內「關於此分頁」查看摘要）
+
+感謝原作者與 Elgato 釋出素材。
+
+---
+
+## 給想改程式的人（進階）
+
+本專案是純前端靜態頁，核心在 `index.html`。  
+圖標與壁紙已打包進 `nachoneko-assets.js`，方便放上 GitHub，不必一定要上傳 `assets` 圖片資料夾。
+
+本機預覽（可選）：
 
 ```bash
-# 簡易本機伺服器（任選其一）
 npx --yes serve .
 # 或
 python -m http.server 8080
 ```
 
-## 專案結構
+然後用瀏覽器開啟提示的本機網址。
 
-```
-newtab/
-├── index.html              # 主頁（樣式與邏輯內嵌）
-├── nachoneko-assets.js     # ★ 圖標+壁紙 base64 內嵌（建議上傳此檔）
-├── favicon.ico
-├── .nojekyll               # GitHub Pages 略過 Jekyll
-├── assets/nachoneko/       # 原始 PNG（可選；本機開發用，不必推 GitHub）
-├── script.js               # 舊版拆分（主頁未引用）
-└── styles.css              # 舊版拆分（主頁未引用）
-```
+若要自己架到 GitHub Pages：倉庫設定 → Pages → 選分支與根目錄即可。  
+線上版範例：https://ashbery.github.io/newtab/
 
-### 為什麼不用 `assets/` 資料夾？
+---
 
-部分環境（sparse checkout、工具限制等）會導致 **二進位資料夾推不上去**。  
-因此改為：
+## 授權
 
-| 方式 | 說明 |
-|------|------|
-| **推薦** | 只上傳 `nachoneko-assets.js`（約 1MB 文字檔，GitHub 可正常讀） |
-| 可選 | 保留本機 `assets/nachoneko/` 方便日後重產 JS |
+- 本專案頁面本身：依倉庫授權為準（若未另標，歡迎個人使用與修改）。  
+- Nachoneko × Elgato 素材：遵循其 **MIT** 授權，使用時請保留署名與授權說明。  
 
-`index.html` 透過 `data-nacho-icon` + CSS 變數 `--nacho-wallpaper` 使用內嵌圖。
-
-## Nachoneko 素材（授權）
-
-圖標與壁紙取自官方免費包：
-
-- [Nachoneko Icon and Wallpaper Pack（Elgato）](https://www.elgato.com/us/en/s/stream-deck-nachoneko-icon-and-wallpaper-pack)
-- 授權：**MIT**（見 `assets/nachoneko/LICENSE.txt`）
-- 角色／繪師：甘城なつき / Nachoneko（[@amsrntk3](https://x.com/amsrntk3)）
-- 發行：Elgato Systems / Corsair, Inc. and other contributors
-
-頁面內「設定 → 關於此分頁」亦有署名與 MIT 摘要。
-
-## 推送到 GitHub
-
-```bash
-git checkout master   # 若目前為 detached HEAD
-# 推薦：不依賴 assets/ 資料夾
-git add index.html nachoneko-assets.js favicon.ico .nojekyll .gitattributes .gitignore README.md
-git status
-git commit -m "Embed Nachoneko assets for GitHub-friendly deploy"
-git push origin master
-```
-
-若本機仍有 `assets/` 且能上傳，可一併 `git add assets/`，但**線上執行不需要**該資料夾。
-
-### 注意
-
-| 項目 | 說明 |
-|------|------|
-| 圖檔替代 | `nachoneko-assets.js` 為文字，避開 assets 上傳問題 |
-| 體積 | `nachoneko-assets.js` 約 1MB（含壁紙 base64） |
-| Pages | 根目錄需有 `.nojekyll`（已包含） |
-| 重產資源 | 本機有 `assets/nachoneko/` 時可再跑產生腳本更新 JS |
-
-## 功能摘要
-
-- 時鐘／日期（zh-TW）
-- Google 搜尋與建議
-- 快捷連結與應用九宮格
-- 背景：預設影片、本機影片（≤500MB）／圖片、網址
-- 響應式排版（`clamp` + 媒體查詢）
+祝使用愉快 ✨
