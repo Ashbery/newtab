@@ -4,10 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ashbery 新分頁</title>
-    
+
     <!-- 使用相同目錄的 favicon.ico -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
+        /*
+         * Nachoneko（甘城なつき）靈感配色
+         * 銀灰髮 · 水色瞳 · 黑貓 mascot（三眼）· 肉球 / 貓耳
+         * 圖標為原創 SVG，非官方立繪素材
+         */
+        :root {
+            --nacho-silver: #C8CDD6;
+            --nacho-silver-deep: #9AA1AF;
+            --nacho-eye: #6BB6E8;
+            --nacho-eye-bright: #9AD0F5;
+            --nacho-eye-deep: #4A9AD9;
+            --nacho-black: #2A2A32;
+            --nacho-soft: #F4F6FA;
+            --nacho-pink: #F7C6D8;
+            --nacho-glow: rgba(107, 182, 232, 0.45);
+
+            /* 響應式 layout tokens（隨視窗平滑縮放） */
+            --edge: clamp(10px, 1.5vw + 4px, 28px);
+            --edge-bottom: clamp(12px, 1.2vw + 8px, 24px);
+            --header-gap: clamp(12px, 2.2vw, 40px);
+            --clock-fs: clamp(1.35rem, 0.85rem + 2.4vw, 2.75rem);
+            --date-fs: clamp(0.68rem, 0.58rem + 0.4vw, 0.9rem);
+            --time-block-w: clamp(9.5rem, 6rem + 14vw, 21rem);
+            --search-h: clamp(42px, 2.2vw + 32px, 56px);
+            --search-fs: clamp(0.875rem, 0.78rem + 0.4vw, 1.05rem);
+            --search-max: clamp(240px, 28vw + 200px, 640px);
+            --search-pad-x: clamp(14px, 1.2vw + 8px, 22px);
+            --search-radius: clamp(18px, 1.2vw + 12px, 28px);
+            --ql-gap: clamp(2px, 0.4vw, 8px);
+            --ql-fs: clamp(0.78rem, 0.7rem + 0.3vw, 0.95rem);
+            --ql-icon: clamp(22px, 1.2vw + 14px, 30px);
+            --apps-btn: clamp(34px, 1.5vw + 24px, 44px);
+            --gear-size: clamp(38px, 1.8vw + 26px, 52px);
+            --apps-panel-top: clamp(52px, 4vw + 36px, 72px);
+            --ease-layout: 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -19,10 +56,26 @@
             color: white;
             overflow: hidden;
             height: 100vh;
+            height: 100dvh;
             background: #000;
+            /* 頁面文字不可被左鍵框選 */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
         }
 
-        #video-background {
+        /* 搜尋框等仍可選取／編輯文字 */
+        input,
+        textarea {
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+        }
+
+        #video-background,
+        #image-background {
             position: fixed;
             top: 0;
             left: 0;
@@ -32,110 +85,188 @@
             z-index: -1;
         }
 
-        .header-container {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            gap: 40px;
+        #image-background {
+            display: none;
+            background-position: center;
+            background-size: cover;
+            background-repeat: no-repeat;
         }
 
+        .header-container {
+            position: fixed;
+            top: var(--edge);
+            left: var(--edge);
+            right: var(--edge);
+            z-index: 10;
+            display: flex;
+            align-items: flex-start;
+            gap: var(--header-gap);
+            transition: top var(--ease-layout), left var(--ease-layout), right var(--ease-layout), gap var(--ease-layout);
+        }
+
+        /* 時間固定左上角；寬度隨解析度縮放 */
         .time-container {
+            position: fixed;
+            top: var(--edge);
+            left: var(--edge);
+            z-index: 11;
             flex-shrink: 0;
-            min-width: 200px;
+            width: auto;
+            max-width: min(var(--time-block-w), calc(100vw - var(--edge) * 2));
+            min-width: 0;
+            white-space: nowrap;
+            transition: top var(--ease-layout), left var(--ease-layout);
         }
 
         .clock {
-            font-size: 2.5rem;
+            font-size: var(--clock-fs);
             font-weight: 300;
-            margin-bottom: 5px;
+            margin-bottom: clamp(2px, 0.3vw, 6px);
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
             font-variant-numeric: tabular-nums;
+            line-height: 1.15;
+            white-space: nowrap;
+            letter-spacing: 0.02em;
+            transition: font-size var(--ease-layout);
         }
 
         .date {
-            font-size: 0.8rem;
+            font-size: var(--date-fs);
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            transition: font-size var(--ease-layout);
         }
 
         .search-container {
-            flex: 1;
-            max-width: 600px;
+            flex: 1 1 auto;
+            width: min(var(--search-max), 100%);
+            max-width: min(
+                var(--search-max),
+                calc(100vw - var(--time-block-w) - clamp(120px, 18vw, 260px) - var(--edge) * 2 - var(--header-gap))
+            );
             position: relative;
+            /* 避開左側時間區，寬度連動解析度 */
+            margin-left: calc(var(--time-block-w) + var(--header-gap) - var(--edge));
+            transition:
+                margin var(--ease-layout),
+                max-width var(--ease-layout),
+                width var(--ease-layout);
         }
 
+        /* 搜尋框與建議列共用同一圓角外殼，展開時整體自然長高 */
         .search-box {
             position: relative;
+            z-index: 100;
+            border-radius: var(--search-radius);
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            overflow: hidden;
+            box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+            transition:
+                background 0.35s ease,
+                border-color 0.35s ease,
+                box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                border-radius var(--ease-layout);
+        }
+
+        .search-box:focus-within {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255, 255, 255, 0.55);
+            box-shadow: 0 0 22px rgba(255, 255, 255, 0.16);
+        }
+
+        .search-box.active {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.45);
+            box-shadow:
+                0 0 24px rgba(255, 255, 255, 0.1),
+                0 18px 40px rgba(0, 0, 0, 0.28);
         }
 
         .search-input-wrapper {
             position: relative;
             display: flex;
             align-items: center;
+            justify-content: center;
+            height: var(--search-h);
+            z-index: 2;
+            transition: height var(--ease-layout);
         }
 
+        /* 垂直置中：高度與字級隨解析度縮放 */
         .search-input {
+            display: block;
             width: 100%;
-            padding: 15px 50px 15px 20px;
+            height: var(--search-h);
+            margin: 0;
+            padding: 0 calc(var(--search-pad-x) + 28px) 0 var(--search-pad-x);
             border: none;
-            border-radius: 25px;
-            background: rgba(255, 255, 255, 0.15);
-            font-size: 1rem;
+            border-radius: 0;
+            background: transparent;
+            font-size: var(--search-fs);
+            line-height: 1.25;
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(10px);
-            transition: all 0.15s ease;
             outline: none;
             text-align: left;
-            /* 禁用瀏覽器自動填充樣式 */
-            autocomplete: "off";
-            -webkit-autocomplete: "off";
+            box-sizing: border-box;
+            appearance: none;
+            -webkit-appearance: none;
+            transition: height var(--ease-layout), font-size var(--ease-layout), padding var(--ease-layout);
         }
 
-        /* 搜尋框獲得焦點時的樣式 */
         .search-input:focus {
-            background: rgba(255, 255, 255, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-        }
-
-        /* 當有建議列顯示時，搜尋框底部變為直角 - 無過渡動畫 */
-        .search-box.active .search-input {
-            border-radius: 25px 25px 0 0;
-            border-bottom: none;
-            /* 移除圓角變化的過渡效果 */
-            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            background: transparent;
+            box-shadow: none;
         }
 
         .search-input::placeholder {
             color: rgba(255, 255, 255, 0.8);
-            text-align: left;
+            opacity: 1;
+            font-size: var(--search-fs);
+            position: relative;
+            top: 1px;
+        }
+
+        .search-input::-webkit-input-placeholder {
+            opacity: 1;
+            position: relative;
+            top: 1px;
+        }
+
+        .search-input::-moz-placeholder {
+            opacity: 1;
         }
 
         /* 清除按鈕 */
         .clear-btn {
             position: absolute;
-            right: 15px;
+            top: 0;
+            bottom: 0;
+            right: clamp(10px, 1vw + 6px, 16px);
+            margin: auto 0;
             background: none;
             border: none;
             color: rgba(255, 255, 255, 0.7);
             cursor: pointer;
-            font-size: 1rem;
+            font-size: var(--search-fs);
             display: none;
-            transition: all 0.15s ease;
-            padding: 5px;
+            transition: color 0.15s ease;
+            padding: 0;
             border-radius: 50%;
             width: 24px;
             height: 24px;
             align-items: center;
             justify-content: center;
+            line-height: 24px;
         }
 
         .clear-btn:hover {
-            /* 移除背景，只改變圖標顏色 */
             background: none;
             color: rgba(255, 255, 255, 1);
         }
@@ -144,279 +275,675 @@
             display: flex;
         }
 
-        /* 搜尋建議容器 */
+        /* 建議列：用 grid 0fr→1fr 展開，比 max-height 更順，且銜接無斷層 */
         .suggestions-container {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 0 0 25px 25px;
-            overflow: hidden;
-            max-height: 0;
+            display: grid;
+            grid-template-rows: 0fr;
             opacity: 0;
-            transition: all 0.15s ease;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-top: none;
-            z-index: 100;
-            transform: translateY(-5px);
+            pointer-events: none;
+            transition:
+                grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.28s ease 0.02s;
+            border-top: 1px solid transparent;
         }
 
         .search-box.active .suggestions-container {
-            max-height: 300px;
+            grid-template-rows: 1fr;
             opacity: 1;
-            transform: translateY(0);
+            pointer-events: auto;
+            border-top-color: rgba(255, 255, 255, 0.12);
+            transition:
+                grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.3s ease 0.04s,
+                border-top-color 0.3s ease 0.06s;
+        }
+
+        .suggestions-container > .suggestions-list {
+            min-height: 0;
+            overflow: hidden;
         }
 
         /* 自定義滾動條 */
         .suggestions-list {
-            max-height: 300px;
+            max-height: min(42vh, 320px);
+            overflow-x: hidden;
+            overflow-y: hidden;
+            padding: 0 0 8px;
+            transition: padding 0.3s ease, max-height var(--ease-layout);
+        }
+
+        .search-box.active .suggestions-list {
             overflow-y: auto;
-            padding: 10px 0;
+            padding: 4px 0 10px;
         }
 
         .suggestions-list::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
 
         .suggestions-list::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
+            background: transparent;
+            margin: 4px 0 12px;
         }
 
         .suggestions-list::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.25);
             border-radius: 4px;
         }
 
         .suggestions-list::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.45);
         }
 
         .suggestion-item {
-            padding: 12px 20px;
+            padding: 11px 18px;
+            margin: 2px 8px;
+            border-radius: 12px;
             cursor: pointer;
             display: flex;
             align-items: center;
-            transition: all 0.15s ease;
+            gap: 12px;
+            opacity: 0;
+            transform: translateY(6px);
+            transition:
+                background 0.18s ease,
+                transform 0.18s ease,
+                box-shadow 0.18s ease;
+            animation: suggestionIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
 
-        .suggestion-item:hover {
-            background: rgba(255, 255, 255, 0.1);
+        @keyframes suggestionIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        .suggestion-item i {
-            margin-right: 12px;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
+        .suggestion-item:hover,
+        .suggestion-item.selected {
+            background: rgba(255, 255, 255, 0.16);
+            transform: translateX(4px);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
         }
 
-        .suggestion-text {
-            font-size: 0.95rem;
-            color: rgba(255, 255, 255, 0.9);
+        .suggestion-item:active {
+            transform: translateX(2px) scale(0.99);
+            background: rgba(255, 255, 255, 0.22);
         }
 
-        /* 右上角快捷鍵 */
-        .quick-links {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10;
-            display: flex;
-            gap: 15px;
-        }
-
-        .quick-link {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-        }
-
-        .quick-link:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateY(-2px);
-        }
-
-        /* Google應用圖標觸發器 */
-        .apps-trigger {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            width: 40px;
-            height: 40px;
+        .suggestion-icon {
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.78rem;
+            transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        }
+
+        .suggestion-item:hover .suggestion-icon,
+        .suggestion-item.selected .suggestion-icon {
+            background: rgba(255, 255, 255, 0.22);
+            color: #fff;
+            transform: scale(1.08);
+        }
+
+        .suggestion-text {
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.88);
+            line-height: 1.35;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .suggestion-text .match {
+            color: #fff;
+            font-weight: 600;
+            text-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+        }
+
+        .suggestion-text .rest {
+            color: rgba(255, 255, 255, 0.72);
+            font-weight: 400;
+        }
+
+        /* 載入中的骨架效果 */
+        .suggestion-item.skeleton {
+            pointer-events: none;
+            animation: suggestionIn 0.25s ease forwards, skeletonPulse 1.1s ease-in-out infinite;
+        }
+
+        .suggestion-item.skeleton .suggestion-icon,
+        .suggestion-item.skeleton .skeleton-bar {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .skeleton-bar {
+            height: 12px;
+            border-radius: 6px;
+            flex: 1;
+            max-width: 70%;
+        }
+
+        .suggestion-item.skeleton:nth-child(2) .skeleton-bar {
+            max-width: 55%;
+        }
+
+        .suggestion-item.skeleton:nth-child(3) .skeleton-bar {
+            max-width: 62%;
+        }
+
+        @keyframes skeletonPulse {
+            0%, 100% { opacity: 0.45; }
+            50% { opacity: 0.9; }
+        }
+
+        /* 右上快捷列 — Nachoneko 風格：銀白 + 水色 */
+        .quick-links {
+            position: fixed;
+            top: var(--edge);
+            right: var(--edge);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: var(--ql-gap);
+            max-width: calc(100vw - var(--edge) * 2);
+            transition: top var(--ease-layout), right var(--ease-layout), gap var(--ease-layout);
+        }
+
+        .quick-link {
+            display: inline-flex;
+            align-items: center;
+            gap: clamp(4px, 0.5vw, 8px);
+            padding: clamp(6px, 0.5vw + 4px, 10px) clamp(8px, 0.8vw + 4px, 14px);
+            border: none;
+            border-radius: 12px;
+            background: transparent;
+            color: var(--nacho-silver);
+            font-size: var(--ql-fs);
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            text-decoration: none;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 1.2rem;
+            filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+            transition:
+                color 0.2s ease,
+                background 0.2s ease,
+                transform 0.2s ease,
+                filter 0.2s ease,
+                padding var(--ease-layout),
+                font-size var(--ease-layout);
+        }
+
+        .quick-link .ql-icon {
+            width: var(--ql-icon);
+            height: var(--ql-icon);
+            flex-shrink: 0;
+            display: block;
+            object-fit: contain;
+            border-radius: 6px;
+            image-rendering: auto;
+            transition: width var(--ease-layout), height var(--ease-layout);
+        }
+
+        .quick-link:hover {
+            color: var(--nacho-eye-bright);
+            background: rgba(107, 182, 232, 0.12);
+            transform: translateY(-1px);
+            filter: drop-shadow(0 0 8px var(--nacho-glow));
+        }
+
+        .quick-link:hover .ql-icon {
+            transform: scale(1.08);
+        }
+
+        .quick-link:active {
+            transform: scale(0.97);
+        }
+
+        /* 應用選單觸發：Elgato Nachoneko pack 圖標 */
+        .apps-trigger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: var(--apps-btn);
+            height: var(--apps-btn);
+            padding: 0;
+            margin: 0;
+            border: none;
+            border-radius: 12px;
+            background: transparent;
+            color: var(--nacho-silver);
+            cursor: pointer;
+            outline: none;
+            filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+            transition:
+                background 0.2s ease,
+                transform 0.2s ease,
+                filter 0.2s ease,
+                width var(--ease-layout),
+                height var(--ease-layout);
+        }
+
+        .apps-trigger .apps-grid-icon {
+            width: calc(var(--apps-btn) * 0.8);
+            height: calc(var(--apps-btn) * 0.8);
+            display: block;
+            object-fit: contain;
+            border-radius: 8px;
+            transition:
+                transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+                width var(--ease-layout),
+                height var(--ease-layout);
         }
 
         .apps-trigger:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.1);
+            background: rgba(107, 182, 232, 0.12);
+            filter: drop-shadow(0 0 8px var(--nacho-glow));
+        }
+
+        .apps-trigger:hover .apps-grid-icon {
+            animation: paw-bounce 0.55s ease;
         }
 
         .apps-trigger.active {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(107, 182, 232, 0.18);
         }
 
-        /* Google應用資料夾 - 透明毛玻璃效果 */
+        .apps-trigger:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes paw-bounce {
+            0%, 100% { transform: scale(1); }
+            40% { transform: scale(1.12) rotate(-4deg); }
+            70% { transform: scale(1.05) rotate(3deg); }
+        }
+
+        /* 應用選單面板 — Nachoneko wallpaper 背景 */
         .google-apps-folder {
             position: fixed;
-            top: 70px;
-            right: 20px;
+            top: var(--apps-panel-top);
+            right: var(--edge);
             z-index: 100;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            background:
+                linear-gradient(160deg, rgba(20, 24, 32, 0.55), rgba(28, 34, 48, 0.62)),
+                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border-radius: 18px;
+            padding: clamp(10px, 1vw + 6px, 16px);
+            box-shadow:
+                0 16px 40px rgba(0, 0, 0, 0.45),
+                0 0 0 1px rgba(107, 182, 232, 0.18),
+                0 0 28px rgba(107, 182, 232, 0.08);
             display: none;
-            min-width: 300px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            width: min(320px, calc(100vw - var(--edge) * 2));
+            min-width: min(280px, calc(100vw - var(--edge) * 2));
+            border: 1px solid rgba(200, 205, 214, 0.22);
+            animation: appsPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+            overflow: hidden;
+            transition: top var(--ease-layout), right var(--ease-layout), width var(--ease-layout);
         }
 
-        /* 9宮格應用圖標 */
+        @keyframes appsPanelIn {
+            from {
+                opacity: 0;
+                transform: translateY(-6px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
         .apps-grid-3x3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
+            gap: 6px;
         }
 
         .google-app-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 12px 8px;
-            border-radius: 8px;
+            gap: 8px;
+            padding: 12px 8px 10px;
+            border-radius: 14px;
             text-decoration: none;
-            color: white;
-            transition: all 0.2s ease;
+            color: var(--nacho-silver);
+            transition: background 0.18s ease, transform 0.18s ease, color 0.18s ease;
             border: none;
             background: transparent;
         }
 
         .google-app-item:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(107, 182, 232, 0.12);
+            color: var(--nacho-soft);
+            transform: translateY(-2px);
+        }
+
+        .google-app-item:active {
+            transform: scale(0.97);
         }
 
         .google-app-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.9);
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: linear-gradient(160deg, rgba(200, 205, 214, 0.14), rgba(107, 182, 232, 0.1));
+            border: 1px solid rgba(200, 205, 214, 0.16);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 8px;
-            transition: all 0.2s ease;
+            overflow: hidden;
+            transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
         }
 
         .google-app-item:hover .google-app-icon {
-            background: white;
-            transform: scale(1.1);
+            background: linear-gradient(160deg, rgba(154, 208, 245, 0.22), rgba(247, 198, 216, 0.12));
+            transform: scale(1.06);
+            box-shadow: 0 6px 16px rgba(74, 154, 217, 0.28);
         }
 
-        .google-app-icon i {
-            font-size: 20px;
-            color: #5f6368;
+        .google-app-icon img {
+            width: 44px;
+            height: 44px;
+            display: block;
+            object-fit: contain;
+        }
+
+        .google-app-icon svg {
+            width: 26px;
+            height: 26px;
+            display: block;
         }
 
         .google-app-label {
             font-size: 12px;
-            font-weight: 400;
+            font-weight: 500;
             text-align: center;
             line-height: 1.2;
+            letter-spacing: 0.01em;
         }
 
-        /* 齒輪圖標 */
+        /* 設定：Elgato Nachoneko pack 圖標 */
         .settings-gear {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: var(--edge-bottom);
+            right: var(--edge);
             z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            border: none;
+            background: transparent;
+            box-shadow: none;
             cursor: pointer;
-            font-size: 2rem;
-            color: white;
-            transition: all 0.3s ease;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            outline: none;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
+            transition:
+                opacity 0.2s ease,
+                transform 0.2s ease,
+                filter 0.2s ease,
+                bottom var(--ease-layout),
+                right var(--ease-layout);
+        }
+
+        .settings-gear .gear-icon {
+            width: var(--gear-size);
+            height: var(--gear-size);
+            display: block;
+            object-fit: contain;
+            border-radius: 12px;
+            transition: width var(--ease-layout), height var(--ease-layout);
         }
 
         .settings-gear:hover {
-            transform: rotate(90deg);
-            color: rgba(255, 255, 255, 0.8);
+            filter: drop-shadow(0 0 12px var(--nacho-glow));
+            transform: scale(1.08);
         }
 
-        /* 設定選單 - 修復為透明毛玻璃效果 */
+        .settings-gear:hover .gear-icon,
+        .settings-gear.active .gear-icon {
+            animation: cat-wiggle 1.2s ease-in-out infinite;
+        }
+
+        .settings-gear.active {
+            filter: drop-shadow(0 0 14px var(--nacho-glow));
+        }
+
+        .settings-gear:active {
+            transform: scale(0.94);
+            opacity: 0.9;
+        }
+
+        @keyframes cat-wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-8deg); }
+            75% { transform: rotate(8deg); }
+        }
+
+        .menu-item .menu-icon {
+            width: 22px;
+            height: 22px;
+            object-fit: contain;
+            border-radius: 5px;
+            flex-shrink: 0;
+        }
+
+
+        /* 設定選單 — Nachoneko wallpaper 背景 */
         .settings-menu {
             position: fixed;
-            bottom: 70px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.15) !important;
-            backdrop-filter: blur(10px) !important;
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            bottom: calc(var(--edge-bottom) + var(--gear-size) + 12px);
+            right: var(--edge);
+            background:
+                linear-gradient(160deg, rgba(20, 24, 32, 0.55), rgba(28, 34, 48, 0.62)),
+                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat !important;
+            backdrop-filter: blur(6px) !important;
+            -webkit-backdrop-filter: blur(6px) !important;
+            border-radius: 14px;
+            padding: 10px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
             z-index: 100;
             display: none;
-            min-width: 200px;
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            min-width: min(220px, calc(100vw - var(--edge) * 2));
+            max-width: calc(100vw - var(--edge) * 2);
+            border: 1px solid rgba(200, 205, 214, 0.25) !important;
+            overflow: hidden;
+            transition: bottom var(--ease-layout), right var(--ease-layout);
         }
 
         .settings-menu::after {
             content: '';
             position: absolute;
             bottom: -8px;
-            right: 15px;
+            right: 18px;
             width: 0;
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 8px solid rgba(255, 255, 255, 0.15);
+            border-top: 8px solid rgba(40, 48, 64, 0.75);
         }
 
         .menu-item {
             display: flex;
             align-items: center;
+            gap: 10px;
             padding: 12px 15px;
-            color: white !important;
+            color: var(--nacho-silver) !important;
             text-decoration: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
             margin-bottom: 5px;
         }
 
         .menu-item:hover {
-            background: rgba(255, 255, 255, 0.1) !important;
+            background: rgba(107, 182, 232, 0.12) !important;
+            color: var(--nacho-soft) !important;
         }
 
         .menu-item:last-child {
             margin-bottom: 0;
         }
 
+        .menu-item svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
         .menu-item i {
             width: 20px;
-            margin-right: 10px;
+            margin-right: 0;
             font-size: 1rem;
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: var(--nacho-eye) !important;
         }
 
         .menu-item span {
             font-size: 0.9rem;
             font-weight: 500;
-            color: white !important;
+            color: inherit !important;
+        }
+
+        /* 關於此分頁 */
+        .about-page-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .about-page-box {
+            position: relative;
+            width: min(520px, 100%);
+            max-height: min(82vh, 640px);
+            overflow: auto;
+            text-align: left;
+            color: #1a1a1a;
+            background:
+                linear-gradient(160deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.22)),
+                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+            padding: 28px 26px 22px;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .about-page-box h3 {
+            margin: 0 0 14px;
+            font-size: 1.25rem;
+            color: #111;
+            text-align: center;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .about-page-box h4 {
+            margin: 16px 0 8px;
+            font-size: 0.95rem;
+            color: #1a1a1a;
+        }
+
+        .about-page-body {
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .about-page-body p {
+            margin: 0 0 10px;
+        }
+
+        .about-lead {
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .about-list {
+            margin: 0 0 10px 1.1em;
+            padding: 0;
+        }
+
+        .about-list li {
+            margin-bottom: 4px;
+        }
+
+        .about-links {
+            word-break: break-word;
+        }
+
+        .about-links a {
+            color: #1a5fb4;
+            text-decoration: underline;
+        }
+
+        .about-links a:hover {
+            color: #0d3d7a;
+        }
+
+        .about-license {
+            margin: 0 0 12px;
+            padding: 12px;
+            max-height: 180px;
+            overflow: auto;
+            font-size: 0.72rem;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #222;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .about-note {
+            font-size: 0.8rem;
+            color: #333;
+            margin-bottom: 0 !important;
+        }
+
+        .about-note code {
+            font-size: 0.78rem;
+            background: rgba(255, 255, 255, 0.75);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+
+        .close-about {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #444;
+            cursor: pointer;
+            font-size: 1.15rem;
+            padding: 6px;
+            line-height: 1;
+        }
+
+        .close-about:hover {
+            color: #111;
         }
 
         .video-upload-container {
@@ -425,6 +952,7 @@
             left: 0;
             width: 100%;
             height: 100%;
+            /* 半透明遮罩，後方維持原本新分頁畫面 */
             background: rgba(0, 0, 0, 0.8);
             display: none;
             align-items: center;
@@ -433,23 +961,55 @@
         }
 
         .upload-box {
-            background: rgba(255, 255, 255, 0.95);
+            /* wallpaper 為主，僅薄遮罩；表單區再加可讀底 */
+            background:
+                linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.18)),
+                url("assets/nachoneko/wallpaper.png") right center / cover no-repeat;
             padding: 30px;
             border-radius: 12px;
             position: relative;
             min-width: 350px;
-            color: #333;
+            max-width: 420px;
+            color: #1a1a1a;
             text-align: center;
-            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            /* 上傳對話框內仍允許選取提示文字 */
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .upload-box h3 {
             margin-bottom: 20px;
-            color: #333;
+            color: #111;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+        }
+
+        .upload-box .url-input,
+        .upload-box .file-input {
+            background: rgba(255, 255, 255, 0.88) !important;
+        }
+
+        .upload-box .current-video {
+            background: rgba(232, 244, 253, 0.92);
         }
 
         .file-input-wrapper {
             margin: 20px 0;
+            background: transparent;
+        }
+
+        /* 格式說明：無白框，直接疊在壁紙上 */
+        .upload-hint {
+            font-size: 0.8rem;
+            color: #222;
+            margin-top: 8px;
+            line-height: 1.5;
+            background: none;
+            border: none;
+            padding: 0;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
         }
 
         .file-input {
@@ -532,13 +1092,165 @@
             outline: none;
             border-color: #4a6cf7;
         }
+
+        /* —— 中等寬度：精簡右上文字、略縮時間占位 —— */
+        @media (max-width: 1100px) {
+            :root {
+                --time-block-w: clamp(8.5rem, 5rem + 12vw, 16rem);
+            }
+        }
+
+        @media (max-width: 900px) {
+            :root {
+                --time-block-w: clamp(7.5rem, 4.5rem + 10vw, 13rem);
+                --search-max: clamp(220px, 48vw, 480px);
+            }
+
+            /* 快捷列只留圖標，騰出搜尋寬度 */
+            .quick-link span {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+
+            .quick-link {
+                padding: clamp(6px, 0.6vw, 8px);
+            }
+        }
+
+        /* —— 窄螢幕：時間在上、搜尋置中下排 —— */
+        @media (max-width: 720px) {
+            :root {
+                --clock-fs: clamp(1.25rem, 0.9rem + 3.5vw, 1.85rem);
+                --date-fs: clamp(0.65rem, 0.55rem + 0.8vw, 0.8rem);
+                --search-max: min(520px, calc(100vw - var(--edge) * 2));
+                --time-block-w: min(100%, calc(100vw - var(--edge) * 2 - 100px));
+            }
+
+            .header-container {
+                flex-direction: column;
+                align-items: stretch;
+                top: var(--edge);
+                /* 為右上快捷列留空 */
+                padding-right: calc(var(--apps-btn) + 12px);
+            }
+
+            .time-container {
+                position: relative;
+                top: auto;
+                left: auto;
+                max-width: calc(100% - var(--apps-btn) - 8px);
+            }
+
+            .search-container {
+                margin-left: 0;
+                margin-top: clamp(10px, 2vw, 16px);
+                width: 100%;
+                max-width: var(--search-max);
+                align-self: center;
+            }
+
+            .quick-links {
+                top: var(--edge);
+                right: var(--edge);
+            }
+
+            .google-apps-folder {
+                top: calc(var(--edge) + var(--apps-btn) + 8px);
+            }
+        }
+
+        /* —— 很窄／直式：再壓緊 —— */
+        @media (max-width: 480px) {
+            :root {
+                --edge: 10px;
+                --clock-fs: clamp(1.15rem, 4.5vw, 1.5rem);
+                --search-h: 44px;
+            }
+
+            .date {
+                white-space: normal;
+                max-width: 12rem;
+            }
+
+            .quick-links {
+                gap: 0;
+            }
+
+            .apps-grid-3x3 {
+                gap: 4px;
+            }
+
+            .google-app-icon {
+                width: 46px;
+                height: 46px;
+            }
+
+            .google-app-icon img {
+                width: 40px;
+                height: 40px;
+            }
+
+            .upload-box,
+            .about-page-box {
+                min-width: 0;
+                width: calc(100vw - 24px);
+                max-width: calc(100vw - 24px);
+            }
+        }
+
+        /* 矮視窗：建議列不要蓋滿 */
+        @media (max-height: 560px) {
+            .suggestions-list {
+                max-height: min(32vh, 200px);
+            }
+
+            .about-page-box {
+                max-height: 90vh;
+            }
+        }
+
+        /* 寬螢幕：搜尋可稍大 */
+        @media (min-width: 1600px) {
+            :root {
+                --search-max: 680px;
+                --clock-fs: clamp(2.4rem, 1.5rem + 1.2vw, 3rem);
+            }
+        }
+
+        /* 減少動態偏好：關閉版面過渡 */
+        @media (prefers-reduced-motion: reduce) {
+            :root {
+                --ease-layout: 0.01ms;
+            }
+
+            .clock,
+            .date,
+            .search-container,
+            .search-input,
+            .quick-links,
+            .settings-gear,
+            .settings-gear .gear-icon,
+            .apps-trigger,
+            .google-apps-folder,
+            .settings-menu {
+                transition: none !important;
+            }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <video id="video-background" autoplay muted loop>
+    <video id="video-background" autoplay muted loop playsinline>
         <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4" type="video/mp4">
     </video>
+    <div id="image-background" aria-hidden="true"></div>
 
     <div class="header-container">
         <div class="time-container">
@@ -563,94 +1275,163 @@
         </div>
     </div>
 
-    <!-- 右上角快捷鍵 -->
+    <!-- 右上快捷列：Elgato Nachoneko Icon Pack -->
     <div class="quick-links">
-        <a href="https://www.google.com/imghp" class="quick-link" target="_blank">圖片</a>
-        <a href="https://mail.google.com" class="quick-link" target="_blank">Gmail</a>
-        <!-- Google應用圖標觸發器 -->
-        <div class="apps-trigger" id="apps-trigger">
-            <i class="fas fa-th"></i>
-        </div>
+        <a href="https://www.google.com/imghp" class="quick-link" title="Google 圖片">
+            <img class="ql-icon" src="assets/nachoneko/icons/on_icon_12.png" alt="" width="28" height="28" decoding="async">
+            <span>圖片</span>
+        </a>
+        <a href="https://mail.google.com" class="quick-link" title="Gmail">
+            <img class="ql-icon" src="assets/nachoneko/icons/on_icon_13.png" alt="" width="28" height="28" decoding="async">
+            <span>Gmail</span>
+        </a>
+        <button type="button" class="apps-trigger" id="apps-trigger" aria-label="應用程式" title="應用程式" aria-expanded="false">
+            <img class="apps-grid-icon" src="assets/nachoneko/icons/on_icon_11.png" alt="" width="34" height="34" decoding="async">
+        </button>
     </div>
 
-    <!-- Google應用資料夾 - 透明毛玻璃效果 -->
+    <!-- 應用選單：Nachoneko Stream Deck icons -->
     <div class="google-apps-folder" id="google-apps-folder">
         <div class="apps-grid-3x3">
-            <a href="https://mail.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-envelope"></i>
+            <a href="https://mail.google.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_01.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">Gmail</div>
             </a>
-            <a href="https://www.google.com/imghp" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-images"></i>
+            <a href="https://www.google.com/imghp" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_03.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">圖片</div>
             </a>
-            <a href="https://maps.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-map"></i>
+            <a href="https://maps.google.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_08.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">地圖</div>
             </a>
-            <a href="https://www.youtube.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fab fa-youtube"></i>
+            <a href="https://www.youtube.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_02.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">YouTube</div>
             </a>
-            <a href="https://play.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-play-circle"></i>
+            <a href="https://play.google.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_05.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">Play</div>
             </a>
-            <a href="https://news.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-newspaper"></i>
+            <a href="https://news.google.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_06.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">新聞</div>
             </a>
-            <a href="https://drive.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-cloud"></i>
+            <a href="https://drive.google.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_07.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">雲端硬碟</div>
             </a>
-            <a href="https://calendar.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-calendar"></i>
+            <a href="https://calendar.google.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_04.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">日曆</div>
             </a>
-            <a href="https://translate.google.com" class="google-app-item" target="_blank">
-                <div class="google-app-icon">
-                    <i class="fas fa-language"></i>
+            <a href="https://translate.google.com" class="google-app-item">
+                <div class="google-app-icon" aria-hidden="true">
+                    <img src="assets/nachoneko/icons/on_icon_09.png" alt="" width="44" height="44" decoding="async">
                 </div>
                 <div class="google-app-label">翻譯</div>
             </a>
         </div>
     </div>
 
-    <!-- 齒輪設定圖標 -->
-    <div class="settings-gear" id="settings-gear">
-        <i class="fas fa-cog"></i>
-    </div>
+    <!-- 設定：Nachoneko pack 圖標 -->
+    <button type="button" class="settings-gear" id="settings-gear" aria-label="設定" title="設定">
+        <img class="gear-icon" src="assets/nachoneko/icons/pack-icon.png" alt="" width="48" height="48" decoding="async">
+    </button>
 
     <!-- 設定選單 -->
     <div class="settings-menu" id="settings-menu">
+        <div class="menu-item" id="about-page-btn">
+            <img class="menu-icon" src="assets/nachoneko/icons/pack-icon.png" alt="" width="22" height="22" decoding="async">
+            <span>關於此分頁</span>
+        </div>
         <div class="menu-item" id="play-pause-btn">
-            <i class="fas fa-play"></i>
+            <img class="menu-icon" src="assets/nachoneko/icons/on_icon_14.png" alt="" width="22" height="22" decoding="async">
             <span>播放/暫停</span>
         </div>
         <div class="menu-item" id="mute-btn">
-            <i class="fas fa-volume-up"></i>
+            <img class="menu-icon" src="assets/nachoneko/icons/on_icon_15.png" alt="" width="22" height="22" decoding="async">
             <span>靜音/取消靜音</span>
         </div>
         <div class="menu-item" id="upload-video-btn">
-            <i class="fas fa-upload"></i>
-            <span>上傳背景影片</span>
+            <img class="menu-icon" src="assets/nachoneko/icons/on_icon_10.png" alt="" width="22" height="22" decoding="async">
+            <span>上傳背景</span>
+        </div>
+    </div>
+
+    <!-- 關於此分頁（授權與署名） -->
+    <div class="about-page-container" id="about-page-container" role="dialog" aria-labelledby="about-page-title" aria-modal="true">
+        <div class="about-page-box">
+            <button type="button" class="close-about" id="close-about" aria-label="關閉">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 id="about-page-title">關於此分頁</h3>
+            <div class="about-page-body">
+                <p class="about-lead">Ashbery 新分頁 — 瀏覽器自訂新分頁頁面。</p>
+
+                <h4>圖標與壁紙素材</h4>
+                <p>
+                    本頁 UI 圖標與設定／選單相關壁紙素材取自
+                    <strong>Nachoneko Icon and Wallpaper Pack</strong>
+                    （Elgato Stream Deck 合作素材包）。
+                </p>
+                <ul class="about-list">
+                    <li><strong>素材包</strong>：Nachoneko × Elgato</li>
+                    <li><strong>角色／繪師</strong>：甘城なつき / Nachoneko</li>
+                    <li><strong>發行</strong>：Elgato Systems / Corsair, Inc. and other contributors</li>
+                    <li><strong>授權</strong>：MIT License</li>
+                </ul>
+                <p class="about-links">
+                    <a href="https://www.elgato.com/us/en/s/stream-deck-nachoneko-icon-and-wallpaper-pack" target="_blank" rel="noopener noreferrer">Elgato 素材頁</a>
+                    ·
+                    <a href="https://x.com/amsrntk3" target="_blank" rel="noopener noreferrer">@amsrntk3</a>
+                    ·
+                    <a href="https://www.twitch.tv/nacho_dayo" target="_blank" rel="noopener noreferrer">Twitch</a>
+                    ·
+                    <a href="https://www.youtube.com/channel/UCvNn6mRroGDctnqU-FUsszg" target="_blank" rel="noopener noreferrer">YouTube</a>
+                    ·
+                    <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">MIT 授權全文</a>
+                </p>
+
+                <h4>MIT License 摘要</h4>
+                <pre class="about-license">Copyright 2021 Corsair/Elgato, Inc and other contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
+
+                <p class="about-note">
+                    完整授權原文見專案內
+                    <code>assets/nachoneko/LICENSE.txt</code>。
+                    本「關於」頁面旨在保留署名與授權資訊，以符合 MIT 條款並避免著作權爭議。
+                </p>
+            </div>
         </div>
     </div>
 
@@ -659,12 +1440,13 @@
             <button class="close-upload" id="close-upload">
                 <i class="fas fa-times"></i>
             </button>
-            <h3>上傳自訂背景影片</h3>
-            
+            <h3>上傳自訂背景</h3>
+
             <div class="file-input-wrapper">
-                <input type="file" id="video-file" accept="video/mp4" class="file-input">
-                <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
-                    支援 MP4 格式影片
+                <input type="file" id="bg-file" accept="video/mp4,video/webm,image/jpeg,image/png,image/webp,image/gif,image/bmp" class="file-input">
+                <div class="upload-hint">
+                    影片：MP4 / WebM，上限 500MB<br>
+                    圖片：JPG / PNG / WebP / GIF
                 </div>
             </div>
 
@@ -673,8 +1455,8 @@
             </div>
 
             <div>
-                <input type="url" id="video-url" class="url-input" placeholder="輸入影片網址 (MP4)">
-                <button id="load-url-btn" class="upload-btn">載入網址影片</button>
+                <input type="url" id="bg-url" class="url-input" placeholder="輸入影片或圖片網址">
+                <button id="load-url-btn" class="upload-btn" disabled>載入網址背景</button>
             </div>
 
             <button id="confirm-upload" class="upload-btn" disabled>確認設定</button>
@@ -686,17 +1468,22 @@
     </div>
 
     <script>
-        // 時鐘功能
+        // 時鐘功能（上午/下午與時間同一行）
         function updateClock() {
             const now = new Date();
-            const time = now.toLocaleTimeString('zh-TW');
-            const date = now.toLocaleDateString('zh-TW', { 
-                year: 'numeric', 
-                month: 'long', 
+            const time = now.toLocaleTimeString('zh-TW', {
+                hour: 'numeric',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+            const date = now.toLocaleDateString('zh-TW', {
+                year: 'numeric',
+                month: 'long',
                 day: 'numeric',
                 weekday: 'long'
             });
-            
+
             document.getElementById('clock').textContent = time;
             document.getElementById('date').textContent = date;
         }
@@ -710,23 +1497,58 @@
         const clearBtn = document.getElementById('clear-btn');
         const suggestionsContainer = document.getElementById('suggestions-container');
         const suggestionsList = document.getElementById('suggestions-list');
-        
+
         let searchTimeout;
         let currentSuggestions = [];
-        let isActive = false; // 追蹤搜尋框是否處於活躍狀態
+        let isActive = false;
+        let selectedIndex = -1;
+        let latestQuery = '';
+        let jsonpScript = null;
+
+        function openSuggestions() {
+            if (isActive) {
+                searchBox.classList.add('active');
+                return;
+            }
+            // 先確保內容已在 DOM 且為收合狀態，下一幀再開啟，高度過渡才會連貫
+            searchBox.classList.remove('active');
+            requestAnimationFrame(() => {
+                searchBox.classList.add('active');
+                isActive = true;
+            });
+        }
+
+        function closeSuggestions() {
+            searchBox.classList.remove('active');
+            isActive = false;
+            selectedIndex = -1;
+            clearSelectedHighlight();
+        }
+
+        function clearSelectedHighlight() {
+            suggestionsList.querySelectorAll('.suggestion-item.selected').forEach((el) => {
+                el.classList.remove('selected');
+            });
+        }
+
+        function updateSelectedHighlight() {
+            const items = suggestionsList.querySelectorAll('.suggestion-item:not(.skeleton)');
+            items.forEach((item, index) => {
+                item.classList.toggle('selected', index === selectedIndex);
+            });
+            if (selectedIndex >= 0 && items[selectedIndex]) {
+                items[selectedIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
 
         // 清除按鈕功能
-        clearBtn.addEventListener('click', function() {
+        clearBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
             searchInput.value = '';
             searchInput.focus();
             updateClearButton();
             clearSuggestions();
-            
-            // 只有在輸入框為空時才關閉建議列
-            if (!searchInput.value.trim()) {
-                searchBox.classList.remove('active');
-                isActive = false;
-            }
+            closeSuggestions();
         });
 
         // 更新清除按鈕顯示狀態
@@ -738,99 +1560,186 @@
             }
         }
 
-        // 點擊搜尋框時不展開，僅添加焦點樣式
+        // 聚焦時：有文字就展開建議（必要時重新載入）
         searchInput.addEventListener('focus', function() {
-            // 如果已經有內容，保持建議列開啟
-            if (searchInput.value.trim()) {
-                searchBox.classList.add('active');
-                isActive = true;
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            if (currentSuggestions.length > 0) {
+                openSuggestions();
+            } else {
+                showSkeleton();
+                openSuggestions();
+                fetchSuggestions(query);
             }
         });
 
-        // 點擊頁面其他地方時關閉建議
+        // 點擊頁面其他地方時，一律收起搜尋建議
         document.addEventListener('click', function(event) {
             if (!searchBox.contains(event.target)) {
-                // 只有在輸入框為空時才關閉建議列
-                if (!searchInput.value.trim()) {
-                    searchBox.classList.remove('active');
-                    isActive = false;
-                }
+                closeSuggestions();
             }
+        });
+
+        // 防止點建議區時輸入框失焦造成閃爍
+        suggestionsContainer.addEventListener('mousedown', function(e) {
+            e.preventDefault();
         });
 
         // 輸入時獲取搜尋建議
         searchInput.addEventListener('input', function() {
             const query = this.value.trim();
-            
-            // 更新清除按鈕顯示狀態
+            latestQuery = query;
+            selectedIndex = -1;
+
             updateClearButton();
-            
-            // 清除之前的計時器
             clearTimeout(searchTimeout);
-            
+
             if (query) {
-                // 第一次輸入時才添加active類，後續輸入保持active狀態
-                if (!isActive) {
+                // 先放骨架再展開，外殼從膠囊形自然長高
+                const wasOpen = isActive;
+                showSkeleton();
+                if (!wasOpen) {
+                    openSuggestions();
+                } else {
                     searchBox.classList.add('active');
                     isActive = true;
                 }
-                
-                // 設定新的計時器，避免過於頻繁的請求
                 searchTimeout = setTimeout(() => {
                     fetchSuggestions(query);
-                }, 200);
+                }, 180);
             } else {
-                // 如果沒有輸入，清空建議並收起搜尋框
                 clearSuggestions();
-                searchBox.classList.remove('active');
-                isActive = false;
+                closeSuggestions();
             }
         });
 
-        // 使用Google搜尋建議API
-        function fetchSuggestions(query) {
-            // 不再顯示載入狀態，直接清空建議列表
-            suggestionsList.innerHTML = '';
-            
-            // 使用JSONP方式獲取Google搜尋建議
-            const script = document.createElement('script');
-            script.src = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}&callback=handleSuggestions`;
-            document.head.appendChild(script);
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
-        // 處理Google搜尋建議回調
-        window.handleSuggestions = function(data) {
-            // 移除載入中的提示
+        function highlightMatch(suggestion, query) {
+            const safeSuggestion = escapeHtml(suggestion);
+            const safeQuery = escapeHtml(query.trim());
+            if (!safeQuery) {
+                return `<span class="rest">${safeSuggestion}</span>`;
+            }
+
+            const lowerSuggestion = suggestion.toLowerCase();
+            const lowerQuery = query.trim().toLowerCase();
+            const matchIndex = lowerSuggestion.indexOf(lowerQuery);
+
+            if (matchIndex === -1) {
+                return `<span class="rest">${safeSuggestion}</span>`;
+            }
+
+            const before = escapeHtml(suggestion.slice(0, matchIndex));
+            const match = escapeHtml(suggestion.slice(matchIndex, matchIndex + query.trim().length));
+            const after = escapeHtml(suggestion.slice(matchIndex + query.trim().length));
+
+            return `${before ? `<span class="rest">${before}</span>` : ''}<span class="match">${match}</span>${after ? `<span class="rest">${after}</span>` : ''}`;
+        }
+
+        function showSkeleton() {
             suggestionsList.innerHTML = '';
-            
+            for (let i = 0; i < 4; i++) {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item skeleton';
+                // 略晚於面板展開，讓項目跟著「長出來」而不是同時跳出
+                item.style.animationDelay = `${0.08 + i * 0.045}s`;
+                item.innerHTML = `
+                    <div class="suggestion-icon"><i class="fas fa-search"></i></div>
+                    <div class="skeleton-bar"></div>
+                `;
+                suggestionsList.appendChild(item);
+            }
+        }
+
+        // 使用 Google 搜尋建議 API（JSONP）
+        function fetchSuggestions(query) {
+            latestQuery = query;
+
+            if (jsonpScript && jsonpScript.parentNode) {
+                jsonpScript.parentNode.removeChild(jsonpScript);
+            }
+
+            const callbackName = 'handleSuggestions_' + Date.now();
+            window[callbackName] = function(data) {
+                try {
+                    handleSuggestionsResult(data, query);
+                } finally {
+                    delete window[callbackName];
+                    if (jsonpScript && jsonpScript.parentNode) {
+                        jsonpScript.parentNode.removeChild(jsonpScript);
+                    }
+                    jsonpScript = null;
+                }
+            };
+
+            jsonpScript = document.createElement('script');
+            jsonpScript.src = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}&callback=${callbackName}`;
+            jsonpScript.onerror = function() {
+                delete window[callbackName];
+                if (query === latestQuery) {
+                    clearSuggestions();
+                }
+            };
+            document.head.appendChild(jsonpScript);
+        }
+
+        function handleSuggestionsResult(data, query) {
+            // 忽略過期回應
+            if (query !== latestQuery) return;
+
+            suggestionsList.innerHTML = '';
+            selectedIndex = -1;
+
             if (data && data[1] && data[1].length > 0) {
                 currentSuggestions = data[1];
-                
-                // 顯示建議
+                openSuggestions();
+
                 currentSuggestions.forEach((suggestion, index) => {
                     const suggestionItem = document.createElement('div');
                     suggestionItem.className = 'suggestion-item';
+                    suggestionItem.style.animationDelay = `${0.06 + index * 0.04}s`;
                     suggestionItem.innerHTML = `
-                        <i class="fas fa-search"></i>
-                        <span class="suggestion-text">${suggestion}</span>
+                        <div class="suggestion-icon"><i class="fas fa-search"></i></div>
+                        <span class="suggestion-text">${highlightMatch(suggestion, query)}</span>
                     `;
-                    
-                    // 點擊建議時執行搜尋
+
+                    suggestionItem.addEventListener('mouseenter', function() {
+                        selectedIndex = index;
+                        updateSelectedHighlight();
+                    });
+
                     suggestionItem.addEventListener('click', function() {
                         searchInput.value = suggestion;
                         performSearch(suggestion);
                     });
-                    
+
                     suggestionsList.appendChild(suggestionItem);
                 });
+            } else {
+                currentSuggestions = [];
+                closeSuggestions();
             }
-            // 如果沒有建議，也不顯示任何提示
+        }
+
+        // 相容舊 callback 名稱（避免殘留請求報錯）
+        window.handleSuggestions = function(data) {
+            handleSuggestionsResult(data, latestQuery);
         };
 
         // 清空搜尋建議
         function clearSuggestions() {
             suggestionsList.innerHTML = '';
             currentSuggestions = [];
+            selectedIndex = -1;
         }
 
         // 執行搜尋
@@ -842,11 +1751,37 @@
             }
         }
 
-        // 按Enter執行搜尋
-        searchInput.addEventListener('keypress', function(e) {
+        // 鍵盤：方向鍵瀏覽、Enter 搜尋、Esc 收起
+        searchInput.addEventListener('keydown', function(e) {
+            const items = suggestionsList.querySelectorAll('.suggestion-item:not(.skeleton)');
+            const isOpen = isActive && items.length > 0;
+
+            if (e.key === 'Escape') {
+                closeSuggestions();
+                searchInput.blur();
+                return;
+            }
+
+            if (e.key === 'ArrowDown' && isOpen) {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % items.length;
+                updateSelectedHighlight();
+                return;
+            }
+
+            if (e.key === 'ArrowUp' && isOpen) {
+                e.preventDefault();
+                selectedIndex = selectedIndex <= 0 ? items.length - 1 : selectedIndex - 1;
+                updateSelectedHighlight();
+                return;
+            }
+
             if (e.key === 'Enter') {
-                const query = this.value.trim();
+                const query = selectedIndex >= 0 && items[selectedIndex]
+                    ? currentSuggestions[selectedIndex]
+                    : this.value.trim();
                 if (query) {
+                    e.preventDefault();
                     performSearch(query);
                 }
             }
@@ -856,158 +1791,355 @@
         const appsTrigger = document.getElementById('apps-trigger');
         const appsFolder = document.getElementById('google-apps-folder');
 
+        function openAppsFolder() {
+            appsFolder.style.display = 'block';
+            appsTrigger.classList.add('active');
+            appsTrigger.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeAppsFolder() {
+            appsFolder.style.display = 'none';
+            appsTrigger.classList.remove('active');
+            appsTrigger.setAttribute('aria-expanded', 'false');
+        }
+
         appsTrigger.addEventListener('click', function(e) {
             e.stopPropagation();
             if (appsFolder.style.display === 'block') {
-                appsFolder.style.display = 'none';
-                appsTrigger.classList.remove('active');
+                closeAppsFolder();
             } else {
-                appsFolder.style.display = 'block';
-                appsTrigger.classList.add('active');
+                openAppsFolder();
             }
         });
 
         // 點擊頁面其他區域關閉應用資料夾
         document.addEventListener('click', function(event) {
             if (!appsTrigger.contains(event.target) && !appsFolder.contains(event.target)) {
-                appsFolder.style.display = 'none';
-                appsTrigger.classList.remove('active');
+                closeAppsFolder();
             }
         });
 
-        // 影片控制
+        // 背景控制（影片 / 圖片）
         const video = document.getElementById('video-background');
+        const imageBg = document.getElementById('image-background');
         const uploadContainer = document.getElementById('video-upload-container');
         const settingsMenu = document.getElementById('settings-menu');
         const settingsGear = document.getElementById('settings-gear');
+        const bgFileInput = document.getElementById('bg-file');
+        const bgUrlInput = document.getElementById('bg-url');
+        const loadUrlBtn = document.getElementById('load-url-btn');
+        const confirmUploadBtn = document.getElementById('confirm-upload');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const muteBtn = document.getElementById('mute-btn');
+
+        const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500MB
+        const MAX_IMAGE_BYTES = 50 * 1024 * 1024;  // 圖片 50MB
+
         let selectedFile = null;
-        let selectedVideoUrl = '';
+        let selectedUrl = '';
+        let selectedKind = ''; // 'video' | 'image'
+        let currentBgType = 'video'; // 'video' | 'image'
+        let objectUrlToRevoke = null;
+
+        function isVideoFile(file) {
+            return file && (file.type.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(file.name));
+        }
+
+        function isImageFile(file) {
+            return file && (file.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(file.name));
+        }
+
+        function isImageUrl(url) {
+            return /\.(jpe?g|png|gif|webp|bmp)(\?.*)?$/i.test(url) || /[?&](format|type)=image/i.test(url);
+        }
+
+        function revokePreviousObjectUrl() {
+            if (objectUrlToRevoke) {
+                URL.revokeObjectURL(objectUrlToRevoke);
+                objectUrlToRevoke = null;
+            }
+        }
+
+        function setVideoBackground(src, name, persistMeta) {
+            revokePreviousObjectUrl();
+            if (src.startsWith('blob:')) {
+                objectUrlToRevoke = src;
+            }
+
+            currentBgType = 'video';
+            imageBg.style.display = 'none';
+            imageBg.style.backgroundImage = '';
+            video.style.display = 'block';
+            video.src = src;
+            video.load();
+            video.play().catch(function() {});
+
+            if (persistMeta) {
+                localStorage.setItem('customBackground', src);
+                localStorage.setItem('bgType', 'video');
+                localStorage.setItem('bgSource', persistMeta.source || 'url');
+                localStorage.setItem('bgName', name || '自訂影片');
+                // 相容舊鍵
+                localStorage.setItem('customVideo', src);
+                localStorage.setItem('videoSource', persistMeta.source || 'url');
+                localStorage.setItem('videoName', name || '自訂影片');
+            }
+
+            updateCurrentBgInfo(name || '自訂影片');
+            updateMediaControlsState();
+        }
+
+        function setImageBackground(src, name, persistMeta) {
+            revokePreviousObjectUrl();
+            if (src.startsWith('blob:')) {
+                objectUrlToRevoke = src;
+            }
+
+            currentBgType = 'image';
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            video.style.display = 'none';
+            imageBg.style.display = 'block';
+            imageBg.style.backgroundImage = `url("${src.replace(/"/g, '\\"')}")`;
+
+            if (persistMeta) {
+                localStorage.setItem('customBackground', src);
+                localStorage.setItem('bgType', 'image');
+                localStorage.setItem('bgSource', persistMeta.source || 'url');
+                localStorage.setItem('bgName', name || '自訂圖片');
+                localStorage.removeItem('customVideo');
+            }
+
+            updateCurrentBgInfo(name || '自訂圖片');
+            updateMediaControlsState();
+        }
+
+        function updateMediaControlsState() {
+            const isVideo = currentBgType === 'video';
+            playPauseBtn.style.opacity = isVideo ? '1' : '0.45';
+            muteBtn.style.opacity = isVideo ? '1' : '0.45';
+            playPauseBtn.style.pointerEvents = isVideo ? 'auto' : 'none';
+            muteBtn.style.pointerEvents = isVideo ? 'auto' : 'none';
+        }
+
+        function updateCurrentBgInfo(name) {
+            document.getElementById('current-video-info').style.display = 'block';
+            document.getElementById('current-video-name').textContent = name;
+        }
+
+        function resetUploadForm() {
+            bgFileInput.value = '';
+            bgUrlInput.value = '';
+            loadUrlBtn.disabled = true;
+            confirmUploadBtn.disabled = true;
+            selectedFile = null;
+            selectedUrl = '';
+            selectedKind = '';
+        }
+
+        function updateLoadUrlBtnState() {
+            loadUrlBtn.disabled = !bgUrlInput.value.trim();
+        }
+
+        function openSettingsMenu() {
+            settingsMenu.style.display = 'block';
+            settingsGear.classList.add('active');
+            settingsGear.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeSettingsMenu() {
+            settingsMenu.style.display = 'none';
+            settingsGear.classList.remove('active');
+            settingsGear.setAttribute('aria-expanded', 'false');
+        }
+
+        function toggleSettingsMenu() {
+            if (settingsMenu.style.display === 'block') {
+                closeSettingsMenu();
+            } else {
+                openSettingsMenu();
+            }
+        }
 
         // 齒輪點擊事件
-        settingsGear.addEventListener('click', function() {
-            settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+        settingsGear.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleSettingsMenu();
         });
 
         // 點擊頁面其他區域關閉選單
         document.addEventListener('click', function(event) {
             if (!settingsGear.contains(event.target) && !settingsMenu.contains(event.target)) {
-                settingsMenu.style.display = 'none';
+                closeSettingsMenu();
             }
         });
 
-        // 播放/暫停
-        document.getElementById('play-pause-btn').addEventListener('click', function() {
+        // 播放/暫停（僅影片背景）
+        playPauseBtn.addEventListener('click', function() {
+            if (currentBgType !== 'video') return;
             if (video.paused) {
                 video.play();
-                this.innerHTML = '<i class="fas fa-pause"></i><span>暫停影片</span>';
+                this.innerHTML = '<img class="menu-icon" src="assets/nachoneko/icons/on_icon_14.png" alt="" width="22" height="22"><span>暫停影片</span>';
             } else {
                 video.pause();
-                this.innerHTML = '<i class="fas fa-play"></i><span>播放影片</span>';
+                this.innerHTML = '<img class="menu-icon" src="assets/nachoneko/icons/off_icon_02.png" alt="" width="22" height="22"><span>播放影片</span>';
             }
-            settingsMenu.style.display = 'none';
+            closeSettingsMenu();
         });
 
-        // 靜音/取消靜音
-        document.getElementById('mute-btn').addEventListener('click', function() {
+        // 靜音/取消靜音（僅影片背景）
+        muteBtn.addEventListener('click', function() {
+            if (currentBgType !== 'video') return;
             video.muted = !video.muted;
-            this.innerHTML = video.muted ? 
-                '<i class="fas fa-volume-mute"></i><span>取消靜音</span>' : 
-                '<i class="fas fa-volume-up"></i><span>靜音影片</span>';
-            settingsMenu.style.display = 'none';
+            this.innerHTML = video.muted
+                ? '<img class="menu-icon" src="assets/nachoneko/icons/off_icon_01.png" alt="" width="22" height="22"><span>取消靜音</span>'
+                : '<img class="menu-icon" src="assets/nachoneko/icons/on_icon_15.png" alt="" width="22" height="22"><span>靜音影片</span>';
+            closeSettingsMenu();
         });
 
-        // 上傳影片介面
+        // 關於此分頁
+        const aboutContainer = document.getElementById('about-page-container');
+
+        function openAboutPage() {
+            aboutContainer.style.display = 'flex';
+            closeSettingsMenu();
+        }
+
+        function closeAboutPage() {
+            aboutContainer.style.display = 'none';
+        }
+
+        document.getElementById('about-page-btn').addEventListener('click', openAboutPage);
+        document.getElementById('close-about').addEventListener('click', closeAboutPage);
+        aboutContainer.addEventListener('click', function(e) {
+            if (e.target === aboutContainer) {
+                closeAboutPage();
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && aboutContainer.style.display === 'flex') {
+                closeAboutPage();
+            }
+        });
+
+        // 上傳背景介面
         document.getElementById('upload-video-btn').addEventListener('click', function() {
             uploadContainer.style.display = 'flex';
-            settingsMenu.style.display = 'none';
+            closeSettingsMenu();
         });
 
         document.getElementById('close-upload').addEventListener('click', function() {
             uploadContainer.style.display = 'none';
         });
 
-        // 檔案選擇
-        document.getElementById('video-file').addEventListener('change', function(e) {
-            selectedFile = e.target.files[0];
-            selectedVideoUrl = '';
-            document.getElementById('video-url').value = '';
-            
-            if (selectedFile && selectedFile.type === 'video/mp4') {
-                document.getElementById('confirm-upload').disabled = false;
-            } else {
-                document.getElementById('confirm-upload').disabled = true;
-                alert('請選擇 MP4 格式的影片檔案');
+        // 檔案選擇：影片（≤500MB）或圖片
+        bgFileInput.addEventListener('change', function(e) {
+            selectedFile = e.target.files[0] || null;
+            selectedUrl = '';
+            selectedKind = '';
+            bgUrlInput.value = '';
+
+            if (!selectedFile) {
+                confirmUploadBtn.disabled = true;
+                return;
             }
+
+            if (isVideoFile(selectedFile)) {
+                if (selectedFile.size > MAX_VIDEO_BYTES) {
+                    alert('影片檔案不可超過 500MB');
+                    bgFileInput.value = '';
+                    selectedFile = null;
+                    confirmUploadBtn.disabled = true;
+                    return;
+                }
+                selectedKind = 'video';
+                confirmUploadBtn.disabled = false;
+                return;
+            }
+
+            if (isImageFile(selectedFile)) {
+                if (selectedFile.size > MAX_IMAGE_BYTES) {
+                    alert('圖片檔案不可超過 50MB');
+                    bgFileInput.value = '';
+                    selectedFile = null;
+                    confirmUploadBtn.disabled = true;
+                    return;
+                }
+                selectedKind = 'image';
+                confirmUploadBtn.disabled = false;
+                return;
+            }
+
+            alert('請選擇影片（MP4 / WebM）或圖片（JPG / PNG / WebP / GIF）');
+            bgFileInput.value = '';
+            selectedFile = null;
+            confirmUploadBtn.disabled = true;
         });
 
+        // 未輸入網址時「載入網址背景」不可按
+        bgUrlInput.addEventListener('input', updateLoadUrlBtnState);
+        bgUrlInput.addEventListener('change', updateLoadUrlBtnState);
+
         // 網址載入
-        document.getElementById('load-url-btn').addEventListener('click', function() {
-            const url = document.getElementById('video-url').value.trim();
-            if (url) {
-                selectedVideoUrl = url;
-                selectedFile = null;
-                document.getElementById('video-file').value = '';
-                document.getElementById('confirm-upload').disabled = false;
-            } else {
-                alert('請輸入影片網址');
+        loadUrlBtn.addEventListener('click', function() {
+            const url = bgUrlInput.value.trim();
+            if (!url) {
+                loadUrlBtn.disabled = true;
+                return;
             }
+            selectedUrl = url;
+            selectedFile = null;
+            selectedKind = isImageUrl(url) ? 'image' : 'video';
+            bgFileInput.value = '';
+            confirmUploadBtn.disabled = false;
         });
 
         // 確認設定
-        document.getElementById('confirm-upload').addEventListener('click', function() {
+        confirmUploadBtn.addEventListener('click', function() {
             if (selectedFile) {
-                // 上傳本地檔案
-                const videoURL = URL.createObjectURL(selectedFile);
-                video.src = videoURL;
-                video.play();
-                
-                // 儲存到本地儲存
-                localStorage.setItem('customVideo', videoURL);
-                localStorage.setItem('videoSource', 'file');
-                localStorage.setItem('videoName', selectedFile.name);
-                
-                updateCurrentVideoInfo(selectedFile.name);
-                
-            } else if (selectedVideoUrl) {
-                // 使用網址影片
-                video.src = selectedVideoUrl;
-                video.play();
-                
-                // 儲存到本地儲存
-                localStorage.setItem('customVideo', selectedVideoUrl);
-                localStorage.setItem('videoSource', 'url');
-                localStorage.setItem('videoName', '自訂網址影片');
-                
-                updateCurrentVideoInfo('自訂網址影片');
+                const objectUrl = URL.createObjectURL(selectedFile);
+                if (selectedKind === 'image') {
+                    setImageBackground(objectUrl, selectedFile.name, { source: 'file' });
+                } else {
+                    setVideoBackground(objectUrl, selectedFile.name, { source: 'file' });
+                }
+            } else if (selectedUrl) {
+                const kind = selectedKind || (isImageUrl(selectedUrl) ? 'image' : 'video');
+                if (kind === 'image') {
+                    setImageBackground(selectedUrl, '自訂網址圖片', { source: 'url' });
+                } else {
+                    setVideoBackground(selectedUrl, '自訂網址影片', { source: 'url' });
+                }
             }
-            
+
             uploadContainer.style.display = 'none';
-            // 重置表單
-            document.getElementById('video-file').value = '';
-            document.getElementById('video-url').value = '';
-            document.getElementById('confirm-upload').disabled = true;
-            selectedFile = null;
-            selectedVideoUrl = '';
+            resetUploadForm();
         });
 
-        function updateCurrentVideoInfo(name) {
-            document.getElementById('current-video-info').style.display = 'block';
-            document.getElementById('current-video-name').textContent = name;
-        }
-
-        // 載入儲存的影片
+        // 載入儲存的背景
         window.addEventListener('DOMContentLoaded', function() {
-            const savedVideo = localStorage.getItem('customVideo');
-            const videoSource = localStorage.getItem('videoSource');
-            const videoName = localStorage.getItem('videoName');
-            
-            if (savedVideo) {
-                video.src = savedVideo;
-                updateCurrentVideoInfo(videoName || '自訂影片');
+            const savedBg = localStorage.getItem('customBackground') || localStorage.getItem('customVideo');
+            const bgType = localStorage.getItem('bgType') || 'video';
+            const bgName = localStorage.getItem('bgName') || localStorage.getItem('videoName');
+
+            if (savedBg && !savedBg.startsWith('blob:')) {
+                // blob URL 重新整理後失效，略過
+                if (bgType === 'image' || isImageUrl(savedBg)) {
+                    setImageBackground(savedBg, bgName || '自訂圖片', null);
+                    updateCurrentBgInfo(bgName || '自訂圖片');
+                } else {
+                    setVideoBackground(savedBg, bgName || '自訂影片', null);
+                    updateCurrentBgInfo(bgName || '自訂影片');
+                }
+            } else {
+                currentBgType = 'video';
+                video.style.display = 'block';
+                imageBg.style.display = 'none';
+                video.play().catch(function() {});
+                updateMediaControlsState();
             }
-            
-            video.play();
-            
+
             // 聚焦搜尋框
             searchInput.focus();
         });
