@@ -77,7 +77,7 @@
             -ms-user-select: text;
         }
 
-        #video-background,
+        .video-background,
         #image-background {
             position: fixed;
             top: 0;
@@ -86,6 +86,29 @@
             height: 100%;
             object-fit: cover;
             z-index: -1;
+        }
+
+        /* 雙緩衝：一層顯示、一層待命，切換時淡入接近無縫 */
+        .video-background {
+            opacity: 0;
+            transition: opacity 0.08s linear;
+            pointer-events: none;
+            background: #000;
+        }
+
+        .video-background.is-active {
+            opacity: 1;
+            z-index: -1;
+        }
+
+        .video-background.is-standby {
+            opacity: 0;
+            z-index: -2;
+        }
+
+        .video-background.is-hidden {
+            display: none !important;
+            opacity: 0;
         }
 
         #image-background {
@@ -1336,9 +1359,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <video id="video-background" autoplay muted loop playsinline>
-        <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4" type="video/mp4">
-    </video>
+    <!-- 雙緩衝背景影片：同一來源兩路輪流，減少 loop 頭尾卡頓 -->
+    <video id="video-background-a" class="video-background is-active" muted playsinline preload="auto"></video>
+    <video id="video-background-b" class="video-background is-standby" muted playsinline preload="auto"></video>
     <div id="image-background" aria-hidden="true"></div>
 
     <div class="header-container">
@@ -1961,8 +1984,11 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             }
         });
 
-        // 背景控制（影片 / 圖片）
-        const video = document.getElementById('video-background');
+        // 背景控制（影片雙緩衝 / 圖片）
+        const videoA = document.getElementById('video-background-a');
+        const videoB = document.getElementById('video-background-b');
+        const videos = [videoA, videoB];
+        const DEFAULT_VIDEO_SRC = 'https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4';
         const imageBg = document.getElementById('image-background');
         const uploadContainer = document.getElementById('video-upload-container');
         const settingsMenu = document.getElementById('settings-menu');
@@ -1976,12 +2002,189 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
 
         const MAX_VIDEO_BYTES = 1000 * 1024 * 1024; // 1000MB
         const MAX_IMAGE_BYTES = 50 * 1024 * 1024;  // 圖片 50MB
+        /** 結尾前多少秒啟動另一路，減少接縫 */
+        const DUAL_SWAP_LEAD_SEC = 0.35;
 
         let selectedFile = null;
         let selectedUrl = '';
         let selectedKind = ''; // 'video' | 'image'
         let currentBgType = 'video'; // 'video' | 'image'
         let objectUrlToRevoke = null;
+        let activeVideoIndex = 0;
+        let dualSwapPending = false;
+        let dualUserPaused = false;
+        let currentVideoSrc = '';
+
+        function getActiveVideo() {
+            return videos[activeVideoIndex];
+        }
+
+        function getStandbyVideo() {
+            return videos[1 - activeVideoIndex];
+        }
+
+        function syncVideoClasses() {
+            videos.forEach(function(v, i) {
+                const isActive = i === activeVideoIndex;
+                v.classList.toggle('is-active', isActive && currentBgType === 'video');
+                v.classList.toggle('is-standby', !isActive && currentBgType === 'video');
+                v.classList.toggle('is-hidden', currentBgType !== 'video');
+            });
+        }
+
+        function showVideoLayers() {
+            videos.forEach(function(v) {
+                v.classList.remove('is-hidden');
+                v.style.display = 'block';
+            });
+            syncVideoClasses();
+        }
+
+        function hideVideoLayers() {
+            videos.forEach(function(v) {
+                v.pause();
+                v.classList.add('is-hidden');
+                v.classList.remove('is-active', 'is-standby');
+            });
+        }
+
+        function setBothVideosMuted(muted) {
+            videos.forEach(function(v) { v.muted = muted; });
+        }
+
+        function beginSeamlessSwap() {
+            if (currentBgType !== 'video' || dualUserPaused || dualSwapPending) return;
+            const active = getActiveVideo();
+            const standby = getStandbyVideo();
+            if (!standby.src && !standby.currentSrc) return;
+
+            dualSwapPending = true;
+
+            const finishSwap = function() {
+                // 先讓 standby 可見，再停 active，縮短黑幀
+                activeVideoIndex = 1 - activeVideoIndex;
+                syncVideoClasses();
+                active.pause();
+                try {
+                    active.currentTime = 0;
+                } catch (e) { /* ignore */ }
+                dualSwapPending = false;
+            };
+
+            const startStandby = function() {
+                try {
+                    if (standby.currentTime > 0.05) {
+                        standby.currentTime = 0;
+                    }
+                } catch (e) { /* ignore */ }
+                const playPromise = standby.play();
+                if (playPromise && typeof playPromise.then === 'function') {
+                    playPromise.then(finishSwap).catch(function() {
+                        dualSwapPending = false;
+                        // 後備：單路 loop
+                        try { active.currentTime = 0; } catch (e2) { /* ignore */ }
+                        active.play().catch(function() {});
+                    });
+                } else {
+                    finishSwap();
+                }
+            };
+
+            if (standby.readyState >= 2) {
+                startStandby();
+            } else {
+                standby.addEventListener('canplay', function onCanPlay() {
+                    standby.removeEventListener('canplay', onCanPlay);
+                    startStandby();
+                });
+                standby.load();
+            }
+        }
+
+        function onDualTimeUpdate(e) {
+            if (currentBgType !== 'video' || dualUserPaused) return;
+            const v = e.target;
+            if (v !== getActiveVideo()) return;
+            const dur = v.duration;
+            if (!dur || !isFinite(dur) || dur < 0.5) return;
+            if (dualSwapPending) return;
+            // 避免開播當下就誤觸切換
+            if (v.currentTime < Math.min(0.4, dur * 0.15)) return;
+            const remaining = dur - v.currentTime;
+            if (remaining <= DUAL_SWAP_LEAD_SEC && remaining >= 0) {
+                beginSeamlessSwap();
+            }
+        }
+
+        function onDualEnded(e) {
+            if (currentBgType !== 'video' || dualUserPaused) return;
+            if (e.target !== getActiveVideo()) return;
+            if (!dualSwapPending) {
+                beginSeamlessSwap();
+            }
+        }
+
+        function bindDualBufferEvents() {
+            videos.forEach(function(v) {
+                v.loop = false;
+                v.muted = true;
+                v.playsInline = true;
+                v.addEventListener('timeupdate', onDualTimeUpdate);
+                v.addEventListener('ended', onDualEnded);
+            });
+        }
+
+        function setBothVideosSource(src) {
+            currentVideoSrc = src || '';
+            dualSwapPending = false;
+            dualUserPaused = false;
+            activeVideoIndex = 0;
+
+            videos.forEach(function(v) {
+                v.loop = false;
+                v.muted = true;
+                v.playsInline = true;
+                v.pause();
+                if (src) {
+                    if (v.getAttribute('src') !== src) {
+                        v.setAttribute('src', src);
+                        v.src = src;
+                    }
+                    v.load();
+                } else {
+                    v.removeAttribute('src');
+                    v.load();
+                }
+            });
+
+            showVideoLayers();
+
+            if (!src) return;
+
+            const active = getActiveVideo();
+            const standby = getStandbyVideo();
+
+            const kickoff = function() {
+                try {
+                    active.currentTime = 0;
+                    standby.currentTime = 0;
+                } catch (e) { /* ignore */ }
+                standby.pause();
+                active.play().catch(function() {});
+                syncVideoClasses();
+            };
+
+            if (active.readyState >= 2) {
+                kickoff();
+            } else {
+                active.addEventListener('canplay', function onReady() {
+                    active.removeEventListener('canplay', onReady);
+                    if (currentVideoSrc === src) kickoff();
+                });
+            }
+        }
+
+        bindDualBufferEvents();
 
         function isVideoFile(file) {
             return file && (file.type.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(file.name));
@@ -2107,12 +2310,8 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             currentBgType = 'video';
             imageBg.style.display = 'none';
             imageBg.style.backgroundImage = '';
-            video.style.display = 'block';
-            video.src = src;
-            video.load();
-            video.muted = true;
-            video.loop = true;
-            video.play().catch(function() {});
+            // 雙緩衝：同一來源套到兩路 video，輪流接播
+            setBothVideosSource(src);
 
             if (persistMeta) {
                 if (persistMeta.source === 'url') {
@@ -2148,10 +2347,14 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             }
 
             currentBgType = 'image';
-            video.pause();
-            video.removeAttribute('src');
-            video.load();
-            video.style.display = 'none';
+            dualUserPaused = false;
+            dualSwapPending = false;
+            hideVideoLayers();
+            videos.forEach(function(v) {
+                v.removeAttribute('src');
+                try { v.load(); } catch (e) { /* ignore */ }
+            });
+            currentVideoSrc = '';
             imageBg.style.display = 'block';
             imageBg.style.backgroundImage = `url("${src.replace(/"/g, '\\"')}")`;
 
@@ -2217,11 +2420,10 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
                 console.warn('還原背景失敗:', err);
             }
 
-            // 3) 預設
+            // 3) 預設雙緩衝雲朵片
             currentBgType = 'video';
-            video.style.display = 'block';
             imageBg.style.display = 'none';
-            video.play().catch(function() {});
+            setBothVideosSource(DEFAULT_VIDEO_SRC);
             updateMediaControlsState();
         }
 
@@ -2285,40 +2487,45 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             }
         });
 
-        // 播放/暫停（僅影片背景）
-        playPauseBtn.addEventListener('click', function() {
-            if (currentBgType !== 'video') return;
-            if (video.paused) {
-                video.play();
-                this.innerHTML = '<img class="menu-icon" data-nacho-icon="on_icon_14" alt="" width="22" height="22"><span>暫停影片</span>';
-            } else {
-                video.pause();
-                this.innerHTML = '<img class="menu-icon" data-nacho-icon="off_icon_02" alt="" width="22" height="22"><span>播放影片</span>';
-            }
+        function refreshMenuIcons(el) {
             if (window.NACHONEKO_ASSETS && typeof window.NACHONEKO_ASSETS.applyIcons === 'function') {
-                window.NACHONEKO_ASSETS.applyIcons(this);
+                window.NACHONEKO_ASSETS.applyIcons(el);
             } else if (window.NACHONEKO_ASSETS && window.NACHONEKO_ASSETS.icons) {
-                this.querySelectorAll('[data-nacho-icon]').forEach(function (el) {
-                    var k = el.getAttribute('data-nacho-icon');
-                    if (k && window.NACHONEKO_ASSETS.icons[k]) el.src = window.NACHONEKO_ASSETS.icons[k];
+                el.querySelectorAll('[data-nacho-icon]').forEach(function (node) {
+                    var k = node.getAttribute('data-nacho-icon');
+                    if (k && window.NACHONEKO_ASSETS.icons[k]) node.src = window.NACHONEKO_ASSETS.icons[k];
                 });
             }
+        }
+
+        // 播放/暫停（雙緩衝：暫停兩路，恢復只播 active）
+        playPauseBtn.addEventListener('click', function() {
+            if (currentBgType !== 'video') return;
+            const active = getActiveVideo();
+            if (active.paused || dualUserPaused) {
+                dualUserPaused = false;
+                dualSwapPending = false;
+                active.play().catch(function() {});
+                this.innerHTML = '<img class="menu-icon" data-nacho-icon="on_icon_14" alt="" width="22" height="22"><span>暫停影片</span>';
+            } else {
+                dualUserPaused = true;
+                dualSwapPending = false;
+                videos.forEach(function(v) { v.pause(); });
+                this.innerHTML = '<img class="menu-icon" data-nacho-icon="off_icon_02" alt="" width="22" height="22"><span>播放影片</span>';
+            }
+            refreshMenuIcons(this);
             closeSettingsMenu();
         });
 
-        // 靜音/取消靜音（僅影片背景）
+        // 靜音/取消靜音（兩路同步）
         muteBtn.addEventListener('click', function() {
             if (currentBgType !== 'video') return;
-            video.muted = !video.muted;
-            this.innerHTML = video.muted
+            const nextMuted = !getActiveVideo().muted;
+            setBothVideosMuted(nextMuted);
+            this.innerHTML = nextMuted
                 ? '<img class="menu-icon" data-nacho-icon="off_icon_01" alt="" width="22" height="22"><span>取消靜音</span>'
                 : '<img class="menu-icon" data-nacho-icon="on_icon_15" alt="" width="22" height="22"><span>靜音影片</span>';
-            if (window.NACHONEKO_ASSETS && window.NACHONEKO_ASSETS.icons) {
-                this.querySelectorAll('[data-nacho-icon]').forEach(function (el) {
-                    var k = el.getAttribute('data-nacho-icon');
-                    if (k && window.NACHONEKO_ASSETS.icons[k]) el.src = window.NACHONEKO_ASSETS.icons[k];
-                });
-            }
+            refreshMenuIcons(this);
             closeSettingsMenu();
         });
 
