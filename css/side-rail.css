@@ -1,0 +1,670 @@
+/* Side rail M3 */
+
+:root {
+    --z-rail-dim: 54;
+    --z-rail-tab: 55;
+    --z-rail: 56;
+    --rail-width: 300px;
+    /* R10: larger hover strip so tab appears sooner */
+    --rail-hotzone: 36px;
+    --rail-hide-delay: 450ms; /* documented for JS; hide delay is in side-rail.js */
+}
+
+#settings-gear,
+#settings-menu {
+    display: none !important;
+}
+
+#side-rail-hotzone {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--rail-hotzone);
+    z-index: var(--z-rail-tab);
+}
+
+/* Hidden until hover hotzone / open */
+#side-rail-tab {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translate(100%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    z-index: var(--z-rail-tab);
+    width: 28px;
+    height: 64px;
+    padding: 0;
+    border: 1px solid rgba(200, 205, 214, 0.28);
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+    background: rgba(20, 24, 34, 0.78);
+    color: #e8eef7;
+    cursor: pointer;
+    transition:
+        transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.22s ease,
+        right 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+body.side-rail-hot #side-rail-tab,
+body.side-rail-open #side-rail-tab {
+    transform: translate(0, -50%);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+body.side-rail-open #side-rail-tab {
+    right: var(--rail-width);
+}
+
+#side-rail-dim {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-rail-dim);
+    background: rgba(0, 0, 0, 0.28);
+    border: none;
+    cursor: pointer;
+}
+
+body.side-rail-open #side-rail-dim {
+    display: block;
+}
+
+#side-rail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--rail-width);
+    max-width: min(92vw, 340px);
+    z-index: var(--z-rail);
+    display: flex;
+    flex-direction: column;
+    background: rgba(18, 22, 32, 0.9);
+    border-left: 1px solid rgba(200, 205, 214, 0.2);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    color: #f4f6fa;
+    font-family: var(--font-display, inherit);
+    transform: translateX(105%);
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+
+body.side-rail-open #side-rail {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.side-rail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.side-rail-header h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.side-rail-close {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: #c8cdd6;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.side-rail-close:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.side-rail-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 10px 10px 0;
+    flex-wrap: wrap;
+}
+
+.side-rail-tabs button {
+    appearance: none;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.06);
+    color: #c8cdd6;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.side-rail-tabs button[aria-selected="true"] {
+    background: rgba(107, 182, 232, 0.22);
+    border-color: rgba(154, 208, 245, 0.4);
+    color: #9ad0f5;
+}
+
+.side-rail-panels {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+}
+
+.side-rail-panel {
+    display: none;
+}
+
+.side-rail-panel.is-active {
+    display: block;
+}
+
+.rail-hint {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    line-height: 1.45;
+    margin: 0 0 12px;
+}
+
+.list-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(200, 205, 214, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    touch-action: pan-y;
+    user-select: none;
+}
+
+/* Empty desc hidden (host should omit; CSS safety) */
+.list-desc:empty {
+    display: none;
+}
+
+.list-row.is-placeable {
+    cursor: grab;
+}
+
+.list-row.is-placeable:active {
+    cursor: grabbing;
+}
+
+.list-row.is-on-canvas {
+    opacity: 0.92;
+}
+
+.list-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(107, 182, 232, 0.16);
+    color: #9ad0f5;
+    flex-shrink: 0;
+}
+
+.list-icon-img {
+    background: rgba(20, 24, 34, 0.35);
+    overflow: hidden;
+}
+
+.list-icon-img img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.list-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.list-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.list-desc {
+    font-size: 0.72rem;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+/* .list-toggle removed — Interaction v2 uses .list-state pill badges */
+
+.rail-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    appearance: none;
+    border: 1px solid rgba(200, 205, 214, 0.16);
+    background: rgba(255, 255, 255, 0.05);
+    color: #f4f6fa;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.rail-action:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(154, 208, 245, 0.35);
+}
+
+.rail-action i {
+    width: 1.2em;
+    color: #9ad0f5;
+}
+
+/* ---- P1.1: list-state pill badge (replaces .list-toggle) ---- */
+.list-state {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.list-state.is-placed {
+    background: rgba(247, 198, 216, 0.16);
+    color: #f7c6d8;
+    border: 1px solid rgba(247, 198, 216, 0.28);
+}
+
+/* Unused for placeable rows (no long-press pill); keep class for safety */
+.list-state.is-available {
+    display: none;
+}
+
+/* Custom app delete — top-right trash */
+.list-delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 6px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: rgba(247, 198, 216, 0.75);
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0.55;
+    transition:
+        opacity 0.12s ease,
+        background 0.12s ease,
+        color 0.12s ease;
+    z-index: 2;
+}
+.list-row:hover .list-delete,
+.list-delete:focus-visible {
+    opacity: 1;
+}
+.list-delete:hover {
+    background: rgba(247, 198, 216, 0.16);
+    color: #f7c6d8;
+}
+/* Room for trash so pill doesn't overlap */
+.list-row.has-delete {
+    padding-right: 30px;
+}
+.list-row.has-delete .list-state {
+    margin-right: 4px;
+}
+
+/* ---- P1.2: on-canvas row — dimmed + left pink accent ---- */
+.list-row.is-on-canvas {
+    opacity: 0.58;
+    filter: grayscale(0.3);
+    cursor: default;
+    border-left: 3px solid rgba(247, 198, 216, 0.45);
+    transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+/* ---- P1.3: placeable row hover — left nacho-eye accent + subtle lift ---- */
+.list-row.is-placeable {
+    transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    border-left: 3px solid transparent;
+}
+
+.list-row.is-placeable:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-left-color: rgba(154, 208, 245, 0.48);
+    box-shadow: inset 0 0 0 1px rgba(154, 208, 245, 0.08);
+}
+
+/* ---- P1.8: right-edge tab hover glow ---- */
+#side-rail-tab:hover {
+    box-shadow: 0 0 14px rgba(107, 182, 232, 0.35);
+    border-color: rgba(154, 208, 245, 0.45);
+}
+
+/* ---- R7: add custom app row (bottom of #app-list) ---- */
+.app-add-row,
+#app-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    margin: 10px 0 4px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border: 1px dashed rgba(154, 208, 245, 0.4);
+    border-radius: 12px;
+    background: rgba(154, 208, 245, 0.06);
+    color: #e8eef7;
+    font-family: inherit;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.app-add-row:hover,
+#app-add-btn:hover {
+    background: rgba(154, 208, 245, 0.12);
+    border-color: rgba(154, 208, 245, 0.65);
+    box-shadow: inset 0 0 0 1px rgba(154, 208, 245, 0.08);
+}
+
+.app-add-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(154, 208, 245, 0.45);
+    font-size: 1rem;
+    line-height: 1;
+    color: #9ad0f5;
+    font-weight: 600;
+}
+
+@media (max-width: 720px) {
+    :root {
+        --rail-width: min(92vw, 320px);
+    }
+}
+
+/* Clear entry point, calm surfaces, and controls that work without hovering. */
+:root {
+    --rail-width: min(344px, calc(100vw - 56px));
+}
+
+#side-rail-hotzone {
+    pointer-events: auto;
+}
+
+#side-rail-tab {
+    right: 0;
+    width: 42px;
+    height: 54px;
+    border: 1px solid rgba(170, 210, 244, 0.32);
+    border-radius: 17px;
+    transform: translate(100%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    background: rgba(21, 29, 45, 0.85);
+    box-shadow: 0 8px 28px rgba(7, 15, 28, 0.25);
+    color: #d7edff;
+}
+
+body.side-rail-hot #side-rail-tab,
+body.side-rail-open #side-rail-tab,
+#side-rail-tab:focus-visible {
+    transform: translate(0, -50%);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+body.side-rail-open #side-rail-tab {
+    right: calc(var(--rail-width) + 6px);
+}
+
+#side-rail {
+    max-width: calc(100vw - 56px);
+    background: linear-gradient(155deg, rgba(31, 44, 65, 0.97), rgba(18, 25, 40, 0.97));
+    border-left-color: rgba(171, 208, 239, 0.23);
+    box-shadow: -18px 0 60px rgba(4, 12, 26, 0.3);
+    visibility: hidden;
+}
+
+body.side-rail-open #side-rail {
+    visibility: visible;
+}
+
+.side-rail-header {
+    padding: 22px 20px 16px;
+}
+
+.side-rail-header h2 {
+    font-size: 1.25rem;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+
+.side-rail-header h2::after {
+    content: 'SPACE';
+    display: block;
+    margin-top: 5px;
+    color: #83bce4;
+    font-size: 0.58rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    opacity: 0.8;
+}
+
+.side-rail-close {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: rgba(212, 232, 252, 0.06);
+}
+
+.side-rail-tabs {
+    padding: 16px 16px 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.side-rail-tabs button {
+    min-height: 40px;
+    padding: 8px 2px;
+    font-size: 0.81rem;
+    border-radius: 12px;
+    transition: background 0.16s ease, color 0.16s ease;
+}
+
+.side-rail-tabs button:hover {
+    color: #edf6ff;
+    background: rgba(199, 225, 249, 0.12);
+}
+
+.side-rail-tabs button[aria-selected="true"] {
+    color: #e2f3ff;
+    background: linear-gradient(145deg, rgba(121, 189, 236, 0.28), rgba(124, 155, 224, 0.17));
+    border-color: rgba(174, 219, 251, 0.42);
+}
+
+.side-rail-panels {
+    min-height: 0;
+    padding: 18px 16px 24px;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(154, 208, 245, 0.35) transparent;
+}
+
+.side-rail-panel h3 {
+    margin: 2px 2px 14px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #b6c8dc;
+    letter-spacing: 0.06em;
+}
+
+.rail-hint {
+    margin: 0 2px 16px;
+    color: #bbcce0;
+    opacity: 1;
+    line-height: 1.75;
+    font-size: 0.78rem;
+}
+
+.list-row {
+    min-height: 68px;
+    box-sizing: border-box;
+    gap: 10px;
+    padding: 12px 10px;
+    border-radius: 16px;
+    background: rgba(183, 212, 244, 0.045);
+    border-color: rgba(183, 212, 244, 0.13);
+}
+
+.list-row.is-on-canvas {
+    opacity: 1;
+    filter: none;
+    border-left-color: rgba(247, 198, 216, 0.42);
+}
+
+.list-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #eef5ff;
+    font-size: 0.87rem;
+}
+
+.list-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 1;
+    color: #a8bdd5;
+    font-size: 0.7rem;
+    line-height: 1.5;
+}
+
+.list-state {
+    padding: 4px 7px;
+    font-weight: 500;
+    font-size: 0.67rem;
+}
+
+.list-add {
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 5px 10px;
+    border: 1px solid rgba(154, 208, 245, 0.3);
+    border-radius: 10px;
+    background: rgba(154, 208, 245, 0.12);
+    color: #d5edff;
+    font: inherit;
+    font-size: 0.73rem;
+    cursor: pointer;
+}
+
+.list-add:hover {
+    background: rgba(154, 208, 245, 0.25);
+    border-color: rgba(154, 208, 245, 0.6);
+}
+
+.list-row.has-delete {
+    padding-right: 10px;
+    flex-wrap: wrap;
+}
+
+.list-row.has-delete .list-delete {
+    position: static;
+    width: 30px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    opacity: 1;
+    color: #dfb5c6;
+    background: rgba(247, 198, 216, 0.06);
+}
+
+.list-row.has-delete .list-meta {
+    flex-basis: 70px;
+}
+
+.rail-action {
+    min-height: 52px;
+    border-radius: 14px;
+    font-size: 0.87rem;
+    transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.rail-action:not(:disabled):hover {
+    background: rgba(174, 216, 247, 0.13);
+    border-color: rgba(174, 216, 247, 0.34);
+    transform: translateX(-2px);
+}
+
+.rail-action:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+#side-rail button:focus-visible,
+#side-rail-tab:focus-visible {
+    outline: 2px solid #afdfff;
+    outline-offset: 3px;
+}
+
+@media (pointer: coarse) {
+    #side-rail-tab {
+        transform: translate(calc(100% - 7px), -50%);
+        opacity: 0.7;
+        pointer-events: auto;
+    }
+
+    .list-add,
+    .list-row.has-delete .list-delete,
+    .side-rail-tabs button,
+    .side-rail-close {
+        min-height: 44px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #side-rail,
+    #side-rail-tab,
+    #side-rail * {
+        transition: none !important;
+        animation: none !important;
+    }
+}

@@ -1,0 +1,228 @@
+/* Character artwork yields to every functional surface. */
+.home-companion {
+    --companion-full-width: clamp(280px, 29vw, 420px);
+    /* Share the centered 1344px desktop stage with the clock/search group. */
+    --companion-anchor-right: max(100px, calc((100vw - 1344px) / 2 + 88px));
+    --companion-anchor-bottom: max(28px, calc(100vh - max(0px, (100vh - 760px) / 2) - 120px - var(--companion-full-width) * 4 / 3));
+    --companion-visual-bleed: 44px;
+    --companion-ink: #405971;
+    --companion-x: 0px;
+    --companion-y: 0px;
+    --companion-tilt-x: 0deg;
+    --companion-tilt-y: 0deg;
+    position: fixed;
+    right: var(--companion-anchor-right);
+    bottom: var(--companion-anchor-bottom);
+    z-index: 18;
+    width: var(--companion-full-width);
+    pointer-events: none;
+    color: var(--companion-ink);
+    visibility: hidden;
+}
+/* Keep the paired composition on smaller desktops, joining the regular
+   1280px geometry without a dock-only gap between responsive breakpoints. */
+@media (min-width: 1100px) and (max-width: 1279px) {
+    .home-companion {
+        --companion-full-width: calc(46.6667vw - 227.333px);
+        --companion-anchor-right: max(58px, calc(24.4444vw - 212.889px));
+    }
+}
+.home-companion.is-positioned { visibility: visible; }
+.home-companion.is-space-hidden,
+.home-companion.is-space-hidden .companion-trigger,
+.home-companion.is-space-hidden .companion-message { visibility: hidden; pointer-events: none; }
+.companion-trigger {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    padding: 0;
+    border: 0;
+    border-radius: 24px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    pointer-events: auto;
+    touch-action: manipulation;
+    perspective: 950px;
+    perspective-origin: 50% 45%;
+    -webkit-tap-highlight-color: transparent;
+    isolation: isolate;
+}
+.companion-trigger:focus-visible {
+    outline: 2px solid #527d9f;
+    outline-offset: 8px;
+}
+.companion-scene {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transform-style: preserve-3d;
+    transform: rotateX(calc(1.25deg + var(--companion-tilt-x))) rotateY(calc(-2deg + var(--companion-tilt-y)));
+    transition: transform 420ms cubic-bezier(.16, 1, .3, 1);
+    pointer-events: none;
+}
+.home-companion.is-tracking .companion-scene,
+.home-companion.is-tracking .companion-figure { will-change: transform; }
+.companion-disc {
+    position: absolute;
+    top: 24%;
+    left: 0;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 50%;
+    background: linear-gradient(150deg, #edf4f9 0%, #dfeaf3 62%, #d7e5ef 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 3px 18px 32px rgba(73, 102, 125, .09);
+    transform: translateZ(-14px);
+}
+.companion-cast {
+    position: absolute;
+    width: 100%;
+    max-width: none;
+    left: 0;
+    bottom: 0;
+    opacity: .08;
+    filter: brightness(0) sepia(1) saturate(.3) blur(8px);
+    transform: translate(calc(12px - var(--companion-x)), calc(8px - var(--companion-y)));
+    pointer-events: none;
+    user-select: none;
+}
+.companion-figure {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transform: translate3d(var(--companion-x), var(--companion-y), 22px);
+    transition: transform 420ms cubic-bezier(.16, 1, .3, 1);
+    /* The existing transparent silhouette stays intact above the disc.
+       Below its equator, the scene's circular aperture closes naturally. */
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 50%), radial-gradient(ellipse 50% 37.5% at 50% 61.5%, #000 97%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 50%), radial-gradient(ellipse 50% 37.5% at 50% 61.5%, #000 97%, transparent 100%);
+    -webkit-mask-composite: source-over;
+    mask-composite: add;
+}
+.companion-portrait {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: none;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 76%, rgba(0, 0, 0, .98) 82%, rgba(0, 0, 0, .6) 90%, transparent 98%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 76%, rgba(0, 0, 0, .98) 82%, rgba(0, 0, 0, .6) 90%, transparent 98%);
+}
+.home-companion .companion-message,
+body.has-custom-background .home-companion:not(.is-docked) .companion-message {
+    position: fixed;
+    top: var(--speech-top, 0px);
+    left: var(--speech-left, 0px);
+    right: auto;
+    bottom: auto;
+    width: max-content;
+    max-width: min(230px, calc(100vw - 32px));
+    padding: 10px 15px;
+    margin: 0;
+    color: var(--companion-ink);
+    background: #f8fbfd;
+    border-radius: 14px;
+    box-shadow: 0 7px 24px rgba(52, 75, 96, .1);
+    font: 500 12px / 1.7 var(--font-ui, sans-serif);
+    text-align: left;
+    text-wrap: balance;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: none;
+    transition: opacity 180ms ease, visibility 180ms;
+}
+.home-companion.is-speaking:not(.is-speech-suppressed):not(.is-space-hidden) .companion-message {
+    opacity: 1;
+    visibility: visible;
+}
+.companion-footprint {
+    position: fixed;
+    right: var(--companion-anchor-right);
+    bottom: var(--companion-anchor-bottom);
+    width: var(--companion-full-width);
+    aspect-ratio: 3 / 4;
+    visibility: hidden;
+    pointer-events: none;
+}
+.companion-flourish {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+.companion-spark {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    color: #5d8eaf;
+    opacity: 0;
+}
+.companion-spark--one { top: 19%; left: 7%; }
+.companion-spark--two { top: 8%; right: 10%; width: 15px; height: 15px; }
+.companion-spark--paw { top: 47%; right: -2%; width: 24px; height: 24px; }
+.home-companion.is-greeting .companion-portrait {
+    animation: companion-greet 650ms cubic-bezier(.16, 1, .3, 1) both;
+}
+.home-companion.is-greeting .companion-spark {
+    animation: companion-spark 800ms cubic-bezier(.16, 1, .3, 1) both;
+}
+.home-companion.is-greeting .companion-spark--two { animation-delay: 65ms; }
+.home-companion.is-greeting .companion-spark--paw { animation-delay: 110ms; }
+@keyframes companion-greet {
+    0%, 100% { transform: translateY(0); }
+    35% { transform: translateY(-5px); }
+    65% { transform: translateY(1px); }
+}
+@keyframes companion-spark {
+    0% { opacity: 0; transform: translateY(4px) scale(.65); }
+    28% { opacity: .9; transform: translateY(-4px) scale(1); }
+    100% { opacity: 0; transform: translateY(-16px) scale(.85); }
+}
+.home-companion.is-docked {
+    width: var(--dock-size, 72px);
+    left: var(--dock-left, 36px);
+    top: var(--dock-top, 28px);
+    right: auto;
+    bottom: auto;
+}
+.home-companion.is-docked .companion-trigger {
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid #b4c9da;
+    border-radius: 50%;
+    background: #e0ebf3;
+    box-shadow: inset 0 2px 3px #f8fcff, 0 5px 10px rgba(67, 98, 122, .1);
+    perspective: none;
+}
+.home-companion.is-docked .companion-scene,
+.home-companion.is-docked .companion-figure {
+    transform: none;
+    transition: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+.home-companion.is-docked .companion-portrait {
+    position: absolute;
+    width: 145%;
+    left: -22.5%;
+    top: -3%;
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+.home-companion.is-docked .companion-disc,
+.home-companion.is-docked .companion-flourish { display: none; }
+body.is-focus-mode .home-companion,
+body.is-arranging .home-companion { display: none; }
+@media (prefers-reduced-motion: reduce) {
+    .companion-trigger, .companion-message { transition: none !important; transform: none !important; }
+    .companion-scene, .companion-figure { transition: none !important; }
+    .home-companion.is-greeting .companion-portrait,
+    .home-companion.is-greeting .companion-spark { animation: none !important; }
+    .companion-flourish { display: none; }
+}

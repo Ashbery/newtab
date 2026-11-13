@@ -1,0 +1,40 @@
+/* A calm, explicit workspace. The grid describes real placement cells. */
+body.is-arranging #widget-canvas { overflow-y: auto; pointer-events: auto; touch-action: pan-y; padding-bottom: 120px; }
+body.is-arranging #widget-canvas::before { content: ''; position: absolute; inset: 0 0 auto; height: var(--canvas-content-height, 100vh); pointer-events: none; background-image: radial-gradient(circle, #88a7b9 1px, transparent 1.5px); background-size: var(--editor-pitch-x, 96px) 104px; background-position: var(--editor-grid-left, 24px) var(--editor-grid-top, 24px); opacity: .48; }
+body.is-arranging .widget { cursor: grab; outline: 1px solid transparent; outline-offset: 4px; border-radius: 14px; }
+body.is-arranging .widget.is-editor-selected { outline-color: #527b91; background-color: rgba(238, 247, 251, .32); }
+body.is-arranging .widget.is-dragging { cursor: grabbing; z-index: 899 !important; opacity: .82; transition: none !important; }
+body.is-arranging .widget .widget-handles { opacity: 1; }
+body.is-arranging .widget:not(.is-editor-selected) .widget-handles { display: none; }
+body.is-arranging .widget.is-editor-selected .widget-select-ring { opacity: 1; border-color: #527b91; box-shadow: none; }
+#home-drop-preview { position: absolute; z-index: 890; pointer-events: none; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; padding: 8px; border: 2px solid #48728a; border-radius: 14px; background: rgba(178, 217, 234, .3); color: #2d5067; font: 600 12px/1.4 var(--font-ui, sans-serif); text-align: center; }
+#home-drop-preview[hidden] { display: none; }
+#home-drop-preview[data-state="blocked"] { border-style: dashed; border-color: #915162; background: rgba(247, 223, 229, .38); color: #733a4b; }
+#home-drop-preview[data-state="folder"] { border-color: #315b73; background: #d3eaf4; }
+#home-editor-toolbar { position: fixed; z-index: var(--z-edit-bar, 60); bottom: max(20px, env(safe-area-inset-bottom)); left: 50%; translate: -50% 0; width: max-content; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 12px 16px; border-radius: 16px; background: #f8fbfd; color: #303945; box-shadow: 0 8px 30px rgba(41, 67, 85, .16); }
+#home-editor-toolbar[hidden] { display: none; }
+#editor-status { margin: 0 0 10px; max-width: 42ch; font: 12px/1.5 var(--font-ui, sans-serif); color: #536b7f; text-align: center; }
+.editor-actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
+#home-editor-toolbar button { position: static; inset: auto; translate: none; transform: none; min-width: 58px; height: 44px; padding: 8px 12px; border: 0; border-radius: 9px; color: #36596e; background: #e6f0f6; font: 600 13px var(--font-ui, sans-serif); cursor: pointer; box-shadow: none; }
+#home-editor-toolbar button:hover { background: #d3e7f1; }
+#home-editor-toolbar button:disabled { opacity: .5; cursor: default; }
+#home-editor-toolbar #arrange-done-bar { color: #fff; background: #365f78; display: block; width: auto; animation: none; }
+#home-editor-toolbar button:focus-visible, body.is-arranging .widget:focus-visible { outline: 2px solid #315e78; outline-offset: 3px; }
+body.is-arranging .widget-options { opacity: .8; }
+body.is-arranging .widget.is-editor-selected .widget-options { opacity: 1; }
+@media (max-width: 600px) { #home-editor-toolbar { bottom: max(12px, env(safe-area-inset-bottom)); padding: 10px 12px; } #editor-status { max-width: 32ch; } #home-editor-toolbar button { min-width: 54px; padding-inline: 10px; } }
+@media (prefers-reduced-motion: reduce) { #home-editor-toolbar, #home-drop-preview, body.is-arranging .widget { animation: none !important; transition: none !important; } }
+
+body.side-rail-open #home-editor-toolbar { visibility: hidden; pointer-events: none; }
+/* One selection boundary; the widget's own material border remains intact. */
+body.is-arranging .widget.is-editor-selected:not(.is-pinned),
+body.is-arranging .widget.is-editor-selected:not(.is-pinned):focus-visible { outline: none; box-shadow: none; }
+@media (max-width: 600px), (pointer: coarse) {
+    body.is-arranging .widget[data-type="clock"] .widget-options { top: var(--clock-editor-options-top, -48px); right: 0; }
+}
+@media (min-width: 601px) {
+    body:not(.is-arranging) #widget-canvas { overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
+    body:not(.is-arranging) #widget-canvas::after { content: ''; position: absolute; top: var(--canvas-content-height, 100%); left: 0; width: 1px; height: 24px; pointer-events: none; }
+}
+.home-align-guide { position: absolute; z-index: 891; pointer-events: none; background: #48728a; opacity: .65; }
+.home-align-guide[hidden], body:not(.is-arranging) .home-align-guide { display: none; }

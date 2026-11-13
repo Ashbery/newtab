@@ -1,9 +1,32 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <meta name="newtab-release" content="2026.11.14.1">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ashbery 新分頁</title>
+    <title>Ashbery 新分頁 — 可自訂瀏覽器起始頁</title>
+    <meta name="description" content="Ashbery 新分頁：可愛風格的瀏覽器自訂起始頁。內建時鐘與日期、Google 搜尋與建議、捷徑，並可上傳影片或圖片作為背景。純靜態頁面，可設為瀏覽器啟動頁。">
+    <meta name="robots" content="index,follow">
+    <meta name="theme-color" content="#edf2f6">
+    <meta name="author" content="Ashbery">
+    <link rel="canonical" href="https://ashbery.github.io/newtab/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:site_name" content="Ashbery 新分頁">
+    <meta property="og:title" content="Ashbery 新分頁 — 可自訂瀏覽器起始頁">
+    <meta property="og:description" content="可愛風格的自訂起始頁：時鐘、Google 搜尋、捷徑，以及可長期保存的影片／圖片背景。">
+    <meta property="og:url" content="https://ashbery.github.io/newtab/">
+    <meta property="og:image" content="https://ashbery.github.io/newtab/favicon.ico">
+    <meta property="og:image:alt" content="Ashbery 新分頁">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Ashbery 新分頁 — 可自訂瀏覽器起始頁">
+    <meta name="twitter:description" content="可愛風格的自訂起始頁：時鐘、Google 搜尋、捷徑，以及可長期保存的影片／圖片背景。">
+    <meta name="twitter:image" content="https://ashbery.github.io/newtab/favicon.ico">
+    <meta name="twitter:image:alt" content="Ashbery 新分頁">
 
     <!-- 使用相同目錄的 favicon.ico -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -11,9 +34,10 @@
       字體靈感：甘城なつき / Nachoneko（@amsrntk3 · YouTube Nachoneko_dayo）
       全站字體：Yomogi（手寫可愛）· Font Awesome 圖示除外
     -->
+    <link rel="preload" href="assets/fonts/manrope-clock-light.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Yusei+Magic&family=Kiwi+Maru:wght@400;500&family=M+PLUS+Rounded+1c:wght@400;500;700&family=Noto+Sans+TC:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Yomogi&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /*
          * Nachoneko（甘城なつき）靈感配色與字體
@@ -63,6 +87,13 @@
             --nacho-surface-hover: rgba(28, 34, 48, 0.32);
             --nacho-border: rgba(200, 205, 214, 0.22);
             --nacho-border-focus: rgba(154, 208, 245, 0.5);
+        }
+
+        /* 讓 conic-gradient 角度可被 CSS 動畫平滑驅動 */
+        @property --search-glow-angle {
+            syntax: '<angle>';
+            initial-value: 0deg;
+            inherits: false;
         }
 
         * {
@@ -180,8 +211,8 @@
             -webkit-backdrop-filter: blur(10px) saturate(1.1);
             overflow: hidden;
             animation: none;
-            /* 避免內容變換撐動外框 */
-            contain: layout style;
+            /* v3: allow --widget-scale reflow; widget shell owns fixed size */
+            contain: none;
         }
 
         .clock-glass::before,
@@ -194,7 +225,7 @@
             position: relative;
             z-index: 1;
             font-family: var(--font-display);
-            font-size: var(--clock-fs);
+            font-size: calc(var(--clock-fs) * var(--widget-scale, 1));
             /* Yomogi 僅 Regular */
             font-weight: 400;
             margin: 0;
@@ -317,7 +348,7 @@
             position: relative;
             z-index: 1;
             font-family: var(--font-display);
-            font-size: var(--date-fs);
+            font-size: calc(var(--date-fs) * var(--widget-scale, 1));
             font-weight: 400;
             letter-spacing: 0.04em;
             color: rgba(200, 205, 214, 0.95);
@@ -363,31 +394,83 @@
                 border-radius var(--ease-layout);
         }
 
+        /* 漸層旋轉光暈邊框（mask 技法，僅邊框區域可見） */
         .search-box::before {
-            content: none;
-            display: none;
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            border-radius: inherit;
+            padding: 2px;
+            background: conic-gradient(
+                from var(--search-glow-angle, 0deg),
+                var(--nacho-eye),
+                var(--nacho-eye-bright),
+                var(--nacho-pink),
+                var(--nacho-silver),
+                var(--nacho-eye)
+            );
+            -webkit-mask:
+                linear-gradient(#000 0 0) content-box,
+                linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask:
+                linear-gradient(#000 0 0) content-box,
+                linear-gradient(#000 0 0);
+            mask-composite: exclude;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-out;
         }
 
+        /* S3: focus 僅邊框光暈 + 略亮玻璃，禁止框外直角白霧墊 */
         .search-box:focus-within {
-            background: var(--nacho-surface-hover);
-            border-color: var(--nacho-border-focus);
-            box-shadow: 0 0 16px rgba(107, 182, 232, 0.12);
+            background: rgba(28, 34, 48, 0.38);
+            border-color: transparent;
+            box-shadow:
+                0 0 0 1px rgba(154, 208, 245, 0.2),
+                0 0 18px rgba(107, 182, 232, 0.22);
+            transition:
+                background 0.3s ease-out,
+                border-color 0.3s ease-out,
+                box-shadow 0.3s ease-out,
+                border-radius var(--ease-layout);
         }
 
+        .search-box:focus-within::before {
+            opacity: 1;
+            animation: searchGlowRotate 4s linear infinite;
+        }
+
+        /* R3 + S3: active 建議列與外框同圓角；背景勿溢出成直角白霧 */
         .search-box.active {
-            border-radius: clamp(16px, 1vw + 10px, 20px) clamp(16px, 1vw + 10px, 20px) 14px 14px;
-            background: var(--nacho-surface-hover);
+            --search-active-radius: max(14px, calc(var(--search-radius) * 0.45));
+            border-radius: var(--search-active-radius);
+            background: rgba(28, 34, 48, 0.4);
             border-color: rgba(154, 208, 245, 0.38);
-            box-shadow: 0 0 14px rgba(107, 182, 232, 0.1);
+            box-shadow: 0 0 12px rgba(107, 182, 232, 0.12);
+            overflow: hidden;
+        }
+        .search-box.active,
+        .search-box:focus-within {
+            border-radius: max(14px, calc(var(--search-radius) * 0.45));
+        }
+        .search-box:not(.active):focus-within {
+            border-radius: var(--search-radius);
+        }
+        .search-box.active .suggestions-container,
+        .search-box.active .suggestions-list {
+            border-radius: 0;
         }
 
         /*
-         * 搜尋列置中（修正 CJK／Windows 偏上）
-         * 輸入框鋪滿列高，line-height = 列高；圖示／清除鈕 absolute 垂直置中
+         * S3/S4 搜尋列垂直置中（debug-polish）
+         * flex 置中取代不對稱 padding，避免 placeholder 偏下
          */
         .search-input-wrapper {
             position: relative;
-            display: block;
+            display: flex;
+            align-items: center;
             height: var(--search-h);
             min-height: var(--search-h);
             z-index: 2;
@@ -398,8 +481,7 @@
             position: absolute;
             left: var(--search-pad-x);
             top: 50%;
-            /* 與輸入字同一光學下移，對齊框心 */
-            transform: translateY(calc(-50% + 0.12em));
+            transform: translateY(-50%);
             z-index: 2;
             display: flex;
             align-items: center;
@@ -424,15 +506,16 @@
 
         .search-input {
             display: block;
-            width: 100%;
+            flex: 1 1 auto;
+            min-width: 0;
+            width: auto;
             height: 100%;
             margin: 0;
             border: none;
             border-radius: 0;
             background: transparent;
-            /* 與時鐘／日期同一可愛字體 */
             font-family: var(--font-display);
-            font-size: var(--search-fs);
+            font-size: calc(var(--search-fs) * var(--widget-scale, 1));
             font-weight: 400;
             letter-spacing: 0.03em;
             color: #F4F6FA;
@@ -441,16 +524,10 @@
             box-sizing: border-box;
             appearance: none;
             -webkit-appearance: none;
-            /*
-             * 垂直置中：固定列高 + 等量 padding + line-height:normal
-             * （line-height=高度 對 CJK 常會視覺偏上）
-             * 上下 padding 各半：文字盒落在幾何中心
-             */
-            line-height: normal;
-            /* 上下對稱空白 = (列高 − 字高) / 2；再把 0.14em 從上挪到下，矯正 CJK 偏上 */
-            padding-top: calc((var(--search-h) - 1.25em) / 2 + 0.14em);
+            line-height: 1.2;
+            padding-top: 0;
+            padding-bottom: 0;
             padding-right: calc(var(--search-pad-x) + 1.75rem);
-            padding-bottom: calc((var(--search-h) - 1.25em) / 2 - 0.14em);
             padding-left: calc(var(--search-pad-x) + 1.45rem);
             transition: font-size var(--ease-layout), height var(--ease-layout), padding var(--ease-layout);
         }
@@ -482,38 +559,49 @@
             line-height: normal;
         }
 
-        /* 清除鈕：列內垂直／靠右置中 */
+        /* 清除鈕：flex 右側槽（勿 absolute，避免卡中間） */
+        .search-box,
+        .search-input-wrapper {
+            cursor: default;
+            user-select: none;
+        }
+        .search-input {
+            cursor: text;
+            user-select: text;
+        }
         .clear-btn {
-            position: absolute;
-            right: var(--search-pad-x);
-            top: 50%;
-            transform: translateY(calc(-50% + 0.12em));
+            position: static;
+            flex: 0 0 28px;
+            width: 28px;
+            height: 28px;
+            margin: 0 6px 0 0;
             z-index: 2;
-            margin: 0;
             background: transparent;
             border: none;
             color: rgba(244, 246, 250, 0.65);
             cursor: pointer;
             font-size: 0.78rem;
-            display: none;
-            transition: color 0.15s ease;
-            padding: 0;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             line-height: 1;
+            padding: 0;
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            transform: none;
+            transition: color 0.15s ease, opacity 0.12s ease, background 0.12s ease;
         }
 
         .clear-btn:hover {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.1);
             color: #fff;
             box-shadow: none;
         }
 
         .search-box.has-text .clear-btn {
-            display: inline-flex;
+            opacity: 1;
+            pointer-events: auto;
         }
 
         /* 建議列：用 grid 0fr→1fr 展開，比 max-height 更順，且銜接無斷層 */
@@ -1035,6 +1123,12 @@
         .settings-gear:active {
             transform: scale(0.94);
             opacity: 0.9;
+        }
+
+        /* 搜尋框光暈持續旋轉 */
+        @keyframes searchGlowRotate {
+            from { --search-glow-angle: 0deg; }
+            to   { --search-glow-angle: 360deg; }
         }
 
         @keyframes cat-wiggle {
@@ -1568,7 +1662,8 @@
             .clock .clock-digit,
             .clock .clock-digit.is-tick,
             .clock .clock-sep,
-            .clock .clock-period {
+            .clock .clock-period,
+            .search-box:focus-within::before {
                 animation: none !important;
             }
 
@@ -1583,38 +1678,71 @@
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/widgets.css">
+    <link rel="stylesheet" href="css/side-rail.css">
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/experience.css">
+    <link rel="stylesheet" href="css/character-panels.css">
+    <link rel="stylesheet" href="css/companion.css">
+    <link rel="stylesheet" href="css/clock.css">
+    <link rel="stylesheet" href="css/home-editor.css">
 </head>
 <body>
-    <video id="video-background" autoplay muted loop playsinline preload="auto">
-        <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4" type="video/mp4">
-    </video>
+    <video id="video-background" autoplay muted loop playsinline preload="metadata"></video>
     <div id="image-background" aria-hidden="true"></div>
+    <div class="landscape-shade" aria-hidden="true"></div>
+    <h1 class="sr-only">Ashbery 新分頁</h1>
 
-    <div class="header-container">
-        <div class="time-container">
-            <div class="clock-glass">
-                <div class="clock" id="clock" aria-live="polite"><span class="clock-digit">0</span><span class="clock-digit">0</span><span class="clock-sep">:</span><span class="clock-digit">0</span><span class="clock-digit">0</span><span class="clock-sep">:</span><span class="clock-digit">0</span><span class="clock-digit">0</span></div>
-                <div class="date" id="date">2023年1月1日 星期一</div>
-            </div>
-        </div>
-
-        <div class="search-container">
-            <div class="search-box" id="search-box">
-                <div class="search-input-wrapper">
-                    <i class="fas fa-search search-icon" aria-hidden="true"></i>
-                    <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google 或輸入網址" autocomplete="off" spellcheck="false">
-                    <button type="button" class="clear-btn" id="clear-btn" aria-label="清除">
-                        <i class="fas fa-times" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div class="suggestions-container" id="suggestions-container">
-                    <div class="suggestions-list" id="suggestions-list">
-                        <!-- 搜尋建議將在這裡動態生成 -->
+    <!-- Widget canvas：時鐘 / 搜尋（M1 可編輯排版） -->
+    <main id="widget-canvas" class="widget-canvas" aria-label="主畫面組件">
+        <div class="widget" data-id="clock-1" data-type="clock">
+            <div class="widget-body">
+                <div class="time-container">
+                    <div class="clock-glass">
+                        <div class="clock" id="clock" role="timer" aria-live="off">
+                            <div class="clock-face" aria-hidden="true"><span class="clock-hours">00</span><span class="clock-divider">:</span><span class="clock-minutes">00</span><span class="clock-divider">:</span><span class="clock-seconds">00</span></div>
+                            <div class="clock-caption" aria-hidden="true">
+                                <span class="clock-calendar"><time class="date" id="date"></time><span class="clock-weekday"></span></span>
+                                <span class="clock-period"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+
+        <div class="widget" data-id="search-1" data-type="search">
+            <div class="widget-body">
+                <div class="search-container">
+                    <div class="search-box" id="search-box">
+                        <div class="search-input-wrapper">
+                            <button type="button" class="search-back" aria-label="返回主畫面"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+                            <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/><path d="m10.5 7 1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z" fill="#92bdcf" stroke="none"/></svg>
+                            <input type="text" class="search-input" id="search-input" placeholder="搜尋 Google，或前往一個網址" autocomplete="off" spellcheck="false" autocapitalize="off">
+                            <button type="button" class="clear-btn" id="clear-btn" aria-label="清除">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M7 17 17 7"/></svg>
+                            </button>
+                            <button type="button" class="search-submit" id="search-submit" aria-label="開始搜尋" title="開始搜尋"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 10 15-5.5L14 19.5l-3-6.5-6.5-3Z"/><path d="m11 13 8.5-8.5"/></svg></button>
+                        </div>
+                        <div class="suggestions-container" id="suggestions-container">
+                            <div class="suggestions-list" id="suggestions-list">
+                                <!-- 搜尋建議將在這裡動態生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <aside id="home-companion" class="home-companion" aria-label="貓貓陪伴">
+        <button id="companion-trigger" class="companion-trigger" type="button" aria-label="和貓貓打招呼" aria-describedby="companion-message">
+            <span class="companion-orbit" aria-hidden="true"></span>
+            <img class="companion-portrait" src="assets/character/nacho-companion.webp" alt="" width="1086" height="1448" decoding="async">
+            <span class="companion-flourish" aria-hidden="true"></span>
+        </button>
+        <p id="companion-message" class="companion-message" role="status" aria-live="polite" aria-atomic="true">今天也陪著你。</p>
+    </aside>
+    <div class="home-announcement sr-only" id="home-announcement" role="status"></div>
 
     <!-- 右上快捷列：Elgato Nachoneko Icon Pack -->
     <div class="quick-links">
@@ -1699,22 +1827,26 @@
 
     <!-- 設定選單 -->
     <div class="settings-menu" id="settings-menu">
-        <div class="menu-item" id="about-page-btn">
+        <button type="button" class="menu-item" id="edit-layout-btn">
+            <img class="menu-icon" data-nacho-icon="on_icon_11" alt="" width="22" height="22" decoding="async">
+            <span>編輯主畫面</span>
+        </button>
+        <button type="button" class="menu-item" id="about-page-btn">
             <img class="menu-icon" data-nacho-icon="pack-icon" alt="" width="22" height="22" decoding="async">
             <span>關於此分頁</span>
-        </div>
-        <div class="menu-item" id="play-pause-btn">
+        </button>
+        <button type="button" class="menu-item" id="play-pause-btn">
             <img class="menu-icon" data-nacho-icon="on_icon_14" alt="" width="22" height="22" decoding="async">
             <span>播放/暫停</span>
-        </div>
-        <div class="menu-item" id="mute-btn">
+        </button>
+        <button type="button" class="menu-item" id="mute-btn">
             <img class="menu-icon" data-nacho-icon="on_icon_15" alt="" width="22" height="22" decoding="async">
             <span>靜音/取消靜音</span>
-        </div>
-        <div class="menu-item" id="upload-video-btn">
+        </button>
+        <button type="button" class="menu-item" id="upload-video-btn">
             <img class="menu-icon" data-nacho-icon="on_icon_10" alt="" width="22" height="22" decoding="async">
             <span>上傳背景</span>
-        </div>
+        </button>
     </div>
 
     <!-- 關於此分頁（授權與署名） -->
@@ -1723,13 +1855,13 @@
             <button type="button" class="close-about" id="close-about" aria-label="關閉">
                 <i class="fas fa-times"></i>
             </button>
-            <h3 id="about-page-title">關於此分頁</h3>
+            <h2 id="about-page-title">關於此分頁</h2>
             <div class="about-page-body">
                 <p class="about-lead">Ashbery 新分頁 — 瀏覽器自訂新分頁頁面。</p>
 
-                <h4>圖標與壁紙素材</h4>
+                <h3>圖標與壁紙素材</h3>
                 <p>
-                    本頁 UI 圖標與設定／選單相關壁紙素材取自
+                    本頁保留的原始圖標與壁紙素材取自
                     <strong>Nachoneko Icon and Wallpaper Pack</strong>
                     （Elgato Stream Deck 合作素材包）。
                 </p>
@@ -1751,7 +1883,7 @@
                     <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">MIT 授權全文</a>
                 </p>
 
-                <h4>MIT License 摘要</h4>
+                <h3>MIT License 摘要</h3>
                 <pre class="about-license">Copyright 2021 Corsair/Elgato, Inc and other contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -1768,40 +1900,41 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
 
-                <p class="about-note">
-                    圖標與壁紙以 base64 內嵌於
-                    <code>nachoneko-assets.js</code>（無需上傳 assets 資料夾）。
-                    本「關於」頁面保留署名與 MIT 授權資訊，以符合授權條款。
-                </p>
+                <p class="about-note">這個主題以 Nachoneko 的銀灰、冰藍、爪印與緞帶為靈感。陪伴立繪與九款應用插畫依提供的角色參考以 AI 生成；線條介面圖示為本頁繪製。新增作品與上述原素材包分開署名，本頁為個人主題作品。</p>
             </div>
         </div>
     </div>
 
-    <div class="video-upload-container" id="video-upload-container">
+    <div class="video-upload-container" id="video-upload-container" role="dialog" aria-modal="true" aria-labelledby="background-title" aria-describedby="background-status">
         <div class="upload-box">
-            <button class="close-upload" id="close-upload">
+            <button type="button" class="close-upload" id="close-upload" aria-label="關閉背景設定">
                 <i class="fas fa-times"></i>
             </button>
-            <h3>上傳自訂背景</h3>
+            <h2 id="background-title">換個風景，換個心情</h2>
+            <p class="dialog-lead">選一張喜歡的圖片，或讓日常隨影片慢慢流動。</p>
 
             <div class="file-input-wrapper">
-                <input type="file" id="bg-file" accept="video/mp4,video/webm,image/jpeg,image/png,image/webp,image/gif,image/bmp" class="file-input">
+                <label class="field-label" for="bg-file">從裝置選擇</label>
+                <input type="file" id="bg-file" accept="video/mp4,video/webm,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif" class="file-input">
                 <div class="upload-hint">
                     影片：MP4 / WebM，上限 1000MB<br>
-                    圖片：JPG / PNG / WebP / GIF
+                    圖片：JPG / PNG / WebP / GIF / BMP / AVIF，上限 50MB
                 </div>
+                <button id="confirm-upload" class="upload-btn" disabled>套用所選檔案</button>
             </div>
 
-            <div style="margin: 20px 0; text-align: center; color: #666;">
+            <div class="upload-divider">
                 — 或 —
             </div>
 
             <div>
-                <input type="url" id="bg-url" class="url-input" placeholder="輸入影片或圖片網址">
-                <button id="load-url-btn" class="upload-btn" disabled>載入網址背景</button>
+                <label class="field-label" for="bg-url">或使用媒體連結</label>
+                <input type="url" id="bg-url" class="url-input" placeholder="https://example.com/wallpaper.jpg">
+                <button id="load-url-btn" class="upload-btn" disabled>載入並套用網址</button>
             </div>
 
-            <button id="confirm-upload" class="upload-btn" disabled>確認設定</button>
+            <button id="restore-theme" class="quiet-button restore-theme" type="button">恢復貓貓主題背景</button>
+            <p id="background-status" class="background-status" role="status" aria-live="polite"></p>
 
             <div class="current-video" id="current-video-info" style="display: none;">
                 目前使用: <span id="current-video-name">預設影片</span>
@@ -1809,405 +1942,22 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
         </div>
     </div>
 
-    <!-- Nachoneko 圖標／壁紙 data URI（可單獨上傳 GitHub，無需 assets/） -->
+    <!-- Original licensed icon pack; character artwork also lives in assets/. -->
     <script src="nachoneko-assets.js"></script>
+    <script src="js/app-registry.js"></script>
+    <script src="js/layout-engine.js"></script>
+    <script src="js/clock.js"></script>
+    <script src="js/widget-host.js"></script>
+    <script src="js/widget-catalog.js"></script>
+    <script src="js/folder-ui.js"></script>
+    <script src="js/context-menu.js"></script>
+    <script src="js/side-rail.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/background.js"></script>
+    <script src="js/experience.js"></script>
+    <script src="js/companion.js"></script>
+    <script src="js/motion.js"></script>
     <script>
-        // 時鐘：數字／冒號分層；秒數變更時輕跳
-        let lastClockTime = '';
-
-        function formatClockHtml(timeStr) {
-            return timeStr.replace(/(\d)|(:)|([^:\d]+)/g, (_, digit, sep, rest) => {
-                if (digit) return `<span class="clock-digit">${digit}</span>`;
-                if (sep) return '<span class="clock-sep">:</span>';
-                return `<span class="clock-period">${rest}</span>`;
-            });
-        }
-
-        function updateClock() {
-            const now = new Date();
-            // hour 固定 2 位，避免「9:xx」→「10:xx」撐動毛玻璃框
-            const time = now.toLocaleTimeString('zh-TW', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            });
-            const date = now.toLocaleDateString('zh-TW', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                weekday: 'long'
-            });
-
-            const clockEl = document.getElementById('clock');
-            const prev = lastClockTime;
-            lastClockTime = time;
-            clockEl.innerHTML = formatClockHtml(time);
-            document.getElementById('date').textContent = date;
-
-            // 只對變更的數字加 is-tick（通常是秒）；僅變色不位移
-            if (prev && prev !== time) {
-                const prevDigits = prev.replace(/[^\d]/g, '');
-                const nextDigits = time.replace(/[^\d]/g, '');
-                const digitNodes = clockEl.querySelectorAll('.clock-digit');
-                const len = Math.min(prevDigits.length, nextDigits.length, digitNodes.length);
-                for (let i = 0; i < len; i++) {
-                    if (prevDigits[i] !== nextDigits[i]) {
-                        digitNodes[i].classList.add('is-tick');
-                    }
-                }
-            }
-        }
-
-        updateClock();
-        setInterval(updateClock, 1000);
-
-        // 搜尋功能
-        const searchInput = document.getElementById('search-input');
-        const searchBox = document.getElementById('search-box');
-        const clearBtn = document.getElementById('clear-btn');
-        const suggestionsContainer = document.getElementById('suggestions-container');
-        const suggestionsList = document.getElementById('suggestions-list');
-
-        let searchTimeout;
-        let currentSuggestions = [];
-        let isActive = false;
-        let selectedIndex = -1;
-        let latestQuery = '';
-        let jsonpScript = null;
-        // 建議列是否已展開過（首次才播進場動畫，換字不再整列重刷）
-        let suggestionsEverOpened = false;
-        let pendingAnimate = false;
-
-        function openSuggestions() {
-            if (isActive) {
-                searchBox.classList.add('active');
-                return;
-            }
-            // 先確保內容已在 DOM 且為收合狀態，下一幀再開啟，高度過渡才會連貫
-            searchBox.classList.remove('active');
-            requestAnimationFrame(() => {
-                searchBox.classList.add('active');
-                isActive = true;
-            });
-        }
-
-        function closeSuggestions() {
-            searchBox.classList.remove('active');
-            isActive = false;
-            selectedIndex = -1;
-            suggestionsEverOpened = false;
-            pendingAnimate = false;
-            clearSelectedHighlight();
-        }
-
-        function clearSelectedHighlight() {
-            suggestionsList.querySelectorAll('.suggestion-item.selected').forEach((el) => {
-                el.classList.remove('selected');
-            });
-        }
-
-        function updateSelectedHighlight() {
-            const items = suggestionsList.querySelectorAll('.suggestion-item:not(.skeleton)');
-            items.forEach((item, index) => {
-                item.classList.toggle('selected', index === selectedIndex);
-            });
-            if (selectedIndex >= 0 && items[selectedIndex]) {
-                items[selectedIndex].scrollIntoView({ block: 'nearest' });
-            }
-        }
-
-        // 清除按鈕功能
-        clearBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            searchInput.value = '';
-            searchInput.focus();
-            updateClearButton();
-            clearSuggestions();
-            closeSuggestions();
-        });
-
-        // 更新清除按鈕顯示狀態
-        function updateClearButton() {
-            if (searchInput.value.trim()) {
-                searchBox.classList.add('has-text');
-            } else {
-                searchBox.classList.remove('has-text');
-            }
-        }
-
-        // 聚焦時：有文字就展開建議（必要時重新載入）
-        searchInput.addEventListener('focus', function() {
-            const query = searchInput.value.trim();
-            if (!query) return;
-
-            if (currentSuggestions.length > 0) {
-                openSuggestions();
-                suggestionsEverOpened = true;
-            } else {
-                pendingAnimate = true;
-                showSkeleton();
-                openSuggestions();
-                fetchSuggestions(query);
-            }
-        });
-
-        // 點擊頁面其他地方時，一律收起搜尋建議
-        document.addEventListener('click', function(event) {
-            if (!searchBox.contains(event.target)) {
-                closeSuggestions();
-            }
-        });
-
-        // 防止點建議區時輸入框失焦造成閃爍
-        suggestionsContainer.addEventListener('mousedown', function(e) {
-            e.preventDefault();
-        });
-
-        // 輸入時獲取搜尋建議（已展開時不重播骨架／進場，只更新內容）
-        searchInput.addEventListener('input', function() {
-            const query = this.value.trim();
-            latestQuery = query;
-            selectedIndex = -1;
-
-            updateClearButton();
-            clearTimeout(searchTimeout);
-
-            if (query) {
-                const wasOpen = isActive && suggestionsEverOpened;
-                if (!wasOpen) {
-                    pendingAnimate = true;
-                    showSkeleton();
-                    openSuggestions();
-                } else {
-                    // 保持現有列表，等新結果到再就地更新，避免每字閃爍
-                    searchBox.classList.add('active');
-                    isActive = true;
-                }
-                searchTimeout = setTimeout(() => {
-                    fetchSuggestions(query);
-                }, 260);
-            } else {
-                clearSuggestions();
-                closeSuggestions();
-            }
-        });
-
-        function escapeHtml(text) {
-            return String(text)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        }
-
-        function highlightMatch(suggestion, query) {
-            const safeSuggestion = escapeHtml(suggestion);
-            const safeQuery = escapeHtml(query.trim());
-            if (!safeQuery) {
-                return `<span class="rest">${safeSuggestion}</span>`;
-            }
-
-            const lowerSuggestion = suggestion.toLowerCase();
-            const lowerQuery = query.trim().toLowerCase();
-            const matchIndex = lowerSuggestion.indexOf(lowerQuery);
-
-            if (matchIndex === -1) {
-                return `<span class="rest">${safeSuggestion}</span>`;
-            }
-
-            const before = escapeHtml(suggestion.slice(0, matchIndex));
-            const match = escapeHtml(suggestion.slice(matchIndex, matchIndex + query.trim().length));
-            const after = escapeHtml(suggestion.slice(matchIndex + query.trim().length));
-
-            return `${before ? `<span class="rest">${before}</span>` : ''}<span class="match">${match}</span>${after ? `<span class="rest">${after}</span>` : ''}`;
-        }
-
-        function showSkeleton() {
-            suggestionsList.innerHTML = '';
-            for (let i = 0; i < 4; i++) {
-                const item = document.createElement('div');
-                item.className = 'suggestion-item skeleton is-entering';
-                item.style.animationDelay = `${0.06 + i * 0.04}s`;
-                item.innerHTML = `
-                    <div class="suggestion-icon"><i class="fas fa-search"></i></div>
-                    <div class="skeleton-bar"></div>
-                `;
-                suggestionsList.appendChild(item);
-            }
-        }
-
-        function bindSuggestionItem(item, suggestion, index, query) {
-            item.dataset.suggestion = suggestion;
-            item.innerHTML = `
-                <div class="suggestion-icon"><i class="fas fa-search"></i></div>
-                <span class="suggestion-text">${highlightMatch(suggestion, query)}</span>
-            `;
-            item.onmouseenter = function() {
-                selectedIndex = index;
-                updateSelectedHighlight();
-            };
-            item.onclick = function() {
-                searchInput.value = suggestion;
-                performSearch(suggestion);
-            };
-        }
-
-        function renderSuggestions(list, query, animate) {
-            const existing = Array.from(
-                suggestionsList.querySelectorAll('.suggestion-item:not(.skeleton)')
-            );
-
-            // 已有列表：就地更新文字／重用節點，不重播動畫
-            if (!animate && existing.length > 0) {
-                const max = Math.max(existing.length, list.length);
-                for (let i = 0; i < max; i++) {
-                    if (i >= list.length) {
-                        existing[i].remove();
-                        continue;
-                    }
-                    let item = existing[i];
-                    if (!item) {
-                        item = document.createElement('div');
-                        item.className = 'suggestion-item';
-                        suggestionsList.appendChild(item);
-                    }
-                    item.classList.remove('is-entering', 'skeleton', 'selected');
-                    item.style.animationDelay = '';
-                    bindSuggestionItem(item, list[i], i, query);
-                }
-                return;
-            }
-
-            // 首次展開：整批建立（可帶進場）
-            suggestionsList.innerHTML = '';
-            list.forEach((suggestion, index) => {
-                const suggestionItem = document.createElement('div');
-                suggestionItem.className = animate
-                    ? 'suggestion-item is-entering'
-                    : 'suggestion-item';
-                if (animate) {
-                    suggestionItem.style.animationDelay = `${0.04 + index * 0.03}s`;
-                }
-                bindSuggestionItem(suggestionItem, suggestion, index, query);
-                suggestionsList.appendChild(suggestionItem);
-            });
-        }
-
-        // 使用 Google 搜尋建議 API（JSONP）
-        function fetchSuggestions(query) {
-            latestQuery = query;
-
-            if (jsonpScript && jsonpScript.parentNode) {
-                jsonpScript.parentNode.removeChild(jsonpScript);
-            }
-
-            const callbackName = 'handleSuggestions_' + Date.now();
-            window[callbackName] = function(data) {
-                try {
-                    handleSuggestionsResult(data, query);
-                } finally {
-                    delete window[callbackName];
-                    if (jsonpScript && jsonpScript.parentNode) {
-                        jsonpScript.parentNode.removeChild(jsonpScript);
-                    }
-                    jsonpScript = null;
-                }
-            };
-
-            jsonpScript = document.createElement('script');
-            jsonpScript.src = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}&callback=${callbackName}`;
-            jsonpScript.onerror = function() {
-                delete window[callbackName];
-                if (query === latestQuery && !suggestionsEverOpened) {
-                    clearSuggestions();
-                }
-            };
-            document.head.appendChild(jsonpScript);
-        }
-
-        function handleSuggestionsResult(data, query) {
-            // 忽略過期回應
-            if (query !== latestQuery) return;
-
-            selectedIndex = -1;
-
-            if (data && data[1] && data[1].length > 0) {
-                currentSuggestions = data[1];
-                const shouldAnimate = pendingAnimate || !suggestionsEverOpened;
-                openSuggestions();
-                renderSuggestions(currentSuggestions, query, shouldAnimate);
-                suggestionsEverOpened = true;
-                pendingAnimate = false;
-            } else {
-                currentSuggestions = [];
-                if (!suggestionsEverOpened) {
-                    closeSuggestions();
-                } else {
-                    // 已展開但無建議：清空列表但保持框體，避免狂開關
-                    suggestionsList.innerHTML = '';
-                }
-            }
-        }
-
-        // 相容舊 callback 名稱（避免殘留請求報錯）
-        window.handleSuggestions = function(data) {
-            handleSuggestionsResult(data, latestQuery);
-        };
-
-        // 清空搜尋建議
-        function clearSuggestions() {
-            suggestionsList.innerHTML = '';
-            currentSuggestions = [];
-            selectedIndex = -1;
-        }
-
-        // 執行搜尋
-        function performSearch(query) {
-            if (query.includes('.') || query.includes('://')) {
-                window.location.href = query.includes('://') ? query : 'https://' + query;
-            } else {
-                window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-            }
-        }
-
-        // 鍵盤：方向鍵瀏覽、Enter 搜尋、Esc 收起
-        searchInput.addEventListener('keydown', function(e) {
-            const items = suggestionsList.querySelectorAll('.suggestion-item:not(.skeleton)');
-            const isOpen = isActive && items.length > 0;
-
-            if (e.key === 'Escape') {
-                closeSuggestions();
-                searchInput.blur();
-                return;
-            }
-
-            if (e.key === 'ArrowDown' && isOpen) {
-                e.preventDefault();
-                selectedIndex = (selectedIndex + 1) % items.length;
-                updateSelectedHighlight();
-                return;
-            }
-
-            if (e.key === 'ArrowUp' && isOpen) {
-                e.preventDefault();
-                selectedIndex = selectedIndex <= 0 ? items.length - 1 : selectedIndex - 1;
-                updateSelectedHighlight();
-                return;
-            }
-
-            if (e.key === 'Enter') {
-                const query = selectedIndex >= 0 && items[selectedIndex]
-                    ? currentSuggestions[selectedIndex]
-                    : this.value.trim();
-                if (query) {
-                    e.preventDefault();
-                    performSearch(query);
-                }
-            }
-        });
-
         // Google應用圖標功能
         const appsTrigger = document.getElementById('apps-trigger');
         const appsFolder = document.getElementById('google-apps-folder');
@@ -2240,501 +1990,21 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
             }
         });
 
-        // 背景控制（單一路 loop，避免雙緩衝切換黑閃）
-        const video = document.getElementById('video-background');
-        const DEFAULT_VIDEO_SRC = 'https://assets.mixkit.co/videos/preview/mixkit-white-clouds-passing-by-1152-large.mp4';
-        const imageBg = document.getElementById('image-background');
-        const uploadContainer = document.getElementById('video-upload-container');
-        const settingsMenu = document.getElementById('settings-menu');
-        const settingsGear = document.getElementById('settings-gear');
-        const bgFileInput = document.getElementById('bg-file');
-        const bgUrlInput = document.getElementById('bg-url');
-        const loadUrlBtn = document.getElementById('load-url-btn');
-        const confirmUploadBtn = document.getElementById('confirm-upload');
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const muteBtn = document.getElementById('mute-btn');
-
-        const MAX_VIDEO_BYTES = 1000 * 1024 * 1024; // 1000MB
-        const MAX_IMAGE_BYTES = 50 * 1024 * 1024;  // 圖片 50MB
-
-        let selectedFile = null;
-        let selectedUrl = '';
-        let selectedKind = ''; // 'video' | 'image'
-        let currentBgType = 'video'; // 'video' | 'image'
-        let objectUrlToRevoke = null;
-
-        function isVideoFile(file) {
-            return file && (file.type.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(file.name));
-        }
-
-        function isImageFile(file) {
-            return file && (file.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(file.name));
-        }
-
-        function isImageUrl(url) {
-            return /\.(jpe?g|png|gif|webp|bmp)(\?.*)?$/i.test(url) || /[?&](format|type)=image/i.test(url);
-        }
-
-        /**
-         * IndexedDB 背景媒體快取（參考新分頁擴充插件 helper.js）
-         * 本機檔案的 blob: URL 刷新後會失效，必須把 File/Blob 存進 IDB 才能還原
-         */
-        const BG_DB_NAME = 'NewtabBackgroundDB';
-        const BG_STORE = 'media';
-        const BG_KEY = 'cached_background';
-        let bgDb = null;
-        let bgDbInitPromise = null;
-
-        function initBackgroundDB() {
-            if (bgDb) return Promise.resolve(bgDb);
-            if (bgDbInitPromise) return bgDbInitPromise;
-
-            bgDbInitPromise = new Promise(function(resolve, reject) {
-                try {
-                    const req = indexedDB.open(BG_DB_NAME, 1);
-                    req.onerror = function() {
-                        bgDbInitPromise = null;
-                        reject(req.error);
-                    };
-                    req.onsuccess = function() {
-                        bgDb = req.result;
-                        resolve(bgDb);
-                    };
-                    req.onupgradeneeded = function(event) {
-                        const db = event.target.result;
-                        if (!db.objectStoreNames.contains(BG_STORE)) {
-                            db.createObjectStore(BG_STORE);
-                        }
-                    };
-                } catch (err) {
-                    bgDbInitPromise = null;
-                    reject(err);
-                }
-            });
-            return bgDbInitPromise;
-        }
-
-        function saveBackgroundBlob(blob) {
-            return initBackgroundDB().then(function(db) {
-                return new Promise(function(resolve, reject) {
-                    const tx = db.transaction([BG_STORE], 'readwrite');
-                    const store = tx.objectStore(BG_STORE);
-                    const req = store.put(blob, BG_KEY);
-                    req.onsuccess = function() { resolve(); };
-                    req.onerror = function() { reject(req.error); };
-                });
-            });
-        }
-
-        function loadBackgroundBlob() {
-            return initBackgroundDB().then(function(db) {
-                return new Promise(function(resolve, reject) {
-                    const tx = db.transaction([BG_STORE], 'readonly');
-                    const store = tx.objectStore(BG_STORE);
-                    const req = store.get(BG_KEY);
-                    req.onsuccess = function() { resolve(req.result || null); };
-                    req.onerror = function() { reject(req.error); };
-                });
-            });
-        }
-
-        function clearBackgroundBlob() {
-            return initBackgroundDB().then(function(db) {
-                return new Promise(function(resolve, reject) {
-                    const tx = db.transaction([BG_STORE], 'readwrite');
-                    const store = tx.objectStore(BG_STORE);
-                    const req = store.delete(BG_KEY);
-                    req.onsuccess = function() { resolve(); };
-                    req.onerror = function() { reject(req.error); };
-                });
-            }).catch(function() {});
-        }
-
-        function writeBgMeta(meta) {
-            localStorage.setItem('bgType', meta.type || 'video');
-            localStorage.setItem('bgSource', meta.source || 'url');
-            localStorage.setItem('bgName', meta.name || '');
-            // 僅網址可寫進 localStorage；本機檔改存 IDB
-            if (meta.source === 'url' && meta.url) {
-                localStorage.setItem('customBackground', meta.url);
-                localStorage.setItem('customVideo', meta.url);
-            } else {
-                localStorage.removeItem('customBackground');
-                localStorage.removeItem('customVideo');
-            }
-            localStorage.setItem('videoSource', meta.source || 'url');
-            localStorage.setItem('videoName', meta.name || '');
-            if (meta.source === 'file') {
-                localStorage.setItem('hasIdbBackground', 'true');
-            } else {
-                localStorage.removeItem('hasIdbBackground');
-            }
-        }
-
-        function revokePreviousObjectUrl() {
-            if (objectUrlToRevoke) {
-                URL.revokeObjectURL(objectUrlToRevoke);
-                objectUrlToRevoke = null;
-            }
-        }
-
-        function setVideoBackground(src, name, persistMeta) {
-            revokePreviousObjectUrl();
-            if (src.startsWith('blob:')) {
-                objectUrlToRevoke = src;
-            }
-
-            currentBgType = 'video';
-            imageBg.style.display = 'none';
-            imageBg.style.backgroundImage = '';
-            video.style.display = 'block';
-            video.loop = true;
-            video.muted = true;
-            video.playsInline = true;
-            video.src = src;
-            video.load();
-            video.play().catch(function() {});
-
-            if (persistMeta) {
-                if (persistMeta.source === 'url') {
-                    clearBackgroundBlob();
-                    writeBgMeta({
-                        type: 'video',
-                        source: 'url',
-                        name: name || '自訂網址影片',
-                        url: src
-                    });
-                } else if (persistMeta.source === 'file' && persistMeta.blob) {
-                    // 立即顯示，背景寫入 IDB
-                    writeBgMeta({
-                        type: 'video',
-                        source: 'file',
-                        name: name || '自訂影片'
-                    });
-                    saveBackgroundBlob(persistMeta.blob).catch(function(err) {
-                        console.warn('背景影片儲存失敗:', err);
-                        alert('影片已套用，但無法寫入本機快取（瀏覽器儲存可能已滿）。重新整理後可能需重新上傳。');
-                    });
-                }
-            }
-
-            updateCurrentBgInfo(name || '自訂影片');
-            updateMediaControlsState();
-        }
-
-        function setImageBackground(src, name, persistMeta) {
-            revokePreviousObjectUrl();
-            if (src.startsWith('blob:')) {
-                objectUrlToRevoke = src;
-            }
-
-            currentBgType = 'image';
-            video.pause();
-            video.removeAttribute('src');
-            try { video.load(); } catch (e) { /* ignore */ }
-            video.style.display = 'none';
-            imageBg.style.display = 'block';
-            imageBg.style.backgroundImage = `url("${src.replace(/"/g, '\\"')}")`;
-
-            if (persistMeta) {
-                if (persistMeta.source === 'url') {
-                    clearBackgroundBlob();
-                    writeBgMeta({
-                        type: 'image',
-                        source: 'url',
-                        name: name || '自訂網址圖片',
-                        url: src
-                    });
-                } else if (persistMeta.source === 'file' && persistMeta.blob) {
-                    writeBgMeta({
-                        type: 'image',
-                        source: 'file',
-                        name: name || '自訂圖片'
-                    });
-                    saveBackgroundBlob(persistMeta.blob).catch(function(err) {
-                        console.warn('背景圖片儲存失敗:', err);
-                        alert('圖片已套用，但無法寫入本機快取。重新整理後可能需重新上傳。');
-                    });
-                }
-            }
-
-            updateCurrentBgInfo(name || '自訂圖片');
-            updateMediaControlsState();
-        }
-
-        async function restoreSavedBackground() {
-            const bgType = localStorage.getItem('bgType') || 'video';
-            const bgSource = localStorage.getItem('bgSource') || localStorage.getItem('videoSource') || '';
-            const bgName = localStorage.getItem('bgName') || localStorage.getItem('videoName') || '';
-            const savedUrl = localStorage.getItem('customBackground') || localStorage.getItem('customVideo') || '';
-            const hasIdb = localStorage.getItem('hasIdbBackground') === 'true' || bgSource === 'file' || bgSource === 'extension';
-
-            try {
-                // 1) 本機檔案：從 IndexedDB 還原
-                if (hasIdb || bgSource === 'file') {
-                    const blob = await loadBackgroundBlob();
-                    if (blob) {
-                        const objectUrl = URL.createObjectURL(blob);
-                        const isImg = (blob.type && blob.type.startsWith('image/')) || bgType === 'image';
-                        if (isImg) {
-                            setImageBackground(objectUrl, bgName || '自訂圖片', null);
-                        } else {
-                            setVideoBackground(objectUrl, bgName || '自訂影片', null);
-                        }
-                        return;
-                    }
-                }
-
-                // 2) 網址背景
-                if (savedUrl && !savedUrl.startsWith('blob:')) {
-                    if (bgType === 'image' || isImageUrl(savedUrl)) {
-                        setImageBackground(savedUrl, bgName || '自訂網址圖片', null);
-                    } else {
-                        setVideoBackground(savedUrl, bgName || '自訂網址影片', null);
-                    }
-                    return;
-                }
-            } catch (err) {
-                console.warn('還原背景失敗:', err);
-            }
-
-            // 3) 預設影片
-            currentBgType = 'video';
-            imageBg.style.display = 'none';
-            video.style.display = 'block';
-            if (!video.src || video.src.indexOf('mixkit') === -1 && !video.currentSrc) {
-                video.src = DEFAULT_VIDEO_SRC;
-            }
-            video.loop = true;
-            video.muted = true;
-            video.play().catch(function() {});
-            updateMediaControlsState();
-        }
-
-        function updateMediaControlsState() {
-            const isVideo = currentBgType === 'video';
-            playPauseBtn.style.opacity = isVideo ? '1' : '0.45';
-            muteBtn.style.opacity = isVideo ? '1' : '0.45';
-            playPauseBtn.style.pointerEvents = isVideo ? 'auto' : 'none';
-            muteBtn.style.pointerEvents = isVideo ? 'auto' : 'none';
-        }
-
-        function updateCurrentBgInfo(name) {
-            document.getElementById('current-video-info').style.display = 'block';
-            document.getElementById('current-video-name').textContent = name;
-        }
-
-        function resetUploadForm() {
-            bgFileInput.value = '';
-            bgUrlInput.value = '';
-            loadUrlBtn.disabled = true;
-            confirmUploadBtn.disabled = true;
-            selectedFile = null;
-            selectedUrl = '';
-            selectedKind = '';
-        }
-
-        function updateLoadUrlBtnState() {
-            loadUrlBtn.disabled = !bgUrlInput.value.trim();
-        }
-
-        function openSettingsMenu() {
-            settingsMenu.style.display = 'block';
-            settingsGear.classList.add('active');
-            settingsGear.setAttribute('aria-expanded', 'true');
-        }
-
-        function closeSettingsMenu() {
-            settingsMenu.style.display = 'none';
-            settingsGear.classList.remove('active');
-            settingsGear.setAttribute('aria-expanded', 'false');
-        }
-
-        function toggleSettingsMenu() {
-            if (settingsMenu.style.display === 'block') {
-                closeSettingsMenu();
-            } else {
-                openSettingsMenu();
-            }
-        }
-
-        // 齒輪點擊事件
-        settingsGear.addEventListener('click', function(e) {
-            e.stopPropagation();
-            toggleSettingsMenu();
-        });
-
-        // 點擊頁面其他區域關閉選單
-        document.addEventListener('click', function(event) {
-            if (!settingsGear.contains(event.target) && !settingsMenu.contains(event.target)) {
-                closeSettingsMenu();
-            }
-        });
-
-        function refreshMenuIcons(el) {
-            if (window.NACHONEKO_ASSETS && typeof window.NACHONEKO_ASSETS.applyIcons === 'function') {
-                window.NACHONEKO_ASSETS.applyIcons(el);
-            } else if (window.NACHONEKO_ASSETS && window.NACHONEKO_ASSETS.icons) {
-                el.querySelectorAll('[data-nacho-icon]').forEach(function (node) {
-                    var k = node.getAttribute('data-nacho-icon');
-                    if (k && window.NACHONEKO_ASSETS.icons[k]) node.src = window.NACHONEKO_ASSETS.icons[k];
-                });
-            }
-        }
-
-        // 播放/暫停（僅影片背景）
-        playPauseBtn.addEventListener('click', function() {
-            if (currentBgType !== 'video') return;
-            if (video.paused) {
-                video.play().catch(function() {});
-                this.innerHTML = '<img class="menu-icon" data-nacho-icon="on_icon_14" alt="" width="22" height="22"><span>暫停影片</span>';
-            } else {
-                video.pause();
-                this.innerHTML = '<img class="menu-icon" data-nacho-icon="off_icon_02" alt="" width="22" height="22"><span>播放影片</span>';
-            }
-            refreshMenuIcons(this);
-            closeSettingsMenu();
-        });
-
-        // 靜音/取消靜音
-        muteBtn.addEventListener('click', function() {
-            if (currentBgType !== 'video') return;
-            video.muted = !video.muted;
-            this.innerHTML = video.muted
-                ? '<img class="menu-icon" data-nacho-icon="off_icon_01" alt="" width="22" height="22"><span>取消靜音</span>'
-                : '<img class="menu-icon" data-nacho-icon="on_icon_15" alt="" width="22" height="22"><span>靜音影片</span>';
-            refreshMenuIcons(this);
-            closeSettingsMenu();
-        });
-
-        // 關於此分頁
-        const aboutContainer = document.getElementById('about-page-container');
-
-        function openAboutPage() {
-            aboutContainer.style.display = 'flex';
-            closeSettingsMenu();
-        }
-
-        function closeAboutPage() {
-            aboutContainer.style.display = 'none';
-        }
-
-        document.getElementById('about-page-btn').addEventListener('click', openAboutPage);
-        document.getElementById('close-about').addEventListener('click', closeAboutPage);
-        aboutContainer.addEventListener('click', function(e) {
-            if (e.target === aboutContainer) {
-                closeAboutPage();
-            }
-        });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && aboutContainer.style.display === 'flex') {
-                closeAboutPage();
-            }
-        });
-
-        // 上傳背景介面
-        document.getElementById('upload-video-btn').addEventListener('click', function() {
-            uploadContainer.style.display = 'flex';
-            closeSettingsMenu();
-        });
-
-        document.getElementById('close-upload').addEventListener('click', function() {
-            uploadContainer.style.display = 'none';
-        });
-
-        // 檔案選擇：影片（≤1000MB）或圖片
-        bgFileInput.addEventListener('change', function(e) {
-            selectedFile = e.target.files[0] || null;
-            selectedUrl = '';
-            selectedKind = '';
-            bgUrlInput.value = '';
-
-            if (!selectedFile) {
-                confirmUploadBtn.disabled = true;
-                return;
-            }
-
-            if (isVideoFile(selectedFile)) {
-                if (selectedFile.size > MAX_VIDEO_BYTES) {
-                    alert('影片檔案不可超過 1000MB');
-                    bgFileInput.value = '';
-                    selectedFile = null;
-                    confirmUploadBtn.disabled = true;
-                    return;
-                }
-                selectedKind = 'video';
-                confirmUploadBtn.disabled = false;
-                return;
-            }
-
-            if (isImageFile(selectedFile)) {
-                if (selectedFile.size > MAX_IMAGE_BYTES) {
-                    alert('圖片檔案不可超過 50MB');
-                    bgFileInput.value = '';
-                    selectedFile = null;
-                    confirmUploadBtn.disabled = true;
-                    return;
-                }
-                selectedKind = 'image';
-                confirmUploadBtn.disabled = false;
-                return;
-            }
-
-            alert('請選擇影片（MP4 / WebM）或圖片（JPG / PNG / WebP / GIF）');
-            bgFileInput.value = '';
-            selectedFile = null;
-            confirmUploadBtn.disabled = true;
-        });
-
-        // 未輸入網址時「載入網址背景」不可按
-        bgUrlInput.addEventListener('input', updateLoadUrlBtnState);
-        bgUrlInput.addEventListener('change', updateLoadUrlBtnState);
-
-        // 網址載入
-        loadUrlBtn.addEventListener('click', function() {
-            const url = bgUrlInput.value.trim();
-            if (!url) {
-                loadUrlBtn.disabled = true;
-                return;
-            }
-            selectedUrl = url;
-            selectedFile = null;
-            selectedKind = isImageUrl(url) ? 'image' : 'video';
-            bgFileInput.value = '';
-            confirmUploadBtn.disabled = false;
-        });
-
-        // 確認設定
-        confirmUploadBtn.addEventListener('click', function() {
-            if (selectedFile) {
-                const objectUrl = URL.createObjectURL(selectedFile);
-                const meta = { source: 'file', blob: selectedFile };
-                if (selectedKind === 'image') {
-                    setImageBackground(objectUrl, selectedFile.name, meta);
-                } else {
-                    setVideoBackground(objectUrl, selectedFile.name, meta);
-                }
-            } else if (selectedUrl) {
-                const kind = selectedKind || (isImageUrl(selectedUrl) ? 'image' : 'video');
-                if (kind === 'image') {
-                    setImageBackground(selectedUrl, '自訂網址圖片', { source: 'url' });
-                } else {
-                    setVideoBackground(selectedUrl, '自訂網址影片', { source: 'url' });
-                }
-            }
-
-            uploadContainer.style.display = 'none';
-            resetUploadForm();
-        });
-
         // 載入儲存的背景（IndexedDB 本機檔 + localStorage 網址）
         window.addEventListener('DOMContentLoaded', function() {
-            initBackgroundDB()
-                .then(function() { return restoreSavedBackground(); })
-                .catch(function() { return restoreSavedBackground(); })
-                .finally(function() {
-                    searchInput.focus();
-                });
+            // M3: free layout + apps + side rail
+            if (window.NewtabWidgets && typeof window.NewtabWidgets.init === 'function') {
+                window.NewtabWidgets.init();
+            }
+            if (window.NewtabContextMenu && typeof window.NewtabContextMenu.init === 'function') {
+                window.NewtabContextMenu.init();
+            }
+            if (window.NewtabSideRail && typeof window.NewtabSideRail.init === 'function') {
+                window.NewtabSideRail.init();
+            }
+
+            if (window.NewtabBackground) window.NewtabBackground.init();
+
         });
     </script>
 </body>

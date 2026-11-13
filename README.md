@@ -1,63 +1,82 @@
-# Ashbery 新分頁
+# Ashbery 貓貓新分頁
 
-自訂瀏覽器起始頁：時鐘、Google 搜尋、捷徑、可換影片／圖片背景。
-
-**Demo：** https://ashbery.github.io/newtab/
-
----
+以 Nachoneko 的銀灰、冰藍、爪印與緞帶細節設計的個人起始頁。純 HTML、CSS、JavaScript，無需建置步驟。
 
 ## 功能
 
-- 時鐘／日期（zh-TW）
-- Google 搜尋與建議（可輸入網址直達）
-- 右上捷徑：圖片、Gmail、應用
-- 自訂背景：本機 MP4／WebM（≤1000MB）、圖片，或媒體 URL
-- 本機背景以 IndexedDB 保存；URL 背景寫入 localStorage
-- 雙緩衝循環播放，減少 loop 接縫
-- 響應式排版
+- 本機 Manrope Light 纖細數字時鐘，完整時分秒一行、日期獨立排列；Google 搜尋、建議、網址直達。
+- `/` 或 Ctrl/Cmd+K 開始搜尋；支援中文輸入法、方向鍵、Enter、Escape。建議服務無法使用時仍可搜尋。
+- 圓形銀藍背景與探出的角色、輕微視差及沿圓弧柔化的下緣；點擊或按 Enter 打招呼。觸控及減少動畫時保留靜態層次。
+- 九款角色風格應用插畫與一致的組件圖示；懸停浮起、目的地提示及按壓回饋。
+- 捷徑、資料夾、待辦、筆記、書籤、天氣與倒數組件；格位吸附、落點預覽、選取後調整大小。
+- 桌面與手機分別保留排列；進入編輯時維持當前位置，「完成」儲存，「取消」還原。
+- 預設位置與拖移使用相同格線；調整視窗後保留圖示尺寸，切回原解析度還原排列。
+- 新項目可吸附至既有項目的列、欄與等距排列；舊版儲存的非格點位置也能對齊，預覽即為實際落點。
+- 新增組件以桌面格位決定尺寸；21:9、32:9 保持集中構圖，卡片不會隨整個螢幕寬度放大。既有自訂尺寸保留。
+- 本機圖片／影片或媒體網址背景；影片循環播放，可暫停及靜音。可切回貓貓主題。
+- 專注模式收起捷徑與角色，按 Escape 或從工具選單返回。
+- 天氣提供定位、更新與失敗重試；書籤可直接管理名稱、網址與刪除。
 
----
+## 預覽與使用
 
-## 使用
+在專案目錄啟動靜態伺服器：
 
-線上直接開啟 Demo，或下載後開 `index.html`。
-
-Chrome 設為啟動頁：設定 → 啟動時 → 開啟特定網頁 → 填入 Demo URL。
-
-換背景：右下設定 → 上傳背景。授權說明見設定 → 關於此分頁。
-
----
-
-## 結構
-
-```
-index.html              # 主頁
-nachoneko-assets.js     # 圖標／壁紙（data URI，部署用）
-favicon.ico
-.nojekyll
-assets/nachoneko/       # 原始素材（可選，非部署必要）
+```sh
+python -m http.server 4173 --bind 127.0.0.1
 ```
 
----
+開啟 [本機預覽](http://127.0.0.1:4173/)。也可直接開啟 index.html，建議使用 HTTP 預覽以獲得一致的儲存行為。
 
-## 開發
+[GitHub Pages](https://ashbery.github.io/newtab/) 顯示倉庫已發布的版本。部署需包含 index.html、css/、js/、assets/（包含 fonts/）、nachoneko-assets.js 和圖標檔案。
 
-```bash
-npx --yes serve .
-# 或：python -m http.server 8080
+滑鼠靠近畫面右緣會顯示「工具」，移開後收起；鍵盤聚焦時也會顯示，觸控裝置保留可點的入口。工具內集中組件、應用與個人化設定。
+
+按「新增」放入下一個空位，或按住面板內圖示拖到主畫面。從「個人化 → 排列主畫面」進入編輯，也可長按主畫面的應用。點選項目後拖曳，或再點空位移動；預覽框就是實際落點，空間不足時留在原位。快速拖到另一個應用上會交換位置；停在中央約 650ms、看到資料夾提示後放開才會收進資料夾。
+
+選取組件後可拖曳邊點縮放，或使用工具列的放大／縮小。鍵盤方向鍵移動一格，Shift＋方向鍵調整組件跨度。按「完成」儲存整次編輯，「取消」放棄變更；編輯中的新增項目也屬於草稿。組件設定按鈕提供時間制、鎖定與移除。原有本機排列與背景保留。
+
+## 驗證
+
+```sh
+node --test tests/search.test.cjs tests/layout-resize.test.cjs
+node --test tests/home-grid.test.cjs tests/clock-menu.test.cjs
+node tests/home-editor.cjs
+node tests/layout-roundtrip.cjs
+node tests/layout-legacy.cjs
+node --test tests/layout-alignment.test.cjs
+node tests/layout-alignment.cjs
+node tests/ultrawide-layout.cjs
+node tests/ui-regressions.cjs
+node tests/background-playback.cjs
+node tests/background-seam.cjs
+node tests/background-compatibility.cjs
+node tests/extension-compatibility.cjs
+node tests/weather-regressions.cjs
+node tests/widget-functionality.cjs
+node --test tests/companion-browser.test.cjs
+node --test tests/context-menu-browser.test.cjs
 ```
 
-GitHub Pages：倉庫 Settings → Pages → 分支 root。
+瀏覽器情境測試需要可由 Node 載入的 Playwright，以及 Microsoft Edge；測試前需開啟本機伺服器。可用 PLAYWRIGHT_CHANNEL 改變瀏覽器，NEWTAB_TEST_URL 改變測試網址。測試使用獨立瀏覽器資料，不操作個人資料。
 
----
+循環接點測試另需 FFmpeg／ffprobe，預設產生測試影片並比較接點與平常播放的畫格間隔。可設定 NEWTAB_BROWSER_PATH 指向 Brave；NEWTAB_SEAM_FILE 指向明確選定的原片，經本機上傳流程唯讀驗證，不修改檔案。預設觀察至少三輪，長影片可用 NEWTAB_SEAM_DURATION_MS 指定觀察時間；不足三個接點時不會判為通過。
+
+設計方向見 [DESIGN.md](DESIGN.md)，參考清單見 [DESIGN_RESOURCES.md](DESIGN_RESOURCES.md)，本次檢查紀錄見 [VALIDATION.md](VALIDATION.md)。
+
+## 既有擴充相容性
+
+既有擴充的永久啟用與統計設定存放於擴充自身，本頁不會更改。舊版的本機影片快取與 `videoUrl` 背景網址會讀取並搬入新版背景儲存，保留舊資料；已明確選擇的新背景或預設主題優先。測試使用隔離資料，沒有改寫個人瀏覽器設定。
+
+擴充 1.1.0 改用本機原生新分頁外框，內部載入原有 GitHub 網站；開啟新分頁時網址列保持空白，不需要額外 Windows 小程式或模擬刪除按鍵。搜尋及捷徑會正常離開外框，開啟整個目的地分頁。外框先完成身分登記才載入網站；新增的導航監聽只處理本擴充已登記外框的直接子頁面。舊版網站也適用，現代網站會跳過過時的影片控制項注入。
+
+若更新已安裝擴充的原始檔，需在 `brave://extensions/` 對「Ashbery 新分頁」重新載入；不需要移除或重裝。一般網站更新由 GitHub Pages 提供，開啟新分頁即可載入；若仍看到快取舊版，可使用 Ctrl+Shift+R。
+
+Brave 可能在原生新分頁底部附加白色頁尾，顯示擴充名稱與「自訂 Brave」。在該白條的空白處按右鍵，選擇「隱藏頁尾 / Hide footer」即可移除，同時保留空白網址列。使用者已確認這個操作成功。這是瀏覽器的頁尾顯示設定，不需要修改網頁高度、啟動旗標或模擬鍵盤輸入。
+
+本次網站版本為 `2026.11.14.1`，包含角色主題、纖細時鐘、搜尋與組件修正、既有排列對齊及超寬螢幕支援。擴充繼續載入 GitHub Pages 網站，既有背景與排列仍存於使用者瀏覽器。[驗證範圍與已知限制](VALIDATION.md)。
 
 ## 素材
 
-UI 圖標與面板壁紙取自 [Nachoneko Icon and Wallpaper Pack](https://www.elgato.com/us/en/s/stream-deck-nachoneko-icon-and-wallpaper-pack)（Elgato × 甘城なつき／[Nachoneko](https://x.com/amsrntk3)），**MIT**。頁內「關於此分頁」含署名與授權摘要。
+原圖標／壁紙包：[Nachoneko Icon and Wallpaper Pack](https://www.elgato.com/us/en/s/stream-deck-nachoneko-icon-and-wallpaper-pack)，Elgato × 甘城なつき／[Nachoneko](https://x.com/amsrntk3)，保留包內 MIT 授權與署名。
 
----
-
-## 授權
-
-- 本倉庫：依 repo 授權為準  
-- Nachoneko × Elgato 素材：MIT，保留署名  
+新增立繪及九款應用插畫依使用者提供的角色參考以 AI 生成，來源見 [assets/character/README.md](assets/character/README.md)。貓標誌、搜尋及組件線條圖示為本頁繪製。新增作品與上述 MIT 素材包分開署名。
