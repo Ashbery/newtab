@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const { chromium } = require('playwright');
 const base = process.env.NEWTAB_TEST_URL || 'http://127.0.0.1:4173';
 const fixture = JSON.parse(fs.readFileSync('tests/fixtures/legacy-four-apps.json', 'utf8'));
+const gesturesOnly = process.env.NEWTAB_CANVAS_ONLY === 'gestures';
 const cases = [[1920,1080,1],[3440,1440,1],[3440,1440,1.25],[5120,1440,1.5]];
 const geometry = (page, id) => page.locator('.widget[data-id="'+id+'"]').evaluate(el =>
     Object.fromEntries(['left','top','width','height'].map(key => [key,parseFloat(el.style[key])])));
@@ -28,7 +29,38 @@ async function drag(page,id,x,y) {
     const browser=await chromium.launch({channel:'msedge',headless:true});
     const results=[];
     try {
-        for(const [physicalWidth,physicalHeight,dpr] of cases)for(const legacy of [false,true]) {
+        for(const reducedMotion of ['no-preference','reduce'])for(const arranging of [false,true]) {
+            const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion});
+            const page=await context.newPage();await page.goto(base);await page.waitForFunction(()=>window.NewtabWidgets);
+            if(arranging) {
+                await page.locator('#side-rail-tab').focus();await page.keyboard.press('Enter');
+                await page.getByRole('tab',{name:'個人化',exact:true}).click();await page.locator('#arrange-home').click();
+            }
+            const widget=page.locator('.widget[data-id="clock-1"]');
+            const box=await widget.boundingBox();await page.mouse.move(box.x+20,box.y+20);
+            await page.waitForTimeout(250);
+            const appearance=()=>widget.evaluate(el=>({
+                shadow:getComputedStyle(el).boxShadow,selected:el.classList.contains('is-editor-selected'),
+                handles:[...el.querySelectorAll('.widget-handle')].filter(handle=>
+                    handle.getClientRects().length&&getComputedStyle(handle).visibility!=='hidden'&&+getComputedStyle(handle).opacity>0).length,
+                ring:[...el.querySelectorAll('.widget-select-ring')].some(ring=>
+                    ring.getClientRects().length&&+getComputedStyle(ring).opacity>0)
+            }));
+            const before=await appearance();assert.equal(before.selected,false);assert.equal(before.handles,0);assert.equal(before.ring,false);
+            await page.mouse.down();await page.waitForTimeout(100);
+            assert.deepEqual(await appearance(),before,'100ms press has no selection, handles, ring or extra shadow');
+            await page.mouse.up();await page.waitForTimeout(100);
+            assert.deepEqual(await appearance(),before,'quick click does not leave editing chrome');
+            assert.equal(await page.evaluate(()=>NewtabWidgets.isArranging()),arranging,'quick click preserves current mode');
+            await page.mouse.down();await page.waitForTimeout(580);
+            assert.equal((await appearance()).selected,true,'560ms hold threshold selects the widget');
+            await page.waitForTimeout(160);
+            const held=await appearance();assert(held.handles>0&&held.ring,'confirmed hold paints its frame and resize handles');
+            await page.mouse.up();
+            console.log(`PASS pointer frame ${arranging?'arranging':'idle'} ${reducedMotion}: quick click invisible, hold visible`);
+            await context.close();
+        }
+        for(const [physicalWidth,physicalHeight,dpr] of gesturesOnly?[]:cases)for(const legacy of [false,true]) {
             const viewport={width:Math.round(physicalWidth/dpr),height:Math.round(physicalHeight/dpr)};
             const context=await browser.newContext({viewport,deviceScaleFactor:dpr,reducedMotion:'reduce'});
             if(legacy)await context.addInitScript(data=>{if(!sessionStorage.getItem('corner-seed')){
@@ -70,7 +102,7 @@ async function drag(page,id,x,y) {
         }
         // A persisted v2 profile keeps its exact old 14-column projection;
         // only the deliberately moved item graduates to full-canvas storage.
-        {
+        if(!gesturesOnly) {
             const context=await browser.newContext({viewport:{width:3440,height:1440},reducedMotion:'reduce'});
             const savedLayout={v:4,companionMigrated:true,rail:{open:false,width:300,tab:'personalize'},widgets:
                 ['images','gmail'].map((appId,i)=>({id:'app-'+appId,type:'app',x:.2+i*.1,y:.4,w:.07,h:.11,z:i+1,pinned:false,
@@ -94,8 +126,10 @@ async function drag(page,id,x,y) {
             console.log('PASS actual v2 profile: unchanged until moved, exact custom fractional slot, isolated migration');
             await context.close();
         }
-        fs.mkdirSync('.impeccable/review',{recursive:true});
-        fs.writeFileSync('.impeccable/review/full-canvas-corners.json',JSON.stringify(results,null,2));
-        console.log('FULL CANVAS CORNERS PASS '+results.length);
+        if(!gesturesOnly) {
+            fs.mkdirSync('.impeccable/review',{recursive:true});
+            fs.writeFileSync('.impeccable/review/full-canvas-corners.json',JSON.stringify(results,null,2));
+        }
+        console.log(gesturesOnly?'FULL CANVAS POINTER FRAME PASS 4':'FULL CANVAS CORNERS PASS '+results.length);
     } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

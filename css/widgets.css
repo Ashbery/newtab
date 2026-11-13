@@ -847,16 +847,8 @@ body.is-dragging-widget .widget-handle,
     display: flex;
 }
 
-/* ---- Long-press hint (560ms arm — slightly longer visual settle) ---- */
-.widget.is-longpress-hint {
-    box-shadow:
-        0 0 0 2px rgba(154, 208, 245, 0.35),
-        0 8px 20px rgba(0, 0, 0, 0.18);
-    transition: box-shadow 0.22s ease;
-}
-
-/* The hint must keep the pressed link as the click target. Actual arrangement
-   mode handles pointer suppression after a long press has been confirmed. */
+/* Pending long presses intentionally have no selection frame. The shared
+   editor renders handles only after the 560ms hold has been confirmed. */
 
 /* ---- Layout toast: removed this round (X2) ---- */
 .layout-toast,
