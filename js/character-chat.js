@@ -34,7 +34,12 @@
         } catch (_) { state.messages = []; }
         try {
             var prompt = localStorage.getItem(PERSONA_KEY);
-            if (prompt && prompt.trim() && prompt.length <= persona.maxLength) state.characterPrompt = prompt;
+            if (prompt && prompt.trim() && prompt.length <= persona.maxLength) {
+                // Refresh only an unchanged shipped default. Read-time mapping
+                // preserves custom text and works when storage is read-only.
+                var legacyDefaults = persona.legacyDefaultPrompts || [];
+                state.characterPrompt = legacyDefaults.indexOf(prompt) >= 0 ? persona.defaultPrompt : prompt;
+            }
         } catch (_) { state.personaReadError = '無法讀取已儲存的角色設定，目前使用預設內容。'; }
     }
     function element(tag, className, text) {

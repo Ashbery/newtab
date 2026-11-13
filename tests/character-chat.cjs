@@ -44,6 +44,67 @@ async function send(page, text) {
 }
 async function complete(page) { await page.getByRole('status').filter({ hasText: '回覆完成。' }).waitFor(); }
 
+async function checkPersonaMigration(browser) {
+    const defaults = require('../js/character-persona.js');
+    assert(defaults.legacyDefaultPrompts.length > 0, 'the previously shipped default is retained for exact matching');
+    const old = defaults.legacyDefaultPrompts[0];
+    assert.notEqual(old, defaults.defaultPrompt, 'the migration must exercise a genuinely revised default');
+    const cases = [
+        ...defaults.legacyDefaultPrompts.map((saved, index) => ({ name: 'exact legacy ' + index, saved, expected: defaults.defaultPrompt })),
+        { name: 'legacy with blocked writes', saved: old, expected: defaults.defaultPrompt, readOnly: true },
+        { name: 'one-character custom edit', saved: old + ' ', expected: old + ' ' },
+        { name: 'custom appended instructions', saved: old + '\n請始終用兩句話回答。', expected: old + '\n請始終用兩句話回答。', restore: true }
+    ];
+    for (const sample of cases) {
+        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+        await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
+        await context.addInitScript(({ saved, readOnly }) => {
+            const set = Storage.prototype.setItem;
+            if (!sessionStorage.getItem('persona-migration-seeded')) {
+                set.call(localStorage, 'nt_character_persona_v1', saved);
+                set.call(sessionStorage, 'persona-migration-seeded', '1');
+            }
+            window.personaWriteAttempts = 0;
+            Storage.prototype.setItem = function (key, value) {
+                if (this === localStorage && key === 'nt_character_persona_v1') {
+                    personaWriteAttempts++;
+                    if (readOnly) throw new DOMException('denied', 'SecurityError');
+                }
+                return set.call(this, key, value);
+            };
+        }, sample);
+        const page = await context.newPage();
+        const errors = []; page.on('pageerror', error => errors.push(error.message));
+        try {
+            await boot(page);
+            const edit = () => page.getByRole('button', { name: '角色設定', exact: true }).click();
+            const prompt = page.getByRole('textbox', { name: '角色提示詞', exact: true });
+            await edit(); assert.equal(await prompt.inputValue(), sample.expected, sample.name + ': editor uses the correct active prompt');
+            await page.getByRole('button', { name: '取消', exact: true }).click();
+            await send(page, '預設更新後的第一則訊息'); await complete(page);
+            assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), sample.expected, sample.name + ': next request uses the active prompt');
+            assert.equal(await page.evaluate(() => localStorage.getItem('nt_character_persona_v1')), sample.saved, 'reading and sending never replace saved prompt text');
+            assert.equal(await page.evaluate(() => personaWriteAttempts), 0, 'migration does not even attempt a storage write');
+            await boot(page); await edit();
+            assert.equal(await prompt.inputValue(), sample.expected, sample.name + ': mapping survives reload without rewriting storage');
+            assert.equal(await page.evaluate(() => localStorage.getItem('nt_character_persona_v1')), sample.saved);
+            assert.equal(await page.evaluate(() => personaWriteAttempts), 0);
+            if (sample.restore) {
+                await page.getByRole('button', { name: '恢復預設', exact: true }).click();
+                assert.equal(await prompt.inputValue(), defaults.defaultPrompt, 'Restore always targets the latest shipped prompt');
+                assert.equal(await page.evaluate(() => localStorage.getItem('nt_character_persona_v1')), sample.saved, 'Restore remains a draft until Save');
+                await page.getByRole('button', { name: '儲存設定', exact: true }).click();
+                await send(page, '恢復新版預設後的訊息'); await complete(page);
+                assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), defaults.defaultPrompt);
+                assert.equal(await page.evaluate(() => localStorage.getItem('nt_character_persona_v1')), defaults.defaultPrompt);
+                assert.equal(await page.evaluate(() => personaWriteAttempts), 1, 'only the explicit Save writes the revised default');
+            }
+            assert.deepEqual(errors, []);
+        } finally { await context.close(); }
+    }
+    console.log('PASS persona migration: exact old defaults only, custom text preserved, zero migration writes, reload/request/Restore use current default');
+}
+
 async function checkPersona(browser) {
     const defaults = require('../js/character-persona.js');
     assert.equal(defaults.maxLength, 8000);
@@ -263,6 +324,7 @@ async function checkLazyTransportAndPlacement(browser) {
 (async () => {
     const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
     try {
+        await checkPersonaMigration(browser);
         await checkPersona(browser);
         await checkConnectionLifecycle(browser);
         await checkLazyTransportAndPlacement(browser);

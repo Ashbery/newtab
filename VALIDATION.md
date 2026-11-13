@@ -1,4 +1,21 @@
-# Release 2026.11.14.4
+# Release 2026.11.14.5
+
+Validation date:2026-11-14 (Asia/Taipei).
+
+- Revised the shared Nacho default using verified public character details, the official profile's drawing/gaming/pineapple-pizza interests, and AVIOT's description of a relaxed voice. Original Traditional Chinese conversation guidance and examples give the page a coherent, gentle and playful voice. Source limitations and the distinction between reference facts and interpretation are recorded in [CHARACTER_PERSONA.md](CHARACTER_PERSONA.md).
+- Read-time migration upgrades only an exact match of the previous shipped default. Edited prompts, including a single added character, are preserved. No migration storage write occurs, so read-only storage still works. Restore/Save continues to be explicit.
+- Bumped the persona and chat script URLs. Updated the idle installed helper's shared default and restarted only its owned process; encrypted account storage was untouched.
+
+| Verification | Observed result |
+| --- | --- |
+| Browser regression | Full character-chat suite passed, including legacy/default/custom migration, blocked writes, reload, next-message payload, explicit Restore/Save, imports, lifecycle and responsive dialog coverage. |
+| Backend/transport |25/25 tests passed, including per-request persona, shared default, limits and existing authentication/streaming protections. |
+| Real default response | Isolated Brave loaded the updated source through the actual newtab extension with the existing authorized helper. An unedited default request produced a short Traditional Chinese reply about drawing, gaming and pineapple pizza, with57 streamed deltas and1 completion. The full current prompt was present in the request; no model override or new tab. |
+| Review | Independently verified the legacy text against the previous commit byte-for-byte; syntax and whitespace checks passed. Existing custom prompts remain user-owned. |
+
+This is a prompt/content update, not a new animation or layout implementation. Earlier motion, resolution and video-loop results below remain historical. Test evidence stays in ignored `.impeccable/review/`.
+
+# Release 2026.11.14.4 (historical results)
 
 Validation date:2026-11-14 (Asia/Taipei).
 
