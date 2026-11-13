@@ -19,7 +19,7 @@
         disconnect: function () { return request('/disconnect', {}); },
         stream: async function (options) {
             var response = await fetch(base + '/chat', { method: 'POST', headers: headers,
-                body: JSON.stringify({ messages: options.messages, model: options.model }), signal: options.signal });
+                body: JSON.stringify({ messages: options.messages, characterPrompt: options.characterPrompt }), signal: options.signal });
             if (!response.ok) { var failure = await response.json(); throw new Error(failure.error && failure.error.message || '暫時無法取得回覆。'); }
             var reader = response.body.getReader(), decoder = new TextDecoder(), pending = '', text = '', completed = false;
             try {

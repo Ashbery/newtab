@@ -1,4 +1,26 @@
-# Release 2026.11.14.3
+# Release 2026.11.14.4
+
+Validation date:2026-11-14 (Asia/Taipei).
+
+- Removed the model selector and model override from website requests. Responses use a30px portrait and **Nacho** signature; account login retains its ChatGPT name.
+- Added editable/importable character instructions with a shared default, explicit Save/Cancel/Restore, local persistence and an8,000-character limit. `.txt`/`.md` imports use strict UTF-8; invalid/oversized inputs and failed storage writes preserve the saved setting. Every next request carries the saved persona. The helper enforces the same limits and retains its actual no-tools capability boundary.
+- Completed replies render basic bold/list/inline-code formatting with DOM text nodes, never raw HTML. Streaming and all cancellation/lifecycle safeguards remain.
+- Raised render targets from WebGL30 to90FPS and Canvas2D24 to60FPS. Fractional frame budgets prevent cadence loss; time-based pointer smoothing keeps movement speed unchanged. Reused Canvas mesh points reduce allocation pressure. Visibility/editing/reduced-motion pauses remain intact.
+- Added versioned URLs for the changed chat/motion scripts and stylesheet, preventing an updated page from mixing their old cached implementations.
+
+| Verification | Observed result |
+| --- | --- |
+| Motion |9/9 Brave suites passed, including WebGL-disabled rendering, context loss, hidden-frame pause, mode persistence and deterministic60/120/144/240Hz cadence/time tests. |
+| Measured cadence |In isolated Brave at DPR2 with approximately200Hz RAF callbacks: WebGL28.79→90.00FPS; Canvas2D21.98→60.00FPS. JS draw p95 stayed0.10ms/0.60ms. These are measured render callbacks, not physical display certification; a60Hz display presents at most60FPS. |
+| Chat and persona |Full fixture suite passed: import/edit/save/reset/cancel/reload; failed persistence, invalid UTF-8, Unicode/length bounds, older-helper capability checks; safe formatting, no selector/override, streaming/IME/retry/stop/focus and deferred lifecycle regressions. Desktop16:9/21:9/32:9 and1440/390/320px layouts reviewed. |
+| Independent review |Separate reviewer checked UI/import/backend boundaries and ran320/390/1440px browser flows. No unresolved findings. |
+| Backend/transport |25/25 tests passed, covering exact per-request prompt/defaults, bounds, safe request shape, busy/capabilities, existing authentication/stream/cancel protections, UTF-8 and DPAPI. |
+| Existing UI |All four desktop/mobile × normal/reduced-motion regression scenarios passed. |
+| Real authorized inference |Actual Brave extension loading the new source reached the installed helper1.1.0 with the owner's existing authorization. Imported and saved a test `.md` persona; the model returned「Nacho 的角色設定已載入」with8 deltas,1 completion, correct Nacho avatar/name and thinking/speaking/idle reactions, no model override and no new tab. No account identity or tokens are included in public evidence. |
+
+The installed helper was updated while preserving its encrypted account and startup configuration. Test/browser evidence stays in ignored `.impeccable/review/`. Earlier release results below are historical.
+
+# Release 2026.11.14.3 (historical results)
 
 Validation date: 2026-11-14 (Asia/Taipei). This release corrects the previous test definition of an "edge": placement now reaches the **actual viewport** rather than the edges of the centered 1344px composition.
 

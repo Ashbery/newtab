@@ -189,3 +189,92 @@ test('embedded new-tab frame animates while visible and pauses when its frame is
         await frame.waitForFunction(() => NewtabCompanion.getState('companion-1').motion === 'running');
     } finally { await context.close(); }
 });
+
+test('RAF pacing reaches the display-limited target at 60, 120, 144 and 240 Hz without speeding up motion', async () => {
+    for (const fallback of [false, true]) for (const hz of [60, 120, 144, 240]) {
+        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
+        try {
+            await context.addInitScript(({ fallback }) => {
+                if (fallback) {
+                    const getContext = HTMLCanvasElement.prototype.getContext;
+                    HTMLCanvasElement.prototype.getContext = function (kind, ...args) { return kind === 'webgl' ? null : getContext.call(this, kind, ...args); };
+                }
+                let serial = 0, now = 1000;
+                const callbacks = new Map();
+                window.requestAnimationFrame = callback => { callbacks.set(++serial, callback); return serial; };
+                window.cancelAnimationFrame = id => callbacks.delete(id);
+                window.__companionClock = { step(delta) {
+                    now += delta; const batch = Array.from(callbacks.entries());
+                    for (const [id, callback] of batch) if (callbacks.has(id)) { callbacks.delete(id); callback(now); }
+                } };
+            }, { fallback });
+            const page = await context.newPage(); await page.goto(url);
+            await page.waitForFunction(() => NewtabCompanion.getState('companion-1')?.motion === 'running', null, { polling: 50 });
+            const result = await page.evaluate(hz => {
+                __companionClock.step(0);
+                const before = NewtabCompanion.getState('companion-1');
+                const trigger = document.querySelector('.companion-trigger'), box = trigger.getBoundingClientRect();
+                trigger.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'mouse', clientX: box.right, clientY: box.top + box.height / 2, bubbles: true }));
+                for (let i = 0; i < hz / 2; i++) __companionClock.step(1000 / hz);
+                const halfSecond = NewtabCompanion.getState('companion-1');
+                for (let i = 0; i < hz * 2.5; i++) __companionClock.step(1000 / hz);
+                const after = NewtabCompanion.getState('companion-1');
+                return { renderer: after.renderer, target: after.targetFps, frames: after.frames - before.frames,
+                    seconds: after.animationTime - before.animationTime, pointer: halfSecond.pointerX };
+            }, hz);
+            const target = fallback ? 60 : 90;
+            assert.equal(result.renderer, fallback ? 'canvas2d' : 'webgl');
+            assert.equal(result.target, target);
+            assert.ok(Math.abs(result.frames - Math.min(hz, target) * 3) <= 1, JSON.stringify({ hz, ...result }));
+            assert.ok(Math.abs(result.seconds - 3) < .001, 'Animation speed follows elapsed time at every display refresh rate');
+            assert.ok(Math.abs(result.pointer - (1 - Math.pow(.82, 15))) < .001, 'Pointer easing retains its original half-second response');
+            if (hz === 144) {
+                await page.evaluate(() => NewtabWidgets.enterArrange());
+                await page.waitForFunction(() => NewtabCompanion.getState('companion-1').motion === 'paused', null, { polling: 50 });
+                const paused = await page.evaluate(() => { __companionClock.step(10000); return NewtabCompanion.getState('companion-1'); });
+                await page.evaluate(() => NewtabWidgets.exitArrange());
+                await page.waitForFunction(() => NewtabCompanion.getState('companion-1').motion === 'running', null, { polling: 50 });
+                const resumed = await page.evaluate(() => { __companionClock.step(0); return NewtabCompanion.getState('companion-1'); });
+                assert.equal(resumed.animationTime, paused.animationTime, 'A paused interval never fast-forwards the pose');
+            }
+        } finally { await context.close(); }
+    }
+});
+
+test('real Brave rendering sustains the higher target with and without WebGL', async () => {
+    const results = [];
+    for (const fallback of [false, true]) {
+        const measuredBrowser = await chromium.launch({ headless: true, ...browserOptions, args: fallback ? ['--disable-webgl'] : [] });
+        try {
+            const page = await measuredBrowser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, reducedMotion: 'no-preference' });
+            await page.goto(url);
+            await page.waitForFunction(() => NewtabCompanion.getState('companion-1')?.motion === 'running');
+            // Warm up image upload and the first visible render before sampling.
+            await page.waitForTimeout(300);
+            const measured = await page.evaluate(() => new Promise(resolve => {
+                let start, initialFrames, rafs = 0, previous = -1;
+                const costs = [];
+                function sample(now) {
+                    const state = NewtabCompanion.getState('companion-1');
+                    if (start === undefined) { start = now; initialFrames = state.frames; }
+                    else rafs++;
+                    if (state.frames !== previous) { costs.push(state.drawMs); previous = state.frames; }
+                    const duration = now - start;
+                    if (duration >= 2500) {
+                        costs.sort((a, b) => a - b);
+                        resolve({ renderer: state.renderer, targetFps: state.targetFps, fps: (state.frames - initialFrames) * 1000 / duration,
+                            rafHz: rafs * 1000 / duration, medianDrawMs: costs[Math.floor(costs.length / 2)], p95DrawMs: costs[Math.floor(costs.length * .95)] });
+                    } else requestAnimationFrame(sample);
+                }
+                requestAnimationFrame(sample);
+            }));
+            results.push(measured);
+            assert.equal(measured.renderer, fallback ? 'canvas2d' : 'webgl');
+            const displayLimited = Math.min(measured.targetFps, measured.rafHz);
+            assert.ok(measured.fps >= displayLimited * .85, JSON.stringify(measured));
+            assert.ok(measured.fps <= measured.targetFps * 1.05, 'The target caps unnecessary rendering above the selected rate');
+        } finally { await measuredBrowser.close(); }
+    }
+    require('node:fs').writeFileSync('.impeccable/review/companion-motion-performance.json', JSON.stringify(results, null, 2));
+    console.log('Character motion performance:', JSON.stringify(results));
+});

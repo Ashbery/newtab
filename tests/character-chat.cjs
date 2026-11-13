@@ -12,15 +12,17 @@ async function boot(page) {
         window.chatTest = { available: true, connected: true, mode: 'normal', calls: [], reactions: [], loginCalls: 0, disconnectCalls: 0 };
         document.addEventListener('newtab:chat-state', e => chatTest.reactions.push(e.detail));
         window.NewtabChatTransport = {
-            async status() { return { available: chatTest.available, connected: chatTest.connected, canChat: chatTest.available && chatTest.connected,
+            async status() { return { capabilities: { characterPrompt: true }, available: chatTest.available, connected: chatTest.connected, canChat: chatTest.available && chatTest.connected,
                 accountLabel: '測試連線', models: [{ slug: 'test-model', displayName: '測試模型' }, { slug: 'test-other', displayName: '另一個測試模型' }] }; },
             async login() { chatTest.loginCalls++; chatTest.connected = true; return { opened: true }; },
             async disconnect() { chatTest.disconnectCalls++; chatTest.connected = false; },
-            async stream({ messages, model, signal, onDelta }) {
-                chatTest.calls.push({ messages, model });
+            async stream(options) {
+                const { messages, characterPrompt, signal, onDelta } = options;
+                chatTest.calls.push({ messages, characterPrompt, hasModel: Object.hasOwn(options, 'model') });
                 if (chatTest.mode === 'long') { const text = '長'.repeat(18000); onDelta(text); return { text }; }
                 if (chatTest.mode === 'oversize') { const text = '長'.repeat(65000); onDelta(text); return { text }; }
                 if (chatTest.mode === 'oversize-final') return { text: '長'.repeat(65000) };
+                if (chatTest.mode === 'markdown') { const text = '**一起慢慢來**\n\n- 喝一口水\n- <img src=x onerror="window.chatXss=true">\n\n這是 `文字`。'; onDelta(text); return { text }; }
                 if (chatTest.mode === 'failure') { onDelta('部分內容'); throw new Error('測試連線中斷，請重試。'); }
                 if (chatTest.mode === 'hold') {
                     onDelta('正在輸出的內容');
@@ -42,6 +44,108 @@ async function send(page, text) {
 }
 async function complete(page) { await page.getByRole('status').filter({ hasText: '回覆完成。' }).waitFor(); }
 
+async function checkPersona(browser) {
+    const defaults = require('../js/character-persona.js');
+    assert.equal(defaults.maxLength, 8000);
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
+    const page = await context.newPage();
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    await boot(page);
+    const edit = () => page.getByRole('button', { name: '角色設定', exact: true }).click();
+    const prompt = page.getByRole('textbox', { name: '角色提示詞', exact: true });
+    const save = () => page.getByRole('button', { name: '儲存設定', exact: true }).click();
+    await edit();
+    assert.equal(await prompt.inputValue(), defaults.defaultPrompt, 'browser and server share the same default persona');
+    await prompt.fill('尚未儲存的草稿');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), true, 'Escape cancels settings before closing chat');
+    await edit(); assert.equal(await prompt.inputValue(), defaults.defaultPrompt, 'cancel discards only the prompt draft');
+    const custom = '你是 Nacho。請用溫柔、簡短的繁體中文陪我規劃今天。';
+    await prompt.fill(custom); await save();
+    await send(page, '角色設定測試'); await complete(page);
+    assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), custom);
+    assert.equal(await page.evaluate(() => chatTest.calls.at(-1).hasModel), false);
+    assert.equal(await page.evaluate(() => chatTest.loginCalls + chatTest.disconnectCalls), 0, 'saving persona never changes account state');
+    await edit();
+    const importFile = page.locator('input[aria-label="匯入角色提示詞"]');
+    const invalidFiles = [
+        { name: 'bad.png', mimeType: 'image/png', buffer: Buffer.from('image') },
+        { name: 'empty.txt', mimeType: 'text/plain', buffer: Buffer.from('   ') },
+        { name: 'long.md', mimeType: 'text/markdown', buffer: Buffer.from('字'.repeat(8001)) },
+        { name: 'invalid.txt', mimeType: 'text/plain', buffer: Buffer.from([0xff, 0xfe, 0xff]) }
+    ];
+    for (const file of invalidFiles) {
+        await importFile.setInputFiles(file);
+        await page.waitForFunction(() => !document.getElementById('character-chat-prompt').disabled);
+        assert.equal(await prompt.inputValue(), custom, 'invalid import preserves the draft');
+        assert.match(await page.locator('.character-chat-prompt-notice').textContent(), /請|最多|無法/);
+    }
+    await prompt.fill('🐱'.repeat(4001));
+    assert.equal(await page.getByRole('button', { name: '儲存設定', exact: true }).isDisabled(), true, 'prompt length uses the backend UTF-16 limit');
+    assert.equal(await prompt.getAttribute('aria-invalid'), 'true');
+    const imported = '# Nacho\n請用平靜的語氣回答。<script>window.personaXss=true</script>';
+    await importFile.setInputFiles({ name: 'nacho.md', mimeType: 'text/markdown', buffer: Buffer.from(imported) });
+    await page.waitForFunction(value => document.getElementById('character-chat-prompt').value === value, imported);
+    assert.equal(await page.evaluate(() => localStorage.getItem('nt_character_persona_v1')), custom, 'import alone does not save or execute the prompt');
+    assert.equal(await page.evaluate(() => chatTest.calls.length), 1, 'import makes no conversation request');
+    assert.equal(await page.evaluate(() => window.personaXss), undefined);
+    const edited = imported + '\n請先回答重點。';
+    await prompt.fill(edited); await save();
+    await send(page, '第二次角色測試'); await complete(page);
+    assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), edited);
+    await boot(page);
+    await edit(); assert.equal(await prompt.inputValue(), edited, 'saved prompt survives reload');
+    assert.equal(await page.locator('.character-chat-message.is-user').count(), 2, 'settings do not clear conversation history');
+    await page.getByRole('button', { name: '恢復預設', exact: true }).click();
+    assert.equal(await prompt.inputValue(), defaults.defaultPrompt);
+    assert.equal(await page.evaluate(() => localStorage.getItem('nt_character_persona_v1')), edited, 'reset changes draft until explicitly saved');
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    await edit(); assert.equal(await prompt.inputValue(), edited);
+    await page.getByRole('button', { name: '恢復預設', exact: true }).click(); await save();
+    assert.equal(await page.locator('.character-chat-message.is-user').count(), 2, 'default reset affects only the prompt');
+    await send(page, '預設角色測試'); await complete(page);
+    assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), defaults.defaultPrompt);
+
+    await edit(); await prompt.fill('儲存失敗不應套用這段內容。');
+    await page.evaluate(() => {
+        window.originalStorageSet = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) { if (key === 'nt_character_persona_v1') throw new DOMException('denied', 'SecurityError'); return originalStorageSet.call(this, key, value); };
+    });
+    await save();
+    assert.equal(await page.locator('.character-chat-settings').isVisible(), true);
+    assert.match(await page.locator('.character-chat-prompt-notice').textContent(), /無法儲存.*原設定仍保留/);
+    await page.evaluate(() => { Storage.prototype.setItem = originalStorageSet; });
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    await page.evaluate(() => { chatTest.mode = 'markdown'; });
+    await send(page, '格式測試'); await complete(page);
+    assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), defaults.defaultPrompt, 'failed save leaves the active prompt intact');
+    const reply = page.locator('.character-chat-message.is-assistant .character-chat-text').last();
+    assert.equal(await reply.locator('strong').textContent(), '一起慢慢來');
+    assert.equal(await reply.locator('li').count(), 2);
+    assert.equal(await reply.locator('code').textContent(), '文字');
+    assert.equal(await reply.locator('img,script').count(), 0, 'limited markdown never creates model-supplied HTML');
+    assert.equal(await page.evaluate(() => window.chatXss), undefined);
+    await page.screenshot({ path: '.impeccable/review/chat-nacho-replies.png' });
+    await edit(); await page.screenshot({ path: '.impeccable/review/chat-nacho-settings-1440.png' });
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.getByRole('button', { name: '儲存設定', exact: true }).scrollIntoViewIfNeeded();
+    assert.equal(await page.locator('.character-chat-settings').evaluate(el => el.scrollWidth <= el.clientWidth), true, 'settings fit a narrow screen without horizontal overflow');
+    await page.screenshot({ path: '.impeccable/review/chat-nacho-settings-320.png' });
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    await page.evaluate(() => {
+        NewtabChatTransport.status = async () => ({ available: true, connected: true, canChat: true });
+        NewtabCharacterChat.refresh();
+    });
+    await page.waitForFunction(() => document.querySelector('.character-chat-connection').textContent === '請更新對話服務');
+    await page.locator('#character-chat-input').fill('舊服務不應忽略角色設定');
+    assert.equal(await page.locator('.character-chat-send').isDisabled(), true);
+    assert.match(await page.locator('.character-chat-status').textContent(), /需要更新/);
+    assert.deepEqual(errors, []);
+    await context.close();
+    console.log('PASS Nacho persona: shared default, edit/import/cancel/reset/persistence, UTF-16 limits, storage errors, no model UI, safe markdown, older-service guard');
+}
+
 async function checkConnectionLifecycle(browser) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
@@ -56,7 +160,7 @@ async function checkConnectionLifecycle(browser) {
     });
     assert.equal(await page.evaluate(() => connectionProbe.requests.length), 2, 'reopening requests fresh status even while the old request is pending');
     await page.locator('#character-chat-input').fill('尚未傳送');
-    await page.evaluate(() => connectionProbe.requests[0]({ available: true, connected: false, canChat: false, error: 'STALE_STATUS' }));
+    await page.evaluate(() => connectionProbe.requests[0]({ capabilities: { characterPrompt: true }, available: true, connected: false, canChat: false, error: 'STALE_STATUS' }));
     await page.waitForTimeout(30);
     assert.equal(await page.locator('.character-chat-refresh').isDisabled(), true, 'old finally cannot release the new status request');
     assert.equal(await page.locator('.character-chat-send').isDisabled(), true);
@@ -64,7 +168,7 @@ async function checkConnectionLifecycle(browser) {
     await page.keyboard.press('Enter');
     await page.locator('.character-chat-composer').evaluate(form => form.requestSubmit());
     assert.equal(await page.evaluate(() => chatTest.calls.length), 0, 'keyboard and form submission wait for connection checks');
-    await page.evaluate(() => connectionProbe.requests[1]({ available: true, connected: true, canChat: true, accountLabel: '最新連線' }));
+    await page.evaluate(() => connectionProbe.requests[1]({ capabilities: { characterPrompt: true }, available: true, connected: true, canChat: true, accountLabel: '最新連線' }));
     await page.waitForFunction(() => document.querySelector('.character-chat-connection').textContent === '最新連線');
 
     await page.evaluate(() => { chatTest.mode = 'failure'; });
@@ -81,7 +185,7 @@ async function checkConnectionLifecycle(browser) {
     await page.locator('.character-chat-retry').dispatchEvent('click');
     assert.equal(await page.evaluate(() => chatTest.calls.length), sentBeforeDisconnect, 'send and retry handlers reject actions during disconnect');
     await page.evaluate(() => {
-        NewtabChatTransport.status = async () => ({ available: true, connected: false, canChat: false });
+        NewtabChatTransport.status = async () => ({ capabilities: { characterPrompt: true }, available: true, connected: false, canChat: false });
         connectionProbe.disconnect();
     });
     await page.waitForFunction(() => !document.querySelector('.character-chat-connect-button').disabled);
@@ -91,7 +195,7 @@ async function checkConnectionLifecycle(browser) {
     await page.getByRole('button', { name: '使用 ChatGPT 登入', exact: true }).click();
     await page.evaluate(() => {
         NewtabCharacterChat.close();
-        NewtabChatTransport.status = async () => { connectionProbe.statusCalls++; return { available: true, connected: false, canChat: false, error: 'FRESH_STATUS' }; };
+        NewtabChatTransport.status = async () => { connectionProbe.statusCalls++; return { capabilities: { characterPrompt: true }, available: true, connected: false, canChat: false, error: 'FRESH_STATUS' }; };
         NewtabCharacterChat.open('companion-1');
     });
     await page.waitForFunction(() => document.querySelector('.character-chat-status').textContent === 'FRESH_STATUS');
@@ -105,7 +209,7 @@ async function checkConnectionLifecycle(browser) {
         NewtabCharacterChat.close(); connectionProbe.statusCalls = 0;
         NewtabChatTransport.status = async () => {
             connectionProbe.statusCalls++;
-            return connectionProbe.statusCalls === 1 ? { available: true, connected: false, canChat: false, connecting: true } : { available: true, connected: true, canChat: true, accountLabel: '登入完成' };
+            return connectionProbe.statusCalls === 1 ? { capabilities: { characterPrompt: true }, available: true, connected: false, canChat: false, connecting: true } : { capabilities: { characterPrompt: true }, available: true, connected: true, canChat: true, accountLabel: '登入完成' };
         };
         NewtabCharacterChat.open('companion-1');
     });
@@ -114,7 +218,7 @@ async function checkConnectionLifecycle(browser) {
     for (const mode of ['oversize', 'oversize-final']) {
         await page.evaluate(mode => { chatTest.mode = mode; }, mode);
         await send(page, '過長回覆測試');
-        await page.waitForFunction(() => document.querySelector('.character-chat-status').textContent === '回覆過長，已停止；可請 GPT 分段回答');
+        await page.waitForFunction(() => document.querySelector('.character-chat-status').textContent === '回覆過長，已停止；可請 Nacho 分段回答');
         assert.equal(await page.locator('.character-chat-message.is-assistant .character-chat-text').last().evaluate(el => el.textContent.length), 64000);
         assert.equal(await page.locator('.character-chat-message-note').last().textContent(), '回覆過長，已停止');
     }
@@ -131,7 +235,7 @@ async function checkLazyTransportAndPlacement(browser) {
         if (url.origin === 'http://127.0.0.1:43127') {
             serviceCalls.push(url.pathname);
             // Real transport, fixture status only: no login or model calls.
-            return route.fulfill({ json: { available: true, connected: false, canChat: false } });
+            return route.fulfill({ json: { capabilities: { characterPrompt: true }, available: true, connected: false, canChat: false } });
         }
         return route.abort();
     });
@@ -159,6 +263,7 @@ async function checkLazyTransportAndPlacement(browser) {
 (async () => {
     const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
     try {
+        await checkPersona(browser);
         await checkConnectionLifecycle(browser);
         await checkLazyTransportAndPlacement(browser);
         for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 640 }]) {
@@ -173,7 +278,8 @@ async function checkLazyTransportAndPlacement(browser) {
             assert.equal(await page.evaluate(() => !!document.activeElement.closest('.character-chat-dialog')), true, 'native modal keeps keyboard focus in chat');
             const bounds = await page.locator('.character-chat-dialog').boundingBox();
             assert(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width + 1 && bounds.y + bounds.height <= viewport.height + 1, 'chat sheet fits');
-            await page.locator('[aria-label="對話模型"]').selectOption('test-other');
+            assert.equal(await page.locator('[aria-label="對話模型"]').count(), 0, 'the service chooses the model; no model controls appear');
+            assert.equal(await page.locator('#character-chat-title').textContent(), 'Nacho');
             await page.locator('#character-chat-input').fill('中文確認');
             await page.locator('#character-chat-input').evaluate(input => {
                 input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
@@ -185,7 +291,10 @@ async function checkLazyTransportAndPlacement(browser) {
             assert.equal(await page.evaluate(() => chatTest.calls.length), 0, 'Shift+Enter inserts newline');
             await page.keyboard.press('Enter'); await complete(page);
             assert.equal(await page.evaluate(() => chatTest.calls.length), 1);
-            assert.equal(await page.evaluate(() => chatTest.calls[0].model), 'test-other');
+            assert.equal(await page.evaluate(() => chatTest.calls[0].hasModel), false);
+            assert.equal(await page.evaluate(() => chatTest.calls[0].characterPrompt === NewtabCharacterPersona.defaultPrompt), true);
+            assert.equal(await page.locator('.character-chat-message.is-assistant .character-chat-speaker').first().textContent(), 'Nacho');
+            assert.equal((await page.locator('.character-chat-reply-avatar').first().boundingBox()).width, 30);
             assert.equal(await page.locator('.character-chat-text img').count(), 0, 'assistant HTML is rendered as plain text');
             assert.equal(await page.evaluate(() => window.chatXss), undefined);
             assert.deepEqual(await page.evaluate(() => [...new Set(chatTest.reactions.map(x => x.state))]), ['thinking', 'speaking', 'idle']);
@@ -241,7 +350,7 @@ async function checkLazyTransportAndPlacement(browser) {
             assert.deepEqual(errors, []);
             await page.screenshot({ path: `.impeccable/review/chat-${viewport.width}.png` });
             await context.close();
-            console.log(`PASS chat ${viewport.width}×${viewport.height}: sizing, IME, streaming, literal rendering, retry/stop, history/clear, connection/model, focus`);
+            console.log(`PASS chat ${viewport.width}×${viewport.height}: sizing, IME, streaming, literal rendering, retry/stop, history/clear, Nacho identity/prompt contract, focus`);
         }
     } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -4,7 +4,29 @@
     var instances = new Map();
     var ART = 'assets/character/nacho-companion.webp';
     var BLINK = 'assets/character/nacho-blink.webp';
-    var FRAME_INTERVAL = 1000 / 30;
+    var WEBGL_FPS = 90, CANVAS_FPS = 60;
+    // Match the previous 30 Hz response without making the gaze catch up
+    // faster on high-refresh screens.
+    var POINTER_RESPONSE_MS = -(1000 / 30) / Math.log(.82);
+
+    function createFramePacer() {
+        var previous = null, budget = 0, sincePaint = 0;
+        return {
+            reset: function () { previous = null; budget = sincePaint = 0; },
+            advance: function (now, interval) {
+                if (previous === null) { previous = now; return 0; }
+                var delta = Math.max(0, now - previous); previous = now;
+                budget += delta; sincePaint += delta;
+                // Keep the fractional remainder. Resetting the deadline to
+                // "now" would turn 90 fps into 72 fps on a 144 Hz screen.
+                // The tiny tolerance only absorbs timestamp rounding.
+                if (budget + .05 < interval) return null;
+                budget = Math.max(0, budget - Math.floor((budget + .05) / interval) * interval);
+                var elapsed = sincePaint; sincePaint = 0;
+                return elapsed;
+            }
+        };
+    }
 
     function animationMode(options) {
         if (['auto', 'on', 'off'].indexOf(options.animationMode) >= 0) return options.animationMode;
@@ -97,7 +119,7 @@
             var uniforms = {};
             ['time','motion','greet','pointer','blink'].forEach(function (name) { uniforms[name] = gl.getUniformLocation(program, 'u_' + name); });
             return {
-                kind: 'webgl', frameInterval: FRAME_INTERVAL,
+                kind: 'webgl', frameInterval: 1000 / WEBGL_FPS,
                 draw: function (state) {
                     gl.viewport(0, 0, canvas.width, canvas.height);
                     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -139,14 +161,16 @@
         }
         var blended = document.createElement('canvas'); blended.width = source.width; blended.height = source.height;
         var blendPainter = blended.getContext('2d');
-        var cols = 8, rows = 12, nodes = [], cells = [];
-        for (var row = 0; row <= rows; row++) for (var col = 0; col <= cols; col++) nodes.push({ x: col / cols, y: row / rows });
+        var cols = 8, rows = 12, nodes = [], warped = [], cells = [];
+        for (var row = 0; row <= rows; row++) for (var col = 0; col <= cols; col++) {
+            nodes.push({ x: col / cols, y: row / rows }); warped.push({ x: 0, y: 0 });
+        }
         for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) {
             var i = y * (cols + 1) + x;
             cells.push([i, i + 1, i + cols + 1], [i + cols + 1, i + 1, i + cols + 2]);
         }
         function smooth(a, b, v) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
-        function deform(uv, s) {
+        function deform(uv, s, point) {
             var x = uv.x, y = uv.y, head = 1 - smooth(.38, .55, y);
             var breath = Math.sin(s.time * 1.35) * .005 * s.motion;
             y -= breath * (.38 + .62 * head); x += (x - .5) * breath * smooth(.4, .7, y);
@@ -162,7 +186,14 @@
             x += s.x * .0045 * head * s.motion; y += s.y * .0025 * head * s.motion;
             var plush = Math.max(0, 1 - Math.hypot((uv.x - .55) / .2, (uv.y - .65) / .15));
             y -= plush * s.greet * .005 * s.motion;
-            return { x: x * canvas.width, y: y * canvas.height };
+            point.x = x * canvas.width; point.y = y * canvas.height;
+        }
+        function tracePoint(point, centerX, centerY, first) {
+            // A subpixel overlap closes antialiased triangle seams without
+            // changing the source silhouette or creating separate layers.
+            var vx = point.x - centerX, vy = point.y - centerY, length = Math.hypot(vx, vy) || 1;
+            var x = point.x + vx / length * .6, y = point.y + vy / length * .6;
+            if (first) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         function drawTriangle(texture, a, b, c, p, q, r) {
             var ax = a.x * source.width, ay = a.y * source.height;
@@ -176,16 +207,11 @@
             var ee = p.x - aa * ax - cc * ay, ff = p.y - bb * ax - dd * ay;
             var centerX = (p.x + q.x + r.x) / 3, centerY = (p.y + q.y + r.y) / 3;
             ctx.save(); ctx.beginPath();
-            [p, q, r].forEach(function (point, index) {
-                // A subpixel overlap closes antialiased triangle seams. It does
-                // not change the source silhouette or create separate layers.
-                var vx = point.x - centerX, vy = point.y - centerY, length = Math.hypot(vx, vy) || 1;
-                ctx[index ? 'lineTo' : 'moveTo'](point.x + vx / length * .6, point.y + vy / length * .6);
-            });
+            tracePoint(p, centerX, centerY, true); tracePoint(q, centerX, centerY, false); tracePoint(r, centerX, centerY, false);
             ctx.closePath(); ctx.clip(); ctx.setTransform(aa, bb, cc, dd, ee, ff); ctx.drawImage(texture, 0, 0); ctx.restore();
         }
         return {
-            kind: 'canvas2d', frameInterval: 1000 / 24,
+            kind: 'canvas2d', frameInterval: 1000 / CANVAS_FPS,
             draw: function (state) {
                 ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
@@ -196,8 +222,13 @@
                     blendPainter.drawImage(eyes, 0, 0); blendPainter.globalAlpha = 1; texture = blended;
                 }
                 if (!state.motion) { ctx.drawImage(texture, 0, 0, canvas.width, canvas.height); return; }
-                var warped = nodes.map(function (node) { return deform(node, state); });
-                cells.forEach(function (cell) { drawTriangle(texture, nodes[cell[0]], nodes[cell[1]], nodes[cell[2]], warped[cell[0]], warped[cell[1]], warped[cell[2]]); });
+                // Reuse the mesh points rather than allocating a new point
+                // array on every frame; the fallback now paints at 60 fps.
+                for (var n = 0; n < nodes.length; n++) deform(nodes[n], state, warped[n]);
+                for (var c = 0; c < cells.length; c++) {
+                    var cell = cells[c];
+                    drawTriangle(texture, nodes[cell[0]], nodes[cell[1]], nodes[cell[2]], warped[cell[0]], warped[cell[1]], warped[cell[2]]);
+                }
             },
             destroy: function () { source.width = eyes.width = blended.width = 1; }
         };
@@ -221,7 +252,8 @@
         var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
         var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
         var mode = animationMode(options), chatState = 'idle';
-        var disposed = false, visible = true, frame = 0, lastFrame = 0, elapsed = 0, rig = null, greetUntil = 0, messageTimer = 0;
+        var disposed = false, visible = true, frame = 0, elapsed = 0, rig = null, greetUntil = 0, messageTimer = 0;
+        var pacer = createFramePacer();
         var target = { x: 0, y: 0 }, pointer = { x: 0, y: 0 };
         var state = { time: 0, motion: 0, greet: 0, x: 0, y: 0, blink: 0, frames: 0, drawMs: 0 };
         var blinkImage = new Image();
@@ -237,7 +269,7 @@
             if (disposed) return;
             if (shouldMove()) {
                 root.dataset.motion = 'running';
-                if (!frame) { lastFrame = 0; frame = requestAnimationFrame(tick); }
+                if (!frame) { pacer.reset(); frame = requestAnimationFrame(tick); }
             } else {
                 if (frame) cancelAnimationFrame(frame); frame = 0;
                 root.dataset.motion = !rig ? 'static' : mode === 'off' ? 'off' : mode === 'auto' && reduced.matches ? 'reduced' : 'paused';
@@ -247,10 +279,11 @@
         function tick(now) {
             frame = 0;
             if (!shouldMove()) return sync();
-            if (!lastFrame || now - lastFrame >= rig.frameInterval - 1) {
-                var delta = lastFrame ? Math.min(80, now - lastFrame) : FRAME_INTERVAL;
-                lastFrame = now; elapsed += delta;
-                pointer.x += (target.x - pointer.x) * .18; pointer.y += (target.y - pointer.y) * .18;
+            var delta = pacer.advance(now, rig.frameInterval);
+            if (delta !== null) {
+                elapsed += delta;
+                var follow = -Math.expm1(-delta / POINTER_RESPONSE_MS);
+                pointer.x += (target.x - pointer.x) * follow; pointer.y += (target.y - pointer.y) * follow;
                 state.time = elapsed / 1000; state.motion = 1; state.x = pointer.x; state.y = pointer.y;
                 state.greet = Math.max(0, Math.min(1, (greetUntil - now) / 600));
                 if (chatState === 'thinking') state.x += Math.sin(state.time * .7) * .3;
@@ -358,7 +391,7 @@
             destroy: destroy,
             setAnimation: function (value) { mode = ['auto', 'on', 'off'].indexOf(value) >= 0 ? value : value === false ? 'off' : 'on'; sync(); },
             setChatState: updateChatState,
-            state: function () { return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, mode: mode, enabled: mode !== 'off', reduced: reduced.matches, renderer: rig ? rig.kind : 'image', drawMs: state.drawMs, chatState: chatState }; }
+            state: function () { return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, mode: mode, enabled: mode !== 'off', reduced: reduced.matches, renderer: rig ? rig.kind : 'image', drawMs: state.drawMs, targetFps: rig ? Math.round(1000 / rig.frameInterval) : 0, animationTime: state.time, pointerX: pointer.x, pointerY: pointer.y, chatState: chatState }; }
         });
         return destroy;
     }

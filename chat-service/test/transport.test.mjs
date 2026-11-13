@@ -22,11 +22,13 @@ test('transport reconstructs split UTF-8 SSE, preserves delta order and sends no
   let request; const chunks = [];
   const api = load(async (url, options) => { request = { url, ...options }; return response(event('start', { model: 'test' }) + event('delta', { text: '你好🐾' }) + event('delta', { text: '，世界。' }) + event('done', { text: '你好🐾，世界。' })); });
   const messages = [{ role: 'user', content: '你好' }]; const signal = new AbortController().signal;
-  const result = await api.stream({ messages, signal, model: 'test', onDelta: text => chunks.push(text) });
+  const characterPrompt = '你是 Nacho，安靜溫柔的貓耳陪伴角色。';
+  const result = await api.stream({ messages, signal, characterPrompt, model: 'obsolete-client-value', onDelta: text => chunks.push(text) });
   assert.equal(result.text, '你好🐾，世界。'); assert.deepEqual(chunks, ['你好🐾', '，世界。']);
   assert.equal(request.url, 'http://127.0.0.1:43127/v1/chat'); assert.equal(request.signal, signal);
   assert.equal(request.headers['X-Newtab-Client'], '1');
-  assert.deepEqual(JSON.parse(request.body), { messages, model: 'test' });
+  assert.deepEqual(JSON.parse(request.body), { messages, characterPrompt });
+  assert.equal(Object.hasOwn(JSON.parse(request.body), 'model'), false, 'the website no longer sends a model selection');
   assert.ok(!Object.keys(request.headers).some(key => /authorization|cookie/i.test(key)));
 });
 

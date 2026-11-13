@@ -8,13 +8,15 @@ Requires Node.js 22.12 or newer and an eligible ChatGPT account. Run `powershell
 
 Click the character on the newtab page, allow browser access to this computer if prompted, then choose **使用 ChatGPT 登入**. Complete the OpenAI authorization in the browser. The panel updates automatically and all subsequent conversations happen inside the newtab. Plan eligibility, models, and usage are determined by OpenAI and the user's account. Disconnect in the panel to revoke the helper's authorization and remove local credentials.
 
+Version1.1.0 accepts the page's saved `characterPrompt` on every reply (nonblank text, at most8,000 UTF-16 code units). The page automatically uses the first model in the account's available catalog and does not show a model selector. The shared default lives in `js/character-persona.js`; the installer also copies it to `%LOCALAPPDATA%\AshberyNewtabChat\js`, next to the runtime directory. Updating the helper preserves encrypted account authorization. Older clients omitting a prompt receive the shared Nacho default; older explicit model values remain validated for compatibility.
+
 The Brave newtab wrapper must delegate `loopback-network` (and `local-network-access` for older Chromium versions) to its GitHub Pages iframe. The browser may still require the user to grant access. No browser security flag is disabled by this application.
 
 ## Data and boundaries
 
 - Listener: `127.0.0.1:43127`, loopback only. Exact Host and Origin checks plus a required non-simple header protect all routes. Only `https://ashbery.github.io` is allowed in production. A single explicit `NEWTAB_DEV_ORIGIN=http://127.0.0.1:<port>` may be added for development.
 - OAuth uses the official SDK's PKCE, state, nonce, signed ID-token validation, refresh and revocation. Credentials are protected with Windows DPAPI CurrentUser under `%LOCALAPPDATA%\AshberyNewtabChat\account`; no plaintext fallback, website storage, credential logging, or committed account files.
-- Conversation history is bounded and kept in the current tab's session storage. Only submitted user/assistant messages are sent to the selected OpenAI model. No tools, filesystem, browsing, or account-history access is provided. Responses use `store:false` and streaming; incomplete streams are errors, not successful replies.
+- Conversation history is bounded and kept in the current tab's session storage. The saved persona is kept in browser local storage. Submitted user/assistant messages and that persona are sent to OpenAI. Persona imports are UTF-8 plain text, never executed as code or used as API configuration. No tools, filesystem, browsing, or account-history access is provided. Responses use `store:false` and streaming; incomplete streams are errors, not successful replies.
 - The helper has one active response at a time. Closing/stopping the panel cancels it; abandoned requests time out. Failed or stopped assistant responses are excluded from later model context.
 - Origin checks trust all content at the GitHub Pages origin; unrelated applications must not be hosted there without considering that shared trust boundary. The OS account and website must remain trusted.
 

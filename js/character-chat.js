@@ -2,11 +2,14 @@
 (function (global) {
     'use strict';
     var STORAGE_KEY = 'nt_character_chat_session_v1';
+    var PERSONA_KEY = 'nt_character_persona_v1';
+    var persona = global.NewtabCharacterPersona;
     var MAX_MESSAGES = 40;
     var MAX_HISTORY_CHARS = 64000;
-    var state = { dialog: null, widgetId: null, opener: null, connected: false, canChat: false, available: false, model: '',
+    var state = { dialog: null, widgetId: null, opener: null, connected: false, canChat: false, available: false, personaSupported: false,
         checking: false, busy: false, controller: null, request: 0, messages: [], retryAt: -1,
-        loginTimer: 0, loginUntil: 0, connectionGeneration: 0, composing: false, followLatest: true };
+        loginTimer: 0, loginUntil: 0, connectionGeneration: 0, composing: false, followLatest: true,
+        characterPrompt: persona.defaultPrompt, personaEditing: false, personaGeneration: 0, personaImporting: false, personaReadError: '' };
     var ui = {};
 
     function transport() { return global.NewtabChatTransport; }
@@ -29,6 +32,10 @@
                 return { role: m.role, content: m.content.slice(0, 16000), status: m.status === 'complete' ? 'complete' : 'stopped' };
             });
         } catch (_) { state.messages = []; }
+        try {
+            var prompt = localStorage.getItem(PERSONA_KEY);
+            if (prompt && prompt.trim() && prompt.length <= persona.maxLength) state.characterPrompt = prompt;
+        } catch (_) { state.personaReadError = '無法讀取已儲存的角色設定，目前使用預設內容。'; }
     }
     function element(tag, className, text) {
         var el = document.createElement(tag);
@@ -41,6 +48,91 @@
         if (action) el.addEventListener('click', action);
         return el;
     }
+    function avatar(className) {
+        var frame = element('span', className || 'character-chat-avatar');
+        var image = new Image(); image.src = 'assets/character/nacho-companion.webp'; image.alt = '';
+        frame.appendChild(image); return frame;
+    }
+    function inlineText(target, text) {
+        var pattern = /\*\*([^*\n]+)\*\*|`([^`\n]+)`/g, match, end = 0;
+        while ((match = pattern.exec(text))) {
+            target.appendChild(document.createTextNode(text.slice(end, match.index)));
+            target.appendChild(element(match[1] !== undefined ? 'strong' : 'code', null, match[1] !== undefined ? match[1] : match[2]));
+            end = pattern.lastIndex;
+        }
+        target.appendChild(document.createTextNode(text.slice(end)));
+    }
+    function renderReply(target, text) {
+        target.replaceChildren();
+        if (!text) return;
+        text.split(/\n\s*\n/).forEach(function (block) {
+            var lines = block.split('\n');
+            var unordered = lines.every(function (line) { return /^\s*[-*+]\s+/.test(line); });
+            var ordered = lines.every(function (line) { return /^\s*\d+\.\s+/.test(line); });
+            if (unordered || ordered) {
+                var list = element(unordered ? 'ul' : 'ol');
+                lines.forEach(function (line) { var item = element('li'); inlineText(item, line.replace(unordered ? /^\s*[-*+]\s+/ : /^\s*\d+\.\s+/, '')); list.appendChild(item); });
+                target.appendChild(list);
+            } else { var paragraph = element('p'); inlineText(paragraph, block); target.appendChild(paragraph); }
+        });
+    }
+    function promptError(value) {
+        if (!value.trim()) return '請寫下角色的個性與說話方式，或恢復預設內容。';
+        if (value.length > persona.maxLength) return '角色提示詞最多 ' + persona.maxLength.toLocaleString() + ' 字元，請縮短後再儲存。';
+        return '';
+    }
+    function updatePromptControls() {
+        var error = promptError(ui.prompt.value);
+        ui.promptCount.textContent = ui.prompt.value.length.toLocaleString() + ' / ' + persona.maxLength.toLocaleString();
+        ui.promptCount.dataset.over = String(ui.prompt.value.length > persona.maxLength);
+        ui.promptSave.disabled = state.personaImporting || !!error;
+        ui.promptImport.disabled = state.personaImporting;
+        ui.promptReset.disabled = state.personaImporting;
+        ui.prompt.disabled = state.personaImporting;
+        ui.prompt.setAttribute('aria-invalid', String(!!error));
+    }
+    function editPersona() {
+        state.personaGeneration++; state.personaEditing = true; state.personaImporting = false;
+        ui.prompt.value = state.characterPrompt; ui.promptNotice.textContent = state.personaReadError;
+        ui.settings.hidden = false; state.dialog.classList.add('is-settings');
+        ui.personaToggle.setAttribute('aria-expanded', 'true');
+        updatePromptControls(); ui.prompt.focus(); ui.prompt.setSelectionRange(0, 0); ui.prompt.scrollTop = 0;
+    }
+    function closePersona(focus) {
+        state.personaGeneration++; state.personaEditing = false; state.personaImporting = false;
+        ui.settings.hidden = true; state.dialog.classList.remove('is-settings');
+        ui.personaToggle.setAttribute('aria-expanded', 'false');
+        if (focus) ui.personaToggle.focus();
+    }
+    function savePersona() {
+        if (!state.personaEditing || state.personaImporting) return;
+        var value = ui.prompt.value, error = promptError(value);
+        if (error) { ui.promptNotice.textContent = error; updatePromptControls(); return; }
+        try { localStorage.setItem(PERSONA_KEY, value); }
+        catch (_) { ui.promptNotice.textContent = '無法儲存角色設定，請確認瀏覽器允許儲存資料後重試。原設定仍保留。'; return; }
+        state.characterPrompt = value; state.personaReadError = '';
+        closePersona(true); announce('已儲存角色設定，下一則回覆開始套用。');
+    }
+    async function importPersona() {
+        var file = ui.promptFile.files && ui.promptFile.files[0]; ui.promptFile.value = '';
+        if (!file || !state.personaEditing) return;
+        if (!/\.(txt|md)$/i.test(file.name)) { ui.promptNotice.textContent = '請選擇 .txt 或 .md 文字檔。'; return; }
+        if (file.size > 64000) { ui.promptNotice.textContent = '檔案過長；角色提示詞最多 ' + persona.maxLength.toLocaleString() + ' 字元。'; return; }
+        var generation = state.personaGeneration;
+        state.personaImporting = true; updatePromptControls(); ui.promptNotice.textContent = '正在讀取文字檔…';
+        try {
+            var value = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer());
+            if (!state.personaEditing || generation !== state.personaGeneration) return;
+            if (value.includes('\u0000')) throw new Error('invalid_text');
+            var error = promptError(value);
+            if (error) { ui.promptNotice.textContent = error; return; }
+            ui.prompt.value = value; ui.prompt.scrollTop = 0; ui.promptNotice.textContent = '已匯入「' + file.name + '」。檢查內容後按「儲存設定」套用。';
+        } catch (_) {
+            if (state.personaEditing && generation === state.personaGeneration) ui.promptNotice.textContent = '無法讀取檔案，請使用 UTF-8 格式的 .txt 或 .md 文字檔。';
+        } finally {
+            if (state.personaEditing && generation === state.personaGeneration) { state.personaImporting = false; updatePromptControls(); }
+        }
+    }
     function nearBottom() { return ui.messages.scrollHeight - ui.messages.scrollTop - ui.messages.clientHeight < 72; }
     function scrollLatest(force) {
         if (force || state.followLatest) {
@@ -50,9 +142,12 @@
     }
     function addMessage(message) {
         var row = element('article', 'character-chat-message is-' + message.role);
-        row.setAttribute('aria-label', message.role === 'user' ? '你的訊息' : 'GPT 回覆');
-        var name = element('span', 'character-chat-speaker', message.role === 'user' ? '你' : 'GPT');
+        row.setAttribute('aria-label', message.role === 'user' ? '你的訊息' : 'Nacho 回覆');
+        var name = element('div', 'character-chat-speaker');
+        if (message.role === 'assistant') name.appendChild(avatar('character-chat-avatar character-chat-reply-avatar'));
+        name.appendChild(element('span', null, message.role === 'user' ? '你' : 'Nacho'));
         var content = element('div', 'character-chat-text', message.content);
+        if (message.role === 'assistant') renderReply(content, message.content);
         var note = element('span', 'character-chat-message-note');
         if (message.status === 'stopped') note.textContent = '已停止';
         if (message.status === 'failed') note.textContent = '回覆未完成';
@@ -71,12 +166,11 @@
         ui.stop.hidden = !state.busy;
         ui.send.hidden = state.busy;
         ui.clear.disabled = !state.messages.length || state.busy;
-        ui.connect.hidden = state.canChat;
+        ui.connect.hidden = state.canChat || state.available && !state.personaSupported;
         ui.connect.disabled = state.checking || !state.available;
         ui.refresh.disabled = state.checking || state.busy;
         ui.disconnect.hidden = !state.connected || !transport() || !transport().disconnect;
         ui.disconnect.disabled = state.busy || state.checking;
-        ui.model.disabled = state.busy || state.checking;
         ui.retry.hidden = state.retryAt < 0;
         ui.retry.disabled = state.busy || state.checking || !state.canChat;
         ui.input.setAttribute('aria-describedby', 'character-chat-status character-chat-input-hint');
@@ -117,20 +211,16 @@
             if (!result || typeof result !== 'object') throw new Error('無法確認連線，請重新確認。');
             state.available = result.available !== false;
             state.connected = !!result.connected;
-            state.canChat = !!result.canChat;
-            ui.connection.textContent = state.canChat ? (result.accountLabel || 'GPT 已連線') : state.available && result.connected ? '請完成 ChatGPT 登入' : '尚未連線';
+            state.personaSupported = !!(result.capabilities && result.capabilities.characterPrompt);
+            state.canChat = !!result.canChat && state.personaSupported;
+            ui.connection.textContent = state.canChat ? (result.accountLabel || 'Nacho 已準備好') : state.available && !state.personaSupported ? '請更新對話服務' : state.available && result.connected ? '請完成 ChatGPT 登入' : '尚未連線';
             ui.connection.dataset.connected = String(state.canChat);
-            var models = Array.isArray(result.models) ? result.models.filter(function (m) { return m && typeof m.slug === 'string'; }) : [];
-            ui.model.replaceChildren();
-            models.forEach(function (model) { var option = element('option', null, model.displayName || model.slug); option.value = model.slug; ui.model.appendChild(option); });
-            if (!models.some(function (m) { return m.slug === state.model; })) state.model = models.some(function (m) { return m.slug === result.selectedModel; }) ? result.selectedModel : models[0] && models[0].slug || '';
-            ui.model.value = state.model; ui.modelRow.hidden = !state.canChat || !models.length;
             if (state.canChat) {
                 stopLoginPolling();
                 announce('已準備好，可以直接在這裡對話。');
             } else {
                 if (result.connecting) pollLogin(generation);
-                announce(result.error || (!state.available ? '本機對話服務尚未啟動。啟動後按「重新確認」。' : result.connecting ? '在登入視窗完成後，回來就能繼續對話。' : '先登入 ChatGPT，回覆就會顯示在這裡。'));
+                announce(!state.available ? result.error || '本機對話服務尚未啟動。啟動後按「重新確認」。' : !state.personaSupported ? '本機對話服務需要更新，才能套用角色設定。更新後按「重新確認」。' : result.error || (result.connecting ? '在登入視窗完成後，回來就能繼續對話。' : '先登入 ChatGPT，就能在這裡和 Nacho 聊聊。'));
             }
         } catch (error) {
             if (!currentConnection(generation)) return;
@@ -189,12 +279,12 @@
         state.retryAt = -1; state.busy = true; state.followLatest = true;
         state.controller = new AbortController();
         var tooLong = false;
-        var lengthNotice = '回覆過長，已停止；可請 GPT 分段回答';
+        var lengthNotice = '回覆過長，已停止；可請 Nacho 分段回答';
         var reply = { role: 'assistant', content: '', status: 'streaming' };
         state.messages.push(reply);
         var view = addMessage(reply);
         view.row.classList.add('is-pending'); view.note.textContent = '正在思考…';
-        ui.empty.hidden = true; controls(); scrollLatest(true); reaction('thinking'); announce('GPT 正在回覆…');
+        ui.empty.hidden = true; controls(); scrollLatest(true); reaction('thinking'); announce('Nacho 正在回覆…');
         function delta(value) {
             if (id !== state.request || !state.busy || state.controller.signal.aborted) return;
             var text = typeof value === 'string' ? value : value && value.text || '';
@@ -207,7 +297,7 @@
             if (tooLong) state.controller.abort();
         }
         try {
-            var result = await transport().stream({ messages: contextMessages(state.messages.length - 1), model: state.model || undefined, signal: state.controller.signal, onDelta: delta });
+            var result = await transport().stream({ messages: contextMessages(state.messages.length - 1), characterPrompt: state.characterPrompt, signal: state.controller.signal, onDelta: delta });
             if (id !== state.request) return;
             if (!reply.content) reply.content = typeof result === 'string' ? result : result && result.text || '';
             if (reply.content.length > 64000) { reply.content = reply.content.slice(0, 64000); tooLong = true; }
@@ -226,6 +316,7 @@
         } finally {
             if (id === state.request) {
                 state.busy = false; state.controller = null;
+                renderReply(view.content, reply.content);
                 view.row.classList.remove('is-pending'); reaction('idle'); controls(); save(); scrollLatest(false);
             }
         }
@@ -248,6 +339,7 @@
     function close() {
         if (!state.dialog || !state.dialog.open) return;
         if (state.busy) stop();
+        if (state.personaEditing) closePersona(false);
         state.connectionGeneration++; state.checking = false; stopLoginPolling();
         state.dialog.close();
     }
@@ -274,22 +366,41 @@
         dialog.setAttribute('aria-labelledby', 'character-chat-title');
         var header = element('header', 'character-chat-header');
         var identity = element('div', 'character-chat-identity');
-        var avatar = element('span', 'character-chat-avatar');
-        var image = new Image(); image.src = 'assets/character/nacho-companion.webp'; image.alt = ''; avatar.appendChild(image);
-        var heading = element('div'); var title = element('h2', null, '和貓貓聊聊'); title.id = 'character-chat-title';
+        var portrait = avatar();
+        var heading = element('div'); var title = element('h2', null, 'Nacho'); title.id = 'character-chat-title';
         ui.connection = element('p', 'character-chat-connection', '確認連線中…');
-        heading.append(title, ui.connection); identity.append(avatar, heading);
+        heading.append(title, ui.connection); identity.append(portrait, heading);
         var dismiss = button('×', 'character-chat-close', close); dismiss.setAttribute('aria-label', '關閉對話');
-        header.append(identity, dismiss); dialog.appendChild(header);
+        ui.personaToggle = button('角色設定', 'character-chat-persona-toggle', function () { if (state.personaEditing) closePersona(true); else editPersona(); });
+        ui.personaToggle.setAttribute('aria-expanded', 'false'); ui.personaToggle.setAttribute('aria-controls', 'character-chat-settings');
+        var headerActions = element('div', 'character-chat-header-actions'); headerActions.append(ui.personaToggle, dismiss);
+        header.append(identity, headerActions); dialog.appendChild(header);
         var connectionBar = element('div', 'character-chat-connect');
         ui.connect = button('使用 ChatGPT 登入', 'character-chat-connect-button', login);
         ui.refresh = button('重新確認', 'character-chat-refresh', refresh);
         ui.disconnect = button('登出', 'character-chat-disconnect', disconnect); ui.disconnect.hidden = true;
         connectionBar.append(ui.connect, ui.refresh, ui.disconnect); dialog.appendChild(connectionBar);
-        ui.modelRow = element('label', 'character-chat-model-row', '模型'); ui.modelRow.hidden = true;
-        ui.model = element('select'); ui.model.setAttribute('aria-label', '對話模型');
-        ui.model.addEventListener('change', function () { state.model = ui.model.value; });
-        ui.modelRow.appendChild(ui.model); dialog.appendChild(ui.modelRow);
+        ui.settings = element('section', 'character-chat-settings'); ui.settings.id = 'character-chat-settings'; ui.settings.hidden = true;
+        ui.settings.setAttribute('aria-labelledby', 'character-chat-settings-title');
+        var settingsTitle = element('h3', null, '讓 Nacho 更懂你的習慣'); settingsTitle.id = 'character-chat-settings-title';
+        var settingsIntro = element('p', 'character-chat-settings-intro', '描述她的個性與說話方式。設定儲存在此瀏覽器，從下一則回覆開始套用。');
+        var promptLabel = element('label', 'character-chat-prompt-label', '角色提示詞'); promptLabel.htmlFor = 'character-chat-prompt';
+        ui.prompt = element('textarea'); ui.prompt.id = 'character-chat-prompt'; ui.prompt.spellcheck = false;
+        ui.prompt.setAttribute('aria-describedby', 'character-chat-prompt-count character-chat-prompt-notice');
+        ui.prompt.addEventListener('input', function () { updatePromptControls(); ui.promptNotice.textContent = promptError(ui.prompt.value); });
+        var promptTools = element('div', 'character-chat-prompt-tools');
+        ui.promptImport = button('匯入文字檔', 'character-chat-prompt-import', function () { ui.promptFile.click(); });
+        ui.promptFile = element('input'); ui.promptFile.type = 'file'; ui.promptFile.accept = '.txt,.md,text/plain,text/markdown'; ui.promptFile.hidden = true;
+        ui.promptFile.setAttribute('aria-label', '匯入角色提示詞'); ui.promptFile.addEventListener('change', importPersona);
+        ui.promptCount = element('span', 'character-chat-prompt-count'); ui.promptCount.id = 'character-chat-prompt-count';
+        promptTools.append(ui.promptImport, ui.promptFile, ui.promptCount);
+        ui.promptNotice = element('p', 'character-chat-prompt-notice'); ui.promptNotice.id = 'character-chat-prompt-notice'; ui.promptNotice.setAttribute('role', 'status'); ui.promptNotice.setAttribute('aria-live', 'polite');
+        var promptActions = element('div', 'character-chat-prompt-actions');
+        ui.promptReset = button('恢復預設', 'character-chat-prompt-reset', function () { ui.prompt.value = persona.defaultPrompt; ui.prompt.scrollTop = 0; ui.promptNotice.textContent = '已還原預設內容，按「儲存設定」後套用。'; updatePromptControls(); });
+        var promptCancel = button('取消', 'character-chat-prompt-cancel', function () { closePersona(true); });
+        ui.promptSave = button('儲存設定', 'character-chat-prompt-save', savePersona);
+        promptActions.append(ui.promptReset, promptCancel, ui.promptSave);
+        ui.settings.append(settingsTitle, settingsIntro, promptLabel, ui.prompt, promptTools, ui.promptNotice, promptActions); dialog.appendChild(ui.settings);
         var body = element('div', 'character-chat-body');
         ui.messages = element('div', 'character-chat-messages'); ui.messages.setAttribute('role', 'log'); ui.messages.setAttribute('aria-label', '對話內容'); ui.messages.setAttribute('aria-live', 'off'); ui.messages.tabIndex = 0;
         ui.messages.addEventListener('scroll', function () { state.followLatest = nearBottom(); ui.latest.hidden = state.followLatest; });
@@ -298,7 +409,7 @@
         ui.latest = button('查看最新回覆', 'character-chat-latest', function () { state.followLatest = true; scrollLatest(true); }); ui.latest.hidden = true;
         body.append(ui.messages, ui.empty, ui.latest); dialog.appendChild(body);
         var form = element('form', 'character-chat-composer'); form.addEventListener('submit', send);
-        var label = element('label', 'sr-only', '傳送訊息給 GPT'); label.htmlFor = 'character-chat-input';
+        var label = element('label', 'sr-only', '傳送訊息給 Nacho'); label.htmlFor = 'character-chat-input';
         ui.input = element('textarea'); ui.input.id = 'character-chat-input'; ui.input.rows = 2; ui.input.maxLength = 8000; ui.input.placeholder = '想說的話，寫在這裡…';
         ui.input.addEventListener('compositionstart', function () { state.composing = true; });
         ui.input.addEventListener('compositionend', function () { state.composing = false; controls(); });
@@ -337,7 +448,8 @@
             }
             if (event.key !== 'Escape') return;
             event.preventDefault(); event.stopPropagation();
-            if (!ui.confirm.hidden) { ui.confirm.hidden = true; ui.clear.focus(); }
+            if (state.personaEditing) closePersona(true);
+            else if (!ui.confirm.hidden) { ui.confirm.hidden = true; ui.clear.focus(); }
             else close();
         });
         dialog.addEventListener('click', function (event) { if (event.target !== dialog) return; var r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); });
