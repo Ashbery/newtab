@@ -16,6 +16,7 @@
 - 本機圖片／影片或媒體網址背景；影片循環播放，可暫停及靜音。可切回貓貓主題。
 - 個人化面板提供圖片／影片背景透明度與模糊百分比；滑桿和數字輸入同步，並可恢復預設。
 - 右鍵「自訂組件外觀」調整每個組件的底色、透明度、模糊、圓角、邊框、陰影與文字明暗。一般組件底色預設 70% 透明，時鐘完全透明；圖示下方文字沒有底色。
+- 搜尋列的外觀設定另提供「搜尋送出按鈕」：獨立調整背景色、背景透明度百分比、圖示顏色與圓角，即時預覽並儲存。「恢復按鈕預設」只重設按鈕；整體「恢復預設」同時還原搜尋列與按鈕。手機展開搜尋也沿用相同設定。
 - 專注模式收起捷徑與角色，按 Escape 或從工具選單返回。
 - 天氣提供定位、更新與失敗重試；書籤可直接管理名稱、網址與刪除。
 
@@ -58,6 +59,7 @@ node tests/extension-compatibility.cjs
 node tests/weather-regressions.cjs
 node tests/widget-functionality.cjs
 node tests/appearance-controls.cjs
+node tests/search-appearance.cjs
 node --test tests/companion-browser.test.cjs
 node --test tests/context-menu-browser.test.cjs
 node tests/full-canvas.cjs

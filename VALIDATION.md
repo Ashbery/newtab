@@ -1,4 +1,24 @@
-# Release 2026.11.14.5
+# Release 2026.11.14.6
+
+Validation date:2026-11-14 (Asia/Taipei).
+
+- Added search-submit appearance controls: background color, background transparency0–100%, icon color, and corner radius0–22px. The inert preview follows the selected values; button-only reset preserves the search surface, while the existing whole-widget reset restores both.
+- Removed fixed hover/disabled colors that would override those settings. Hover uses an inset ring, keyboard focus stays outlined, and pressing retains its scale feedback. Disabled state dims only the icon, preserving the chosen background transparency and44px hit area.
+- Appearance tokens travel with the original search container when it moves into the mobile/compact search popup. Ownership matching also updates an already-open popup. No cloned search controls or extra event listeners were introduced.
+- The longer search appearance panel keeps Close, Restore and Done visible while its fields scroll. Other widget settings retain their existing layout. Versioned CSS/script URLs prevent cached styles from masking the new options.
+
+| Verification | Observed result |
+| --- | --- |
+| Search/unit interactions |27/27 search and resize tests passed, including IME, suggestions, safe navigation, Enter and submit/long-press separation. |
+| Dedicated search appearance |5/5 rendered scenarios at1440×900,390×844,320×640,3440×1440 and5120×1440 passed. Covers real settings controls, transparency extremes, radius bounds, enabled/disabled/hover/focus/press, preview, reload, mobile popup updates, viewport roundtrip, per-widget isolation, both resets and button/Enter navigation. |
+| Existing appearance |1440/390/320px passed: background percentages, persistence, reset scope, clock/labels, readable text and companion settings. |
+| Existing UI |All four desktop/mobile × normal/reduced-motion scenarios passed, including real search-button and Enter navigation. |
+| Independent Brave audit |1440/390px verified exact custom colors across enabled/disabled/hover, mobile reparenting, live updates while expanded, persistence and button reset; no page errors or duplicate search controls. Dialog checks at320×640,390×844,844×390 and1440×900 kept Close/Done visible and fields scrollable. |
+| Visual review |Desktop and320px custom-button previews inspected; the chosen colors, alpha and radius match the actual control, with fixed dialog actions remaining reachable. |
+
+This update changes search appearance settings and state feedback only. Earlier character, authentication and video-loop results below remain historical. Browser profiles/screenshots stay in ignored `.impeccable/review/`.
+
+# Release 2026.11.14.5 (historical results)
 
 Validation date:2026-11-14 (Asia/Taipei).
 

@@ -89,4 +89,14 @@ body .widget[data-appearance-text] :is(.todo-text, .countdown-days, .countdown-u
 .appearance-dialog .appearance-done { min-height: 44px; padding: 9px 26px; border: 0; border-radius: 10px; background: #396b87; color: #fff; font: 500 13px var(--font-ui); cursor: pointer; }
 .appearance-dialog .appearance-done:hover { background: #2c5870; }
 .appearance-dialog :focus-visible { outline: 2px solid #417a99; outline-offset: 3px; }
+.appearance-search-section { margin: 20px 0; padding-bottom: 20px; border-bottom: 1px solid #d0dfe8; }
+.appearance-search-section h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.appearance-search-preview { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; margin: 14px 0 18px; padding: 8px 10px 8px 16px; border: 1px solid #d5e2ea; border-radius: 16px; background: #e9f0f5; color: #587082; font-size: 12px; }
+.appearance-search-preview-button { flex: 0 0 44px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--search-button-radius, 22px); background: var(--search-button-fill, #d8eaf3); color: var(--search-button-ink, #365f7c); }
+.appearance-search-preview-button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.appearance-search-section .appearance-reset { width: 100%; }
+/* Keep the close/reset actions reachable while the longer search settings scroll. */
+.appearance-dialog[open]:has(.appearance-search-section) { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
+.appearance-dialog:has(.appearance-search-section) .appearance-fields { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 8px; margin-right: -8px; }
+.appearance-dialog:has(.appearance-search-section) > footer { padding-top: 16px; border-top: 1px solid #d0dfe8; }
 @media (max-width: 380px) { .appearance-dialog { padding: 18px; border-radius: 20px; } }

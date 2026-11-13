@@ -11,10 +11,17 @@
         return typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : undefined;
     }
 
+    function color(value) { return typeof value === 'string' && /^#[\da-f]{6}$/i.test(value) ? value : undefined; }
+
+    function searchButtonDefaults() {
+        return { searchButtonTint: '#d8eaf3', searchButtonAlpha: 1, searchButtonIcon: '#365f7c', searchButtonRadius: 22 };
+    }
+
     function defaults(type) {
-        return { preset: 'glass', alpha: type === 'clock' || type === 'companion' ? 0 : .3,
+        var value = { preset: 'glass', alpha: type === 'clock' || type === 'companion' ? 0 : .3,
             blur: 0, tint: '#f8fbfd', text: 'dark', border: 0, radius: 18, shadow: 0,
             bgDataUrl: undefined, bgAlpha: .35 };
+        return type === 'search' ? Object.assign(value, searchButtonDefaults()) : value;
     }
 
     function normalizeWidget(value) {
@@ -22,11 +29,13 @@
         return {
             preset: ['glass', 'solid', 'clear'].indexOf(a.preset) >= 0 ? a.preset : undefined,
             alpha: finite(a.alpha, 0, 1), blur: finite(a.blur, 0, 40),
-            tint: typeof a.tint === 'string' && /^#[\da-f]{6}$/i.test(a.tint) ? a.tint : undefined,
+            tint: color(a.tint),
             text: a.text === 'light' || a.text === 'dark' ? a.text : undefined,
             border: finite(a.border, 0, 1), radius: finite(a.radius, 0, 36), shadow: finite(a.shadow, 0, 1),
             bgDataUrl: typeof a.bgDataUrl === 'string' && a.bgDataUrl.indexOf('data:image/') === 0 && a.bgDataUrl.length <= 180000 ? a.bgDataUrl : undefined,
-            bgAlpha: finite(a.bgAlpha, 0, 1)
+            bgAlpha: finite(a.bgAlpha, 0, 1),
+            searchButtonTint: color(a.searchButtonTint), searchButtonAlpha: finite(a.searchButtonAlpha, 0, 1),
+            searchButtonIcon: color(a.searchButtonIcon), searchButtonRadius: finite(a.searchButtonRadius, 0, 22)
         };
     }
 
@@ -53,6 +62,24 @@
         el.style.setProperty('--widget-image', a.bgDataUrl ? 'url("' + a.bgDataUrl.replace(/["\\\r\n]/g, '') + '")' : 'none');
         el.toggleAttribute('data-appearance-image', !!a.bgDataUrl);
         el.style.setProperty('--widget-image-alpha', String(a.bgAlpha));
+        if (widget.type === 'search') {
+            applySearchButton(el, a);
+            // The mobile search panel moves this same container out of its
+            // widget. Keep its tokens and ownership on the moving DOM node.
+            var container = el.querySelector('.search-container');
+            if (container) container.setAttribute('data-search-appearance-owner', String(widget.id));
+            else container = Array.prototype.find.call(document.querySelectorAll('.search-container[data-search-appearance-owner]'), function (candidate) {
+                return candidate.getAttribute('data-search-appearance-owner') === String(widget.id);
+            });
+            if (container) applySearchButton(container, a);
+        }
+    }
+
+    function applySearchButton(el, value) {
+        var rgb = [1, 3, 5].map(function (i) { return parseInt(value.searchButtonTint.slice(i, i + 2), 16); }).join(', ');
+        el.style.setProperty('--search-button-fill', 'rgba(' + rgb + ', ' + value.searchButtonAlpha + ')');
+        el.style.setProperty('--search-button-ink', value.searchButtonIcon);
+        el.style.setProperty('--search-button-radius', value.searchButtonRadius + 'px');
     }
 
     function applyBackground() {
@@ -153,7 +180,12 @@
         var hint = document.createElement('p'); hint.className = 'appearance-hint'; hint.textContent = '即時預覽，文字與圖示保持清晰。'; dialog.appendChild(hint);
         var fields = document.createElement('div'); fields.className = 'appearance-fields'; dialog.appendChild(fields);
         var values = resolved(widget);
-        function update(key, value) { var patch = {}; patch[key] = value; global.NewtabWidgets.setAppearance(id, patch); }
+        var searchUI = null;
+        function update(key, value) {
+            var patch = {}; patch[key] = value; global.NewtabWidgets.setAppearance(id, patch);
+            var current = widgetById(id);
+            if (searchUI && current) applySearchButton(searchUI.preview, resolved(current));
+        }
         var controls = [
             control(fields, '組件背景透明度', (1 - values.alpha) * 100, function (v) { update('alpha', (100 - v) / 100); }),
             control(fields, '組件背景模糊', values.blur / .4, function (v) { update('blur', v * .4); }),
@@ -175,6 +207,37 @@
         textColor.value = values.text;
         textColor.addEventListener('change', function () { update('text', textColor.value); });
         textRow.appendChild(textColor); fields.appendChild(textRow);
+        if (widget.type === 'search') {
+            var searchSection = document.createElement('section'); searchSection.className = 'appearance-search-section';
+            var searchTitle = document.createElement('h3'); searchTitle.id = 'appearance-search-title-' + (++serial); searchTitle.textContent = '搜尋送出按鈕';
+            searchSection.setAttribute('aria-labelledby', searchTitle.id); searchSection.appendChild(searchTitle);
+            var preview = document.createElement('div'); preview.className = 'appearance-search-preview'; preview.inert = true; preview.setAttribute('aria-hidden', 'true');
+            var previewLabel = document.createElement('span'); previewLabel.className = 'appearance-search-preview-label'; previewLabel.textContent = '按鈕預覽';
+            var previewButton = document.createElement('span'); previewButton.className = 'appearance-search-preview-button';
+            previewButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 10 15-5.5L14 19.5l-3-6.5-6.5-3Z"/><path d="m11 13 8.5-8.5"/></svg>';
+            preview.append(previewLabel, previewButton); searchSection.appendChild(preview);
+            function buttonColor(label, value, key) {
+                var row = document.createElement('label'); row.className = 'appearance-tint'; row.textContent = label;
+                var input = document.createElement('input'); input.type = 'color'; input.value = value; input.setAttribute('aria-label', label);
+                input.addEventListener('input', function () { update(key, input.value); });
+                row.appendChild(input); searchSection.appendChild(row); return input;
+            }
+            var buttonTint = buttonColor('按鈕背景色', values.searchButtonTint, 'searchButtonTint');
+            var buttonAlpha = control(searchSection, '按鈕背景透明度', (1 - values.searchButtonAlpha) * 100, function (v) { update('searchButtonAlpha', (100 - v) / 100); });
+            var buttonIcon = buttonColor('按鈕圖示顏色', values.searchButtonIcon, 'searchButtonIcon');
+            var buttonRadius = control(searchSection, '按鈕圓角', values.searchButtonRadius, function (v) { update('searchButtonRadius', v); }, 22, 'px');
+            var buttonReset = document.createElement('button'); buttonReset.type = 'button'; buttonReset.className = 'appearance-reset appearance-search-reset'; buttonReset.textContent = '恢復按鈕預設';
+            searchUI = { preview: preview, set: function (value) {
+                buttonTint.value = value.searchButtonTint; buttonIcon.value = value.searchButtonIcon;
+                buttonAlpha.set((1 - value.searchButtonAlpha) * 100); buttonRadius.set(value.searchButtonRadius);
+                applySearchButton(preview, value);
+            } };
+            buttonReset.addEventListener('click', function () {
+                var buttonValues = searchButtonDefaults(); global.NewtabWidgets.setAppearance(id, buttonValues); searchUI.set(buttonValues);
+            });
+            searchSection.appendChild(buttonReset); fields.insertBefore(searchSection, fields.firstChild);
+            searchUI.set(values);
+        }
         var animation = null;
         if (widget.type === 'companion' && global.NewtabWidgets.setCompanionOptions) {
             var animationRow = document.createElement('label'); animationRow.className = 'appearance-tint'; animationRow.textContent = '角色動畫';
@@ -220,6 +283,7 @@
             [100 - values.alpha * 100, values.blur / .4, values.border * 100, values.shadow * 100, values.radius].forEach(function (v, i) { controls[i].set(v); });
             tint.value = values.tint;
             textColor.value = values.text;
+            if (searchUI) searchUI.set(values);
             if (imageControl) { imageControl.element.remove(); imageControl = null; }
             if (animation) {
                 animation.value = 'auto';
