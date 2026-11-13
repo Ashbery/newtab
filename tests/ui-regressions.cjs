@@ -303,9 +303,9 @@ async function exerciseCompanion(page, mobile, reducedMotion) {
         return image && image.complete && image.naturalWidth > 0;
     });
     assert.equal(await widget.count(), 1, 'character is a singleton real widget');
-    assert.equal(await trigger.getAttribute('href'), 'https://chatgpt.com/');
-    assert.equal(await trigger.getAttribute('target'), '_blank');
-    assert.match(await trigger.getAttribute('rel'), /noopener/);
+    assert.equal(await trigger.evaluate(element => element.tagName), 'BUTTON');
+    assert.equal(await trigger.getAttribute('href'), null, 'character opens the in-page conversation');
+    assert.equal(await page.evaluate(() => typeof window.NewtabCharacterChat?.open), 'function', 'chat is loaded by the page itself');
     assert.equal(await page.locator('.widget-settings').count(), 0, 'per-widget three-dot buttons are removed');
     const geometry = await widget.evaluate(element => {
         const own = element.getBoundingClientRect();
@@ -320,14 +320,28 @@ async function exerciseCompanion(page, mobile, reducedMotion) {
     assert.equal(geometry.within, true, 'character fits its viewport');
     await trigger.scrollIntoViewIfNeeded();
     await hitTest(page, '.companion-trigger');
-    await page.context().route('https://chatgpt.com/**', route => route.fulfill({ contentType: 'text/html', body: '<title>ChatGPT destination fixture</title>' }));
+    // UI-only disconnected fixture: no account or model service is contacted.
+    await page.evaluate(() => {
+        window.chatFixtureStatusCalls = 0;
+        window.NewtabChatTransport = {
+            status: async () => {
+                window.chatFixtureStatusCalls++;
+                return { available: false, connected: false, canChat: false, error: 'UI fixture disconnected' };
+            }
+        };
+    });
+    assert.equal(await page.evaluate(() => window.chatFixtureStatusCalls), 0, 'no status request before opening chat');
+    const originalUrl = page.url(), pageCount = page.context().pages().length;
     for (const activate of [() => mobile ? trigger.tap() : trigger.click(), async () => { await trigger.focus(); await page.keyboard.press('Enter'); }]) {
-        const popupPromise = page.waitForEvent('popup');
         await activate();
-        const popup = await popupPromise;
-        await popup.waitForLoadState('domcontentloaded');
-        assert.equal(popup.url(), 'https://chatgpt.com/');
-        await popup.close();
+        await page.locator('.character-chat-dialog').waitFor({ state: 'visible' });
+        await page.waitForFunction(() => window.chatFixtureStatusCalls > 0);
+        assert.equal(page.url(), originalUrl);
+        assert.equal(page.context().pages().length, pageCount, 'pointer and keyboard activation never open another page');
+        assert.equal(await page.locator('.character-chat-message.is-assistant').count(), 0, 'disconnected UI fabricates no assistant reply');
+        await page.keyboard.press('Escape');
+        await page.locator('.character-chat-dialog').waitFor({ state: 'hidden' });
+        assert.equal(await trigger.evaluate(element => element === document.activeElement), true, 'chat close returns focus to the character');
     }
     if (reducedMotion === 'reduce') {
         assert.equal(await companion.getAttribute('data-motion'), 'reduced', 'system preference stops character motion');

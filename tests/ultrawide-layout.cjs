@@ -109,8 +109,8 @@ async function clickHitTest(page,selector) {
             await drag(page,'app-youtube',5,stageTop+272);
             await drag(page,'app-maps',entry.viewport.width-5,stageTop+272);
             const draft=await rects(page);
-            assert(draft['app-youtube'].left>=stageLeft&&draft['app-youtube'].left<stageLeft+96,'left-edge drop stays in home stage');
-            assert(draft['app-maps'].left+68<=stageLeft+1344&&draft['app-maps'].left>stageLeft+1248,'right-edge drop stays in home stage');
+            closeEnough(draft['app-youtube'].left,16,'left-edge drop reaches the actual viewport edge');
+            closeEnough(draft['app-maps'].left+68,entry.viewport.width-16,'right-edge drop reaches the actual viewport edge');
             await page.locator('#arrange-done-bar').click();await page.reload();await page.waitForFunction(()=>window.NewtabWidgets);
             const saved=await rects(page);for(const id of Object.keys(draft))sameRect(saved[id],draft[id],'Done/reload '+id);
             assert.equal(await page.getByRole('textbox',{name:'備註內容',exact:true}).inputValue(),'超寬版面 '+name+'\n保留筆記與自訂位置');

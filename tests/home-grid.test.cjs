@@ -94,14 +94,51 @@ test('all fresh default slots are exact drop slots, including tall and short vie
         }
     }
 });
-test('far-edge drops stay inside the actual centered stage',()=>{
-    const grid=L.homeGrid(2560,1440);
-    for(const type of ['app','notes']) {
-        for(const left of [-500,2550]) {
-            const rect=L.homeSnap({left,top:400,width:type==='app'?68:568,height:200},type,grid,false);
-            assert(rect.left>=grid.left);
-            assert(rect.left+rect.width<=grid.left+grid.columns*grid.pitchX);
+test('wide-screen drops reach both actual viewport edges, with stable saved edge positions',()=>{
+    for(const [width,height] of [[1920,1080],[2560,1080],[3440,1440],[5120,1440],[2752,1152],[3413,960]]) {
+        const grid=L.homeGrid(width,height);
+        assert(grid.columns>14);
+        for(const type of ['app','notes'])for(const edge of ['left','right']) {
+            const size=type==='app'?68:280;
+            const rect=L.homeSnap({left:edge==='left'?-500:width,top:400,width:size,height:200},type,grid,false);
+            assert.equal(edge==='left'?rect.left:width-rect.left-rect.width,16,'full viewport edge '+width);
+            const saved=L.homePlacement(rect,type,grid);
+            assert.equal(saved.v,3);
+            assert.equal(saved.edge,edge);
+            for(const otherWidth of [1280,width]) {
+                const moved=L.homePlacementRect(saved,type,L.homeGrid(otherWidth,height));
+                assert.equal(edge==='left'?moved.left:otherWidth-moved.left-moved.width,16);
+                assert.equal(moved.width,size);
+            }
+            assert.deepEqual({...L.homePlacementRect(saved,type,grid)},{...rect});
         }
+    }
+});
+
+test('desktop corners use the full viewport while intentional below-view placements remain scrollable',()=>{
+    for(const [width,height] of [[1920,1080],[3440,1440],[5120,1440]]) {
+        const grid=L.homeGrid(width,height);
+        for(const corner of ['top','bottom']) {
+            const rect=L.homeSnap({left:corner==='top'?-500:width,top:corner==='top'?-500:height-20,width:280,height:200},'notes',grid,false);
+            assert.equal(corner==='top'?rect.top:height-rect.top-rect.height,16);
+            const saved=L.homePlacement(rect,'notes',grid);
+            assert.equal(saved.edgeY,corner);
+            assert.deepEqual({...L.homePlacementRect(saved,'notes',grid)},{...rect});
+        }
+        const low=L.homeSnap({left:16,top:height+210,width:280,height:200},'notes',grid,false);
+        assert(low.top>height,'below-view drag can still extend content');
+    }
+});
+
+test('old v2 profiles retain their capped-grid projection until deliberately moved',()=>{
+    const old={v:2,columns:14,col:8.375,row:3.25,width:68,height:80,spanX:null,spanY:null};
+    for(const width of [1280,1440,1920,2560,3440,5120,3413]) {
+        const grid=L.homeGrid(width,1080),oldCols=Math.min(14,Math.floor((width-48)/96));
+        const oldLeft=(width-oldCols*96)/2;
+        const oldCol=Math.max(0,Math.min(oldCols-1,old.col+Math.floor((oldCols-old.columns)/2)));
+        const rect=L.homePlacementRect(old,'app',grid);
+        assert.equal(rect.left,oldLeft+oldCol*96+14,'legacy geometry '+width);
+        assert.equal(rect.width,68);assert.equal(rect.height,80);
     }
 });
 

@@ -11,6 +11,9 @@ for (const width of [2560, 1920, 1440, 1280, 1100, 390, 320]) for (const reduced
                 isMobile: width < 600, hasTouch: width < 600, reducedMotion });
             await context.route('**/*', route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
             const page = await context.newPage();
+            // Keep real timers/animations while avoiding a clock tick racing
+            // the explicit noon shell-rebuild assertion below.
+            await page.clock.setFixedTime(new Date(2026, 10, 14, 12, 0, 1));
             const errors = [];
             page.on('pageerror', e => errors.push(e.message));
             await page.goto(base);

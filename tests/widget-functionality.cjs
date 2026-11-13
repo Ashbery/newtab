@@ -31,6 +31,21 @@ async function add(page, type) {
     await done(page);
     await page.locator('.widget[data-type="' + type + '"]').waitFor();
 }
+async function selectHeld(page, widget, mobile) {
+    await widget.scrollIntoViewIfNeeded();
+    const box = await widget.boundingBox();
+    const point = { x: box.x + box.width / 2, y: box.y + 4 };
+    if (mobile) {
+        const touch = await page.context().newCDPSession(page);
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+        await page.waitForTimeout(620);
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+        await page.mouse.move(point.x, point.y); await page.mouse.down();
+        await page.waitForTimeout(620); await page.mouse.up();
+    }
+    assert.equal(await widget.evaluate(el => el.classList.contains('is-editor-selected')), true);
+}
 async function options(page, type) {
     return page.evaluate((type) => NewtabWidgets.getLayout().widgets.find((w) => w.type === type)?.options, type);
 }
@@ -286,7 +301,7 @@ async function applications(page, mobile) {
     await tools(page, '個人化');
     await page.locator('#arrange-home').click();
     const clockWidget = page.locator('.widget[data-type=clock]');
-    if (mobile) { await clockWidget.tap(); await page.locator('#editor-widget-settings').tap(); }
+    if (mobile) { await selectHeld(page, clockWidget, true); await page.locator('#editor-widget-settings').tap(); }
     else { await clockWidget.focus(); await page.keyboard.press('Shift+F10'); }
     await page.getByRole('menuitem', { name: '時間制', exact: true }).click();
     await page.getByRole('menuitemradio', { name: use12 ? '12 小時制' : '24 小時制', exact: true }).click();
@@ -344,7 +359,7 @@ async function applications(page, mobile) {
     await page.locator('.folder-overlay').waitFor({ state: 'hidden' });
     await tools(page, '個人化');
     await page.locator('#arrange-home').click();
-    await page.locator('.widget[data-type=folder]').click();
+    await selectHeld(page, page.locator('.widget[data-type=folder]'), mobile);
     await page.locator('#editor-widget-settings').click();
     await page.getByRole('menuitem', { name: '解散資料夾', exact: true }).click();
     await done(page);

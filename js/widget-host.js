@@ -94,6 +94,7 @@
         if (!t || !t.closest) return false;
         return !!(
             t.closest('.appearance-dialog') ||
+            t.closest('.character-chat-dialog') ||
             t.closest('.home-header') ||
             t.closest('.home-footer') ||
             t.closest('#side-rail') ||
@@ -299,7 +300,7 @@
 
     function mountCompanion(el, w) {
         if (!global.NewtabCompanion || !NewtabCompanion.mount) return;
-        var optionsKey = JSON.stringify({ animation: !w.options || w.options.animation !== false,
+        var optionsKey = JSON.stringify({ animation: !w.options || w.options.animation !== false, animationMode: w.options && w.options.animationMode || 'auto',
             greeting: w.options && w.options.greeting || '', chatUrl: w.options && w.options.chatUrl || '' });
         if (el._companionOptions === optionsKey) return;
         if (typeof el._companionCleanup === 'function') el._companionCleanup();
@@ -1385,7 +1386,7 @@
         var source = { vw: fallback.vw, vh: fallback.vh };
         state.layout.widgets.some(function (w) {
             var p = w.options && w.options[narrow ? 'homeMobile' : 'homeDesktop'];
-            if (w.type !== 'app' || !p || p.v === 2 || !p.w || !p.h) return false;
+            if (w.type !== 'app' || !p || (p.v === 2 || p.v === 3) || !p.w || !p.h) return false;
             var preset = L.APP_SIZE_PX[w.options.size || 'm'] || L.APP_SIZE_PX.m;
             source.vw = Math.round(preset.w / p.w);
             if (narrow && source.vw <= 372 && preset.w === 68) source.vw = Math.round(64 / p.w);
@@ -1400,7 +1401,7 @@
         var p = w.options && w.options[narrow ? 'homeMobile' : 'homeDesktop'];
         if (!p) return null;
         var grid = L.homeGrid(vp.vw, vp.vh);
-        if (p.v === 2) return L.homePlacementRect(p, w.type, grid);
+        if (p.v === 2 || p.v === 3) return L.homePlacementRect(p, w.type, grid);
         if (!['x', 'y', 'w', 'h'].every(function (k) { return typeof p[k] === 'number' && isFinite(p[k]); }) || p.w <= 0 || p.h <= 0) return null;
         // Round-four profiles lacked their source viewport. Fixed launcher
         // dimensions recover it without rewriting the stored user's layout.
@@ -1605,7 +1606,7 @@
             var el = document.querySelector('.widget[data-id="' + w.id + '"]');
             if (!el) return;
             var px = state.editor && state.editor.rects[w.id] || normalRects[w.id];
-            contentHeight = Math.max(contentHeight, px.top + px.height + (state.editor ? 180 : global.innerWidth <= 600 ? 96 : 24));
+            contentHeight = Math.max(contentHeight, px.top + px.height + (state.editor ? 180 : global.innerWidth <= 600 ? 96 : 16));
             state.renderedRects[w.id] = px;
             el.style.left = px.left + 'px';
             el.style.top = px.top + 'px';
@@ -1930,8 +1931,12 @@
         if (!d || !canvas) return;
         d.scrollFrame = null;
         var y = d.lastY, height = global.innerHeight;
-        var speed = y < 72 ? -10 : y > height - 144 ? 10 : 0;
-        if (speed) {
+        var speed = y < 56 ? -10 : y > height - 72 ? 10 : 0;
+        // A quick edge drop belongs at the visible edge. Scroll only after
+        // an intentional dwell, so approaching a corner cannot move the page.
+        var direction = Math.sign(speed);
+        if (direction !== d.scrollDirection) { d.scrollDirection = direction; d.scrollSince = performance.now(); }
+        if (speed && performance.now() - d.scrollSince >= 320) {
             var before = canvas.scrollTop;
             canvas.scrollTop += speed;
             if (canvas.scrollTop !== before) onDragMove({ pointerId: d.pointerId, clientX: d.lastX, clientY: d.lastY });
@@ -2649,7 +2654,6 @@
                 }
                 var widgetDrag = e.target.closest && e.target.closest('.widget[data-active="true"]');
                 if (widgetDrag && (e.button == null || e.button === 0)) {
-                    selectEditorWidget(widgetDrag.getAttribute('data-id'));
                     armLongPress(widgetDrag, e);
                 }
                 return;
@@ -2709,8 +2713,7 @@
 
         document.addEventListener('focusin', function (e) {
             if (!state.editor || !e.target.matches || !e.target.matches('.widget')) return;
-            selectEditorWidget(e.target.getAttribute('data-id'));
-            requestAnimationFrame(revealEditorSelection);
+            if (state.editor.selected === e.target.getAttribute('data-id')) requestAnimationFrame(revealEditorSelection);
         });
 
         // Keep a normal text field on desktop. Compact capsules need the
@@ -2737,6 +2740,9 @@
         });
 
         document.addEventListener('keydown', function (e) {
+            if (state.editor && !e.isComposing && (e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.widget')) {
+                e.preventDefault(); selectEditorWidget(e.target.getAttribute('data-id')); revealEditorSelection(); return;
+            }
             if (state.editor && !e.isComposing && e.keyCode !== 229 && /^Arrow/.test(e.key) && e.target.matches && e.target.matches('.widget')) {
                 e.preventDefault();
                 var id = e.target.getAttribute('data-id');
@@ -2855,7 +2861,7 @@
         if (state.layout.companionMigrated) return;
         state.layout.companionMigrated = true;
         if (!state.layout.widgets.some(function (w) { return w.type === 'companion'; })) {
-            var added = L.addWidget(state.layout, 'companion', { options: { animation: true } });
+            var added = L.addWidget(state.layout, 'companion', { options: { animationMode: 'auto' } });
             if (added.ok) {
                 added.widget.options.homeSeed = 'companion';
                 state.layout = added.layout;
@@ -2881,7 +2887,11 @@
             }
             w.options.chatUrl = chatUrl;
         }
-        if (partial && typeof partial.animation === 'boolean') w.options.animation = partial.animation;
+        if (partial && typeof partial.animation === 'boolean') {
+            w.options.animation = partial.animation;
+            if (!partial.animationMode) w.options.animationMode = partial.animation ? 'on' : 'off';
+        }
+        if (partial && ['auto', 'on', 'off'].indexOf(partial.animationMode) >= 0) w.options.animationMode = partial.animationMode;
         if (partial && typeof partial.greeting === 'string') w.options.greeting = partial.greeting.slice(0, 100);
         applyPositions(); persist();
         return { ok: true };

@@ -1,4 +1,32 @@
-# Release 2026.11.14.2
+# Release 2026.11.14.3
+
+Validation date: 2026-11-14 (Asia/Taipei). This release corrects the previous test definition of an "edge": placement now reaches the **actual viewport** rather than the edges of the centered 1344px composition.
+
+## Current changes and evidence
+
+- Full-width and full-height desktop placement, with16px edge slots. Default composition remains centered; existing v2 geometry retains its original projection until intentionally edited. v3 profiles retain new edge anchors across viewport changes. Deliberate edge dwell scrolls; quick edge drops do not unexpectedly shift the page.
+- A quick pointer click no longer selects or reveals an editing frame. A560ms hold selects and starts dragging. Explicit keyboard selection remains available.
+- WebGL character motion now has an animated Canvas2D fallback. Actual Brave with WebGL disabled still changes rendered pixels and blinks using the illustrated eyelid texture. Modes are automatic/on/off; legacy checked animation is honored as on. Hidden/offscreen/editing/focus/appearance states pause work. No new image generation was required.
+- The character opens an in-page chat dialog. Official ChatGPT token-sharing authentication and inference run in a loopback-only Windows helper; credentials are DPAPI-encrypted outside the repository. The page receives streamed text, never tokens. This is not a Dot memory bridge. Helper installation adds a per-user hidden startup shortcut and provides a reversible uninstall script.
+
+| Verification | Observed result |
+| --- | --- |
+| Full canvas |8 real-pointer corner scenarios passed at1920×1080,3440×1440,3440 at125%,5120 at150%, fresh/legacy; reload and viewport-return checks; actual saved v2 fractional profiles preserved. |
+| Ultrawide matrix |20 fresh/legacy resolution and DPI cases passed, now using actual viewport edge expectations. |
+| Home editing | Unit geometry, full home-editor flow, layout roundtrip including intentionally below-view content,8 context-menu scenarios and desktop/mobile widget functionality passed. |
+| Search, geometry and clock/tools |60/60 combined checks passed. The clock fixture now fixes Date while preserving real timers, preventing its noon assertion from racing the live clock's next tick. |
+| Character animation |7 real-Brave suites passed including WebGL-disabled fallback, context loss, actual pixel/blink changes,8 viewports, iframe visibility and playback modes. |
+| Appearance and UI | Appearance1440/390/320; desktop/mobile UI under both motion preferences; no external chat destination or obsolete URL field. |
+| In-page chat UI |1440/390/320 streaming/IME/stop/retry/literal-text/XSS/history/model/focus fixtures passed.1920/3440/5120 placement inspected. No localhost request before character activation. Mock model replies were explicit test fixtures only. |
+| Helper security and protocol |19 tests passed: Origin/Host/header checks, bounds/model validation, concurrent requests, UTF-8 request splitting, cancel/disconnect/login races, complete vs interrupted streams, safe errors, DPAPI roundtrip and corrupt ciphertext rejection. |
+| Native Brave wrapper | Actual installed extension files tested in an isolated profile. In-page chat opens without a new tab; actual loopback service is reachable after simulated local-network permission. Search/shortcut whole-tab navigation, media/storage migration, popup/keep-alive settings and cold restart remain functional. |
+| Runtime dependencies | npm production audit returned0 vulnerabilities. SDK source pinned and license/notices retained. |
+
+**Account-dependent validation remains pending:** no user ChatGPT account was logged into and no real model response was obtained by these tests. The helper and UI are ready for the owner's first authorization; successful real inference must be recorded separately. Local-network permission was granted only in disposable test profiles, not changed in the personal Brave profile. The installed wrapper needs one reload for its new loopback permission delegation.
+
+Test evidence and browser profiles remain ignored under `.impeccable/review/`. No award certification or universal physical-monitor testing is claimed. The earlier video-loop investigation is unchanged and remains documented below.
+
+# Previous release 2026.11.14.2 (historical results)
 
 Validation date: 2026-11-14 (Asia/Taipei). Static HTML/CSS/JavaScript site; no build step.
 

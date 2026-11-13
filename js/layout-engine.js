@@ -1196,7 +1196,7 @@
         else if (type === 'bookmarks') defaultOpts = { links: [] };
         else if (type === 'weather') defaultOpts = { lat: null, lon: null, city: '' };
         else if (type === 'folder') defaultOpts = { name: '資料夾', grid: 2, children: [] };
-        else if (type === 'companion') defaultOpts = { animation: true };
+        else if (type === 'companion') defaultOpts = { animationMode: 'auto' };
         else defaultOpts = opts.options || {};
         if (type === 'app') {
             defaultOpts.size = (opts.options && opts.options.size) || 'm';
@@ -1250,7 +1250,11 @@
     function homeGrid(vw, vh) {
         vw = vw || viewport().vw; vh = vh || viewport().vh;
         var narrow = vw <= 600;
-        var cols = narrow ? 4 : Math.max(1, Math.min(14, Math.floor((vw - 48) / 96)));
+        var cols = narrow ? 4 : Math.max(1, Math.floor((vw - 48) / 96));
+        // Extend the original centered lattice in paired columns. Its phase
+        // stays identical, so old placements and the default composition do
+        // not shift by half a cell on wide screens. Edges remain usable below.
+        if (!narrow && cols > 14) cols -= cols % 2;
         var pitch = narrow ? (vw - 40) / cols : 96;
         return { width: vw, height: vh, columns: cols, pitchX: pitch, pitchY: 104,
             left: (vw - cols * pitch) / 2, top: narrow ? 96 : Math.max(0, (vh - 760) / 2) + 24, gap: 8, narrow: narrow };
@@ -1258,6 +1262,9 @@
 
     function homeDefaultRect(widget, grid) {
         var seed = widget.options && widget.options.homeSeed;
+        // The initial arrangement is centered; the editable canvas is not
+        // limited to this composition. Keep this separate from homeGrid.
+        if (!grid.narrow && grid.columns > 14) grid = Object.assign({}, grid, { columns: 14, left: (grid.width - 14 * grid.pitchX) / 2 });
         if (seed === 'companion') {
             var character = homeNewFootprint('companion', widget.options, grid);
             var clockSpan = Math.min(grid.columns, 6);
@@ -1299,7 +1306,7 @@
         }
         // New cards use semantic spans of the home grid. The old catalogue
         // size fractions scale with the entire monitor and would produce
-        // 850–950px cards on a 5120px display despite a 1344px home stage.
+        // 850–950px cards on a 5120px display. Canvas width is not card size.
         var spans = { clock: [6, 2], search: [6, 1], notes: [3, 2], weather: [3, 2],
             todo: [3, 2], countdown: [3, 2], bookmarks: [4, 1] };
         var span = spans[type] || [3, 2];
@@ -1315,7 +1322,9 @@
         var offset = homeColumnOffset(rect.width, type, grid);
         var colSpan = (rect.width + grid.gap) / grid.pitchX;
         var rowSpan = (rect.height + grid.gap) / grid.pitchY;
-        return { v: 2, columns: grid.columns, col: (rect.left - grid.left - offset) / grid.pitchX,
+        return { v: 3, columns: grid.columns, col: (rect.left - grid.left - offset) / grid.pitchX,
+            edge: Math.abs(rect.left - 16) < 0.1 ? 'left' : Math.abs(rect.left + rect.width - grid.width + 16) < 0.1 ? 'right' : null,
+            edgeY: !grid.narrow && Math.abs(rect.top - 16) < 0.1 ? 'top' : !grid.narrow && Math.abs(rect.top + rect.height - grid.height + 16) < 0.1 ? 'bottom' : null,
             row: (rect.top - grid.top) / grid.pitchY, width: rect.width, height: rect.height,
             spanX: type !== 'app' && type !== 'folder' && Math.abs(colSpan - Math.round(colSpan)) < 0.01 ? Math.round(colSpan) : null,
             spanY: type !== 'app' && type !== 'folder' && Math.abs(rowSpan - Math.round(rowSpan)) < 0.01 ? Math.round(rowSpan) : null };
@@ -1323,17 +1332,31 @@
 
     function homePlacementRect(placement, type, grid) {
         var p = placement;
-        if (!p || p.v !== 2 || !['columns', 'col', 'row', 'width', 'height'].every(function (k) { return typeof p[k] === 'number' && isFinite(p[k]); }) || p.width <= 0 || p.height <= 0) return null;
+        if (!p || (p.v !== 2 && p.v !== 3) || !['columns', 'col', 'row', 'width', 'height'].every(function (k) { return typeof p[k] === 'number' && isFinite(p[k]); }) || p.width <= 0 || p.height <= 0) return null;
         var width = p.spanX ? Math.min(grid.columns, p.spanX) * grid.pitchX - grid.gap : p.width;
         if (type === 'app' && grid.narrow && grid.width <= 350 && width <= 68) width = Math.min(width, 64);
-        width = Math.min(width, grid.columns * grid.pitchX - grid.gap);
+        width = Math.min(width, p.v === 3 ? grid.width - 32 : Math.min(grid.columns, p.columns > 14 ? grid.columns : 14) * grid.pitchX - grid.gap);
         var height = p.spanY ? p.spanY * grid.pitchY - grid.gap : p.height;
         var offset = homeColumnOffset(width, type, grid);
-        var col = p.col + Math.floor((grid.columns - p.columns) / 2);
-        var maxCol = Math.max(0, grid.columns - homeColumnSpan(width, type, grid));
-        col = Math.max(0, Math.min(maxCol, col));
-        return { left: grid.left + col * grid.pitchX + offset,
-            top: Math.max(16, grid.top + p.row * grid.pitchY), width: width, height: height };
+        var projectionColumns = p.v === 2 ? Math.min(14, grid.columns) : grid.columns;
+        var projectionLeft = (grid.width - projectionColumns * grid.pitchX) / 2;
+        var col = p.col + Math.floor((projectionColumns - p.columns) / 2);
+        var maxCol = Math.max(0, projectionColumns - homeColumnSpan(width, type, grid));
+        var left;
+        if (p.v === 2) {
+            // Existing saved profiles retain their exact original projection.
+            col = Math.max(0, Math.min(maxCol, col));
+            left = projectionLeft + col * grid.pitchX + offset;
+        } else {
+            left = grid.left + col * grid.pitchX + offset;
+            if (p.edge === 'left') left = 16;
+            if (p.edge === 'right') left = grid.width - width - 16;
+            left = Math.max(16, Math.min(grid.width - width - 16, left));
+        }
+        var top = grid.top + p.row * grid.pitchY;
+        if (p.v === 3 && p.edgeY === 'top') top = 16;
+        if (p.v === 3 && p.edgeY === 'bottom') top = grid.height - height - 16;
+        return { left: left, top: Math.max(16, top), width: width, height: height };
     }
 
     function homeSnap(rect, type, grid, resize) {
@@ -1347,7 +1370,7 @@
             var minimumCols = grid.narrow ? 4 : 2;
             var cols = Math.max(minimumCols, Math.ceil((min.w + grid.gap) / grid.pitchX), Math.round((r.width + grid.gap) / grid.pitchX));
             var rows = Math.max(minimumRows, Math.ceil((min.h + grid.gap) / grid.pitchY), Math.round((r.height + grid.gap) / grid.pitchY));
-            r.width = Math.min(grid.columns, cols) * grid.pitchX - grid.gap;
+            r.width = Math.min(grid.width - 32, cols * grid.pitchX - grid.gap);
             r.height = rows * grid.pitchY - grid.gap;
         }
         r.width = Math.min(r.width, grid.width - 32);
@@ -1355,9 +1378,27 @@
         var origin = grid.left + centerOffset;
         var maxCol = Math.max(0, grid.columns - homeColumnSpan(r.width, type, grid));
         var col = Math.max(0, Math.min(maxCol, Math.round((r.left - origin) / grid.pitchX)));
-        var row = Math.max(0, Math.round((r.top - grid.top) / grid.pitchY));
-        r.left = Math.max(16, origin + col * grid.pitchX);
-        r.top = grid.top + row * grid.pitchY;
+        var minimumRow = grid.narrow ? 0 : Math.ceil((16 - grid.top) / grid.pitchY);
+        var row = Math.max(minimumRow, Math.round((r.top - grid.top) / grid.pitchY));
+        var snappedLeft = origin + col * grid.pitchX;
+        if (!grid.narrow) {
+            // Edge slots cover the remaining partial cells. A pointer near a
+            // screen edge must never snap back into the centered composition.
+            var right = grid.width - r.width - 16;
+            if (r.left < origin - grid.pitchX / 2 || r.left <= 24) snappedLeft = 16;
+            if (r.left > origin + maxCol * grid.pitchX + grid.pitchX / 2 || r.left >= right - 8) snappedLeft = right;
+            snappedLeft = Math.min(right, snappedLeft);
+        }
+        r.left = Math.max(16, snappedLeft);
+        var snappedTop = grid.top + row * grid.pitchY;
+        if (!grid.narrow) {
+            var bottom = grid.height - r.height - 16;
+            if (r.top <= 24 || r.top < grid.top + minimumRow * grid.pitchY - grid.pitchY / 2) snappedTop = 16;
+            // A viewport-bottom slot is optional. Scrolled placements beyond
+            // this view remain valid instead of being clamped back on screen.
+            if (bottom >= 16 && r.top >= bottom - 8 && r.top < grid.height) snappedTop = bottom;
+        }
+        r.top = Math.max(16, snappedTop);
         return r;
     }
 

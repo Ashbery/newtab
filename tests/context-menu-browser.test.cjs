@@ -51,7 +51,15 @@ async function openSettings(page, widget, input) {
         await widget.focus();
         await page.keyboard.press('Shift+F10');
     } else {
-        await widget.tap();
+        await widget.scrollIntoViewIfNeeded();
+        const box = await widget.boundingBox();
+        const touch = await page.context().newCDPSession(page);
+        // Use the visible upper edge, clear of the fixed editing toolbar.
+        const point = { x: box.x + box.width / 2, y: box.y + 3 };
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+        await page.waitForTimeout(620);
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        assert.equal(await widget.evaluate(el => el.classList.contains('is-editor-selected')), true, 'held touch reveals selection');
         await page.locator('#editor-widget-settings').tap();
     }
     await assertMenuFits(page, '.ctx-menu.is-visible');

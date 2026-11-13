@@ -6,33 +6,32 @@
     var BLINK = 'assets/character/nacho-blink.webp';
     var FRAME_INTERVAL = 1000 / 30;
 
-    function chatUrl(value) {
-        try {
-            var url = new URL(value || 'https://chatgpt.com/');
-            if (url.protocol === 'https:' && url.hostname === 'chatgpt.com' && !url.username && !url.password && !url.port) return url.href;
-        } catch (_) { /* Invalid saved values use the safe default. */ }
-        return 'https://chatgpt.com/';
+    function animationMode(options) {
+        if (['auto', 'on', 'off'].indexOf(options.animationMode) >= 0) return options.animationMode;
+        return options.animation === false ? 'off' : options.animation === true ? 'on' : 'auto';
     }
 
     function createRig(canvas, image, blinkImage) {
-        var gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true, powerPreference: 'low-power', preserveDrawingBuffer: false });
+        var gl;
+        try { gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true, powerPreference: 'low-power', preserveDrawingBuffer: false }); }
+        catch (_) { return null; }
         if (!gl) return null;
         var vertex = [
             'attribute vec2 a_uv; varying vec2 v_uv;',
             'uniform float u_time; uniform float u_motion; uniform float u_greet; uniform vec2 u_pointer;',
             'void main(){ v_uv=a_uv; vec2 p=a_uv;',
             'float head=1.0-smoothstep(0.38,0.55,p.y);',
-            'float breath=sin(u_time*1.35)*0.0027*u_motion;',
+            'float breath=sin(u_time*1.35)*0.005*u_motion;',
             'p.y-=breath*(0.38+0.62*head);',
             'p.x+=(p.x-0.5)*breath*smoothstep(0.4,0.7,p.y);',
             'float hair=smoothstep(0.16,0.3,abs(p.x-0.51))*smoothstep(0.22,0.5,p.y)*(1.0-smoothstep(0.84,1.0,p.y));',
-            'p.x+=sin(u_time*1.05+p.y*5.0)*0.0048*hair*u_motion;',
-            'p.y+=cos(u_time*0.95+p.x*3.0)*0.0015*hair*u_motion;',
+            'p.x+=sin(u_time*1.05+p.y*5.0)*0.008*hair*u_motion;',
+            'p.y+=cos(u_time*0.95+p.x*3.0)*0.0025*hair*u_motion;',
             'float ear=(1.0-smoothstep(0.12,0.23,p.y))*smoothstep(0.10,0.2,abs(p.x-0.5));',
             'float earBeat=pow(max(0.0,sin(u_time*0.68)),18.0);',
             'p.x+=sign(p.x-0.5)*ear*(sin(u_time*12.0)*earBeat*0.003+u_greet*0.005)*u_motion;',
             'p.y-=ear*u_greet*0.004*u_motion;',
-            'float headTurn=sin(u_time*0.47)*0.0035*u_motion;',
+            'float headTurn=sin(u_time*0.47)*0.007*u_motion;',
             'vec2 d=p-vec2(0.52,0.46); p+=vec2(-d.y,d.x)*headTurn*head;',
             'p+=u_pointer*vec2(0.0045,0.0025)*head*u_motion;',
             'float plush=max(0.0,1.0-length((a_uv-vec2(0.55,0.65))/vec2(0.20,0.15)));',
@@ -98,6 +97,7 @@
             var uniforms = {};
             ['time','motion','greet','pointer','blink'].forEach(function (name) { uniforms[name] = gl.getUniformLocation(program, 'u_' + name); });
             return {
+                kind: 'webgl', frameInterval: FRAME_INTERVAL,
                 draw: function (state) {
                     gl.viewport(0, 0, canvas.width, canvas.height);
                     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -111,32 +111,123 @@
         } catch (_) { dispose(); return null; }
     }
 
+    // Brave can disable WebGL while ordinary Canvas2D remains available.
+    // Draw the same illustrated textures through a small local mesh instead
+    // of silently replacing the animated character with a still image.
+    function createCanvasRig(canvas, image, blinkImage) {
+        var ctx;
+        try { ctx = canvas.getContext('2d', { alpha: true }); } catch (_) { return null; }
+        if (!ctx) return null;
+        var source = document.createElement('canvas');
+        source.width = 544; source.height = 725;
+        var base = source.getContext('2d');
+        base.imageSmoothingQuality = 'high'; base.drawImage(image, 0, 0, source.width, source.height);
+        var eyes = document.createElement('canvas'); eyes.width = source.width; eyes.height = source.height;
+        var eyePainter = eyes.getContext('2d');
+        if (blinkImage) {
+            eyePainter.drawImage(blinkImage, 0, 0, eyes.width, eyes.height);
+            var mask = document.createElement('canvas'); mask.width = eyes.width; mask.height = eyes.height;
+            var maskPainter = mask.getContext('2d');
+            [[.435,.317,.084,.041],[.619,.283,.082,.041]].forEach(function (eye) {
+                maskPainter.save(); maskPainter.translate(eye[0] * mask.width, eye[1] * mask.height);
+                maskPainter.scale(eye[2] * mask.width, eye[3] * mask.height);
+                var gradient = maskPainter.createRadialGradient(0, 0, .74, 0, 0, 1);
+                gradient.addColorStop(0, '#fff'); gradient.addColorStop(1, 'transparent');
+                maskPainter.fillStyle = gradient; maskPainter.fillRect(-1, -1, 2, 2); maskPainter.restore();
+            });
+            eyePainter.globalCompositeOperation = 'destination-in'; eyePainter.drawImage(mask, 0, 0);
+        }
+        var blended = document.createElement('canvas'); blended.width = source.width; blended.height = source.height;
+        var blendPainter = blended.getContext('2d');
+        var cols = 8, rows = 12, nodes = [], cells = [];
+        for (var row = 0; row <= rows; row++) for (var col = 0; col <= cols; col++) nodes.push({ x: col / cols, y: row / rows });
+        for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) {
+            var i = y * (cols + 1) + x;
+            cells.push([i, i + 1, i + cols + 1], [i + cols + 1, i + 1, i + cols + 2]);
+        }
+        function smooth(a, b, v) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
+        function deform(uv, s) {
+            var x = uv.x, y = uv.y, head = 1 - smooth(.38, .55, y);
+            var breath = Math.sin(s.time * 1.35) * .005 * s.motion;
+            y -= breath * (.38 + .62 * head); x += (x - .5) * breath * smooth(.4, .7, y);
+            var hair = smooth(.16, .3, Math.abs(x - .51)) * smooth(.22, .5, y) * (1 - smooth(.84, 1, y));
+            x += Math.sin(s.time * 1.05 + y * 5) * .008 * hair * s.motion;
+            y += Math.cos(s.time * .95 + x * 3) * .0025 * hair * s.motion;
+            var ear = (1 - smooth(.12, .23, y)) * smooth(.1, .2, Math.abs(x - .5));
+            var beat = Math.pow(Math.max(0, Math.sin(s.time * .68)), 18);
+            x += Math.sign(x - .5) * ear * (Math.sin(s.time * 12) * beat * .003 + s.greet * .005) * s.motion;
+            y -= ear * s.greet * .004 * s.motion;
+            var turn = Math.sin(s.time * .47) * .007 * s.motion, dx = x - .52, dy = y - .46;
+            x -= dy * turn * head; y += dx * turn * head;
+            x += s.x * .0045 * head * s.motion; y += s.y * .0025 * head * s.motion;
+            var plush = Math.max(0, 1 - Math.hypot((uv.x - .55) / .2, (uv.y - .65) / .15));
+            y -= plush * s.greet * .005 * s.motion;
+            return { x: x * canvas.width, y: y * canvas.height };
+        }
+        function drawTriangle(texture, a, b, c, p, q, r) {
+            var ax = a.x * source.width, ay = a.y * source.height;
+            var bx = b.x * source.width, by = b.y * source.height;
+            var cx = c.x * source.width, cy = c.y * source.height;
+            var denominator = ax * (by - cy) + bx * (cy - ay) + cx * (ay - by);
+            var aa = (p.x * (by - cy) + q.x * (cy - ay) + r.x * (ay - by)) / denominator;
+            var bb = (p.y * (by - cy) + q.y * (cy - ay) + r.y * (ay - by)) / denominator;
+            var cc = (p.x * (cx - bx) + q.x * (ax - cx) + r.x * (bx - ax)) / denominator;
+            var dd = (p.y * (cx - bx) + q.y * (ax - cx) + r.y * (bx - ax)) / denominator;
+            var ee = p.x - aa * ax - cc * ay, ff = p.y - bb * ax - dd * ay;
+            var centerX = (p.x + q.x + r.x) / 3, centerY = (p.y + q.y + r.y) / 3;
+            ctx.save(); ctx.beginPath();
+            [p, q, r].forEach(function (point, index) {
+                // A subpixel overlap closes antialiased triangle seams. It does
+                // not change the source silhouette or create separate layers.
+                var vx = point.x - centerX, vy = point.y - centerY, length = Math.hypot(vx, vy) || 1;
+                ctx[index ? 'lineTo' : 'moveTo'](point.x + vx / length * .6, point.y + vy / length * .6);
+            });
+            ctx.closePath(); ctx.clip(); ctx.setTransform(aa, bb, cc, dd, ee, ff); ctx.drawImage(texture, 0, 0); ctx.restore();
+        }
+        return {
+            kind: 'canvas2d', frameInterval: 1000 / 24,
+            draw: function (state) {
+                ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+                var texture = source;
+                if (blinkImage && state.blink > .001) {
+                    blendPainter.clearRect(0, 0, source.width, source.height); blendPainter.globalAlpha = 1;
+                    blendPainter.drawImage(source, 0, 0); blendPainter.globalAlpha = state.blink;
+                    blendPainter.drawImage(eyes, 0, 0); blendPainter.globalAlpha = 1; texture = blended;
+                }
+                if (!state.motion) { ctx.drawImage(texture, 0, 0, canvas.width, canvas.height); return; }
+                var warped = nodes.map(function (node) { return deform(node, state); });
+                cells.forEach(function (cell) { drawTriangle(texture, nodes[cell[0]], nodes[cell[1]], nodes[cell[2]], warped[cell[0]], warped[cell[1]], warped[cell[2]]); });
+            },
+            destroy: function () { source.width = eyes.width = blended.width = 1; }
+        };
+    }
+
     function mount(body, widget) {
         if (!body || !widget) return function () {};
         if (instances.has(widget.id)) instances.get(widget.id).destroy();
         var options = widget.options || {};
         var root = document.createElement('div');
         root.className = 'home-companion'; root.dataset.motion = 'loading';
-        root.innerHTML = '<a class="companion-trigger" target="_blank" rel="noopener noreferrer" aria-label="開啟 ChatGPT 對話">' +
+        root.innerHTML = '<button class="companion-trigger" type="button" aria-label="與角色聊天" aria-haspopup="dialog">' +
             '<span class="companion-scene" aria-hidden="true"><span class="companion-disc companion-surface"></span>' +
             '<span class="companion-figure"><img class="companion-portrait" src="' + ART + '" alt="" width="1086" height="1448" draggable="false"><canvas class="companion-canvas" width="544" height="725"></canvas></span>' +
             '<span class="companion-flourish"><svg class="companion-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z"/></svg></span></span>' +
-            '<span class="companion-action-label">和 ChatGPT 聊聊 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 5h11v11M19 5 5 19"/></svg></span></a>' +
+            '<span class="companion-action-label">和我聊聊 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 11.5a8 8 0 0 1-8 8H5l-3 2v-10a9 9 0 0 1 18 0Z"/><path d="M7 11h.01M12 11h.01M17 11h.01"/></svg></span></button>' +
             '<p class="companion-message" aria-live="polite"></p>';
         body.appendChild(root);
         var trigger = root.querySelector('.companion-trigger');
-        trigger.href = chatUrl(options.chatUrl || (options.companion && options.companion.chatUrl));
         var image = root.querySelector('.companion-portrait'), canvas = root.querySelector('canvas'), message = root.querySelector('.companion-message');
         var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
         var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-        var enabled = options.animation !== false;
+        var mode = animationMode(options), chatState = 'idle';
         var disposed = false, visible = true, frame = 0, lastFrame = 0, elapsed = 0, rig = null, greetUntil = 0, messageTimer = 0;
         var target = { x: 0, y: 0 }, pointer = { x: 0, y: 0 };
-        var state = { time: 0, motion: 0, greet: 0, x: 0, y: 0, blink: 0, frames: 0 };
+        var state = { time: 0, motion: 0, greet: 0, x: 0, y: 0, blink: 0, frames: 0, drawMs: 0 };
         var blinkImage = new Image();
         var ready = { art: false, blink: false, blinkFailed: false };
         function shouldMove() {
-            return !!rig && enabled && !reduced.matches && !document.hidden && visible && !document.body.matches('.is-arranging, .is-focus-mode') && !document.querySelector('.appearance-dialog[open]');
+            return !!rig && mode !== 'off' && (mode === 'on' || !reduced.matches) && !document.hidden && visible && !document.body.matches('.is-arranging, .is-focus-mode') && !document.querySelector('.appearance-dialog[open]');
         }
         function drawNeutral() {
             if (!rig) return;
@@ -149,23 +240,25 @@
                 if (!frame) { lastFrame = 0; frame = requestAnimationFrame(tick); }
             } else {
                 if (frame) cancelAnimationFrame(frame); frame = 0;
-                root.dataset.motion = !rig ? 'static' : reduced.matches ? 'reduced' : enabled ? 'paused' : 'off';
+                root.dataset.motion = !rig ? 'static' : mode === 'off' ? 'off' : mode === 'auto' && reduced.matches ? 'reduced' : 'paused';
                 root.classList.remove('is-greeting'); drawNeutral();
             }
         }
         function tick(now) {
             frame = 0;
             if (!shouldMove()) return sync();
-            if (!lastFrame || now - lastFrame >= FRAME_INTERVAL - 1) {
+            if (!lastFrame || now - lastFrame >= rig.frameInterval - 1) {
                 var delta = lastFrame ? Math.min(80, now - lastFrame) : FRAME_INTERVAL;
                 lastFrame = now; elapsed += delta;
                 pointer.x += (target.x - pointer.x) * .18; pointer.y += (target.y - pointer.y) * .18;
                 state.time = elapsed / 1000; state.motion = 1; state.x = pointer.x; state.y = pointer.y;
                 state.greet = Math.max(0, Math.min(1, (greetUntil - now) / 600));
-                var phase = (state.time + 2.15) % 5.9;
-                var blink = phase > 4.3 && phase < 4.5 ? Math.sin((phase - 4.3) / .2 * Math.PI) : 0;
+                if (chatState === 'thinking') state.x += Math.sin(state.time * .7) * .3;
+                if (chatState === 'replying') state.greet = Math.max(state.greet, .15 + .12 * Math.sin(state.time * 3));
+                var phase = (state.time + 2.1) % 4.6;
+                var blink = phase > 3 && phase < 3.26 ? Math.sin((phase - 3) / .26 * Math.PI) : 0;
                 state.blink = Math.max(blink, state.greet > .4 ? .75 * state.greet : 0);
-                rig.draw(state); state.frames++;
+                var paintStarted = performance.now(); rig.draw(state); state.drawMs = performance.now() - paintStarted; state.frames++;
                 root.classList.toggle('is-greeting', state.greet > .02);
             }
             frame = requestAnimationFrame(tick);
@@ -182,8 +275,15 @@
         function start() {
             if (disposed || rig || !ready.art || (!ready.blink && !ready.blinkFailed)) return;
             rig = createRig(canvas, image, ready.blink ? blinkImage : null);
-            if (rig) { resize(); drawNeutral(); root.classList.add('has-rig'); }
+            if (!rig) useCanvasFallback();
+            if (rig) { resize(); drawNeutral(); root.classList.add('has-rig'); root.dataset.renderer = rig.kind; }
             sync();
+        }
+        function useCanvasFallback() {
+            canvas.removeEventListener('webglcontextlost', lost);
+            var fallback = document.createElement('canvas'); fallback.className = 'companion-canvas';
+            fallback.width = canvas.width; fallback.height = canvas.height; canvas.replaceWith(fallback); canvas = fallback;
+            rig = createCanvasRig(canvas, image, ready.blink ? blinkImage : null);
         }
         function loaded() { ready.art = true; start(); }
         function artFailed() { root.dataset.motion = 'unavailable'; root.classList.add('art-unavailable'); }
@@ -207,11 +307,25 @@
         }
         function resetPointer() { target.x = 0; target.y = 0; }
         function escape(event) { if (event.key === 'Escape') root.classList.remove('is-speaking'); }
+        function updateChatState(value) {
+            if (value === 'speaking') value = 'replying';
+            chatState = ['idle', 'thinking', 'replying', 'error'].indexOf(value) >= 0 ? value : 'idle';
+            root.dataset.chatState = chatState;
+        }
+        function chatChanged(event) { if (event.detail && event.detail.widgetId === widget.id) updateChatState(event.detail.state); }
+        function openChat(event) {
+            event.preventDefault();
+            if (document.body.classList.contains('is-arranging')) return;
+            greet();
+            if (window.NewtabCharacterChat && typeof NewtabCharacterChat.open === 'function') NewtabCharacterChat.open(widget.id);
+            else { message.textContent = '聊天面板尚未載入，請重新整理後再試。'; root.classList.add('is-speaking'); }
+        }
         trigger.addEventListener('pointermove', move); trigger.addEventListener('pointerenter', greet);
         trigger.addEventListener('pointerleave', resetPointer); trigger.addEventListener('focus', greet);
-        trigger.addEventListener('blur', resetPointer); trigger.addEventListener('keydown', escape); trigger.addEventListener('click', greet);
+        trigger.addEventListener('blur', resetPointer); trigger.addEventListener('keydown', escape); trigger.addEventListener('click', openChat);
         document.addEventListener('visibilitychange', sync); reduced.addEventListener('change', sync);
         document.addEventListener('newtab:appearance-dialog', sync);
+        document.addEventListener('newtab:chat-state', chatChanged);
         var observer = new MutationObserver(sync);
         observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
         var intersection = window.IntersectionObserver ? new IntersectionObserver(function (entries) { visible = entries[0].isIntersecting; sync(); }, { threshold: .05 }) : null;
@@ -221,33 +335,41 @@
         function lost(event) {
             event.preventDefault(); if (disposed) return;
             if (frame) cancelAnimationFrame(frame); frame = 0;
-            rig = null; root.classList.remove('has-rig'); root.dataset.motion = 'static';
+            var previous = rig; rig = null;
+            useCanvasFallback();
+            if (previous) previous.destroy();
+            if (rig) { root.dataset.renderer = rig.kind; resize(); drawNeutral(); } else root.classList.remove('has-rig');
+            sync();
         }
-        canvas.addEventListener('webglcontextlost', lost); canvas.addEventListener('webglcontextrestored', start);
+        canvas.addEventListener('webglcontextlost', lost);
         function destroy() {
             if (disposed) return; disposed = true;
             if (frame) cancelAnimationFrame(frame); clearTimeout(messageTimer);
             document.removeEventListener('visibilitychange', sync); reduced.removeEventListener('change', sync);
             document.removeEventListener('newtab:appearance-dialog', sync);
+            document.removeEventListener('newtab:chat-state', chatChanged);
             observer.disconnect(); if (intersection) intersection.disconnect(); if (resizeObserver) resizeObserver.disconnect();
             image.removeEventListener('load', loaded); image.removeEventListener('error', artFailed);
             blinkImage.onload = blinkImage.onerror = null;
-            canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', start);
+            canvas.removeEventListener('webglcontextlost', lost);
             if (rig) rig.destroy(); root.remove(); instances.delete(widget.id);
         }
         instances.set(widget.id, {
             destroy: destroy,
-            setAnimation: function (value) { enabled = value; sync(); },
-            state: function () { return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, enabled: enabled, renderer: rig ? 'webgl' : 'image' }; }
+            setAnimation: function (value) { mode = ['auto', 'on', 'off'].indexOf(value) >= 0 ? value : value === false ? 'off' : 'on'; sync(); },
+            setChatState: updateChatState,
+            state: function () { return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, mode: mode, enabled: mode !== 'off', reduced: reduced.matches, renderer: rig ? rig.kind : 'image', drawMs: state.drawMs, chatState: chatState }; }
         });
         return destroy;
     }
     window.NewtabCompanion = {
-        mount: mount, safeChatUrl: chatUrl,
+        mount: mount,
         setAnimation: function (id, value) {
-            if (window.NewtabWidgets && window.NewtabWidgets.setCompanionOptions) return window.NewtabWidgets.setCompanionOptions(id, { animation: value !== false });
-            if (instances.has(id)) instances.get(id).setAnimation(value !== false);
+            var mode = ['auto', 'on', 'off'].indexOf(value) >= 0 ? value : value === false ? 'off' : 'on';
+            if (window.NewtabWidgets && window.NewtabWidgets.setCompanionOptions) return window.NewtabWidgets.setCompanionOptions(id, { animationMode: mode, animation: mode !== 'off' });
+            if (instances.has(id)) instances.get(id).setAnimation(mode);
         },
+        setChatState: function (id, value) { if (instances.has(id)) instances.get(id).setChatState(value); },
         getState: function (id) { return instances.has(id) ? instances.get(id).state() : null; }
     };
 })();

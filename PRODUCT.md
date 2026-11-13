@@ -17,6 +17,8 @@ Keep the Ashbery identity in the document title and About, Traditional Chinese c
 
 The owner subsequently supplied three Nachoneko references and asked for the entire interface, controls and optional animated avatar to follow that character. Silver-grey, powder blue, white, aqua and charcoal are the final visual direction.
 
+The character now supports an in-page GPT conversation through a separately installed Windows local helper and official ChatGPT authorization. Search, widgets, backgrounds, and the static website remain independent of that helper. No existing Dot memories or ChatGPT conversation history are imported. The personal noncommercial integration retains the official SDK's separate license.
+
 ## Principles
 - Search is immediately available and works even when remote suggestions fail.
 - Backgrounds belong to the user; interface controls remain legible over them.

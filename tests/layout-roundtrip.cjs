@@ -82,8 +82,8 @@ async function size(page,width,height) {
         await drag(page,'app-gmail',{x:5,y:390});
         await page.locator('#arrange-done-bar').click();
         const initial={images:await geometry(page,'app-images'),gmail:await geometry(page,'app-gmail')};
-        assert(initial.images.left+initial.images.width<=1952,'far right drop stays inside centered stage');
-        assert(initial.gmail.left>=608,'far left drop stays inside centered stage');
+        assert.equal(initial.images.left+initial.images.width,2560-16,'far right drop reaches viewport edge');
+        assert.equal(initial.gmail.left,16,'far left drop reaches viewport edge');
         for(const [width,height] of [[1280,720],[1440,900],[1920,1080],[2560,1440]]) {
             await size(page,width,height);await page.reload();
             const images=await geometry(page,'app-images'),gmail=await geometry(page,'app-gmail');
@@ -112,11 +112,11 @@ async function size(page,width,height) {
         await size(page,1440,900);await page.reload();exact(await geometry(page,'app-images'),desktop,'committed breakpoint roundtrip');
         console.log('PASS active draft through1920/1280/390/600/601/1440 and independent phone/desktop commits');
         await size(page,1280,540);await edit(page);
-        await drag(page,'app-images',{x:64,y:500},300);assert((await geometry(page,'app-images')).top+80>540,'fixture genuinely extends below viewport');await page.locator('#arrange-done-bar').click();
+        await drag(page,'app-images',{x:64,y:535},720);assert((await geometry(page,'app-images')).top+80>540,'fixture genuinely extends below viewport');await page.locator('#arrange-done-bar').click();
         await page.mouse.move(300,380);await page.mouse.wheel(0,-3000);await delay(100);
-        await page.mouse.move(300,380);await page.mouse.wheel(0,650);await delay(200);
+        await page.mouse.move(300,380);await page.mouse.wheel(0,3000);await delay(200);
         assert(await page.locator('#widget-canvas').evaluate(el=>el.scrollTop)>0,'short desktop home scrolls to low placement');
-        const low=await page.locator('.widget[data-id=app-images]').boundingBox();assert(low.y+low.height<=540,'low placement is reachable after Done');
+        const low=await page.locator('.widget[data-id=app-images]').boundingBox();assert(low.y+low.height<=540,'low placement is reachable after Done: '+JSON.stringify({low,scroll:await page.locator('#widget-canvas').evaluate(el=>({top:el.scrollTop,height:el.scrollHeight}))}));
         console.log('PASS short desktop: actual wheel scroll reaches lower committed item');
         await context.close();
         fs.writeFileSync('.impeccable/review/round5-coordinates-after.json',JSON.stringify(evidence,null,2));

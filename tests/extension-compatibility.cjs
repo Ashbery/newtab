@@ -104,18 +104,24 @@ async function seedWebsite(page) {
     await reread.close();
     evidence.push({ websiteStorage: preserved, bidirectionalLocalStorage: true });
 
-    // The character's explicit ChatGPT link opens independently; the native
-    // new-tab wrapper and its background remain in the original tab.
-    await context.route('https://chatgpt.com/**', r => r.fulfill({ contentType: 'text/html', body: '<title>ChatGPT destination</title>' }));
-    const characterPage = context.waitForEvent('page');
+    // The real character opens its dialog inside the native wrapper.
+    const pageCount = context.pages().length;
     await modern.frame.locator('.companion-trigger').click();
-    const chat = await characterPage;
-    await chat.waitForLoadState('domcontentloaded');
-    assert.equal(chat.url(), 'https://chatgpt.com/');
-    assert.equal(await chat.evaluate(() => window.opener), null);
+    await modern.frame.locator('.character-chat-dialog').waitFor();
+    assert.equal(context.pages().length, pageCount);
     assert(modern.page.url().endsWith('/newtab.html'));
-    await chat.close();
-    evidence.push({ companionChat: 'separate ChatGPT tab without opener; original native wrapper retained' });
+    assert.equal(await modern.frame.evaluate(() => document.featurePolicy.allowsFeature('loopback-network')), true);
+    if (process.env.NEWTAB_TEST_CHAT_SERVICE === '1') {
+      // Simulates the user's permission choice only in this disposable profile.
+      const cdp = await context.newCDPSession(modern.page);
+      const topUrl = new URL(modern.page.url());
+      await cdp.send('Browser.setPermission', { permission: { name: 'loopback-network' }, setting: 'granted', origin: topUrl.protocol + '//' + topUrl.host, embeddedOrigin: 'https://ashbery.github.io' });
+      const connection = await modern.frame.evaluate(() => NewtabChatTransport.status());
+      assert.equal(connection.available, true, 'Real loopback service reachable inside extension iframe');
+      evidence.push({ realLocalServiceReachable: true, accountConnected: connection.connected, inferenceTested: false });
+    }
+    await modern.frame.locator('.character-chat-close').click();
+    evidence.push({ companionChat: 'in-page dialog; no new tab; original native wrapper retained' });
 
     const stats = () => popup.evaluate(() => chrome.runtime.sendMessage({ action: 'getActivationStats' })).then(r => r.stats);
     assert.equal((await stats()).isActive, true);
@@ -159,7 +165,7 @@ async function seedWebsite(page) {
     await app.click();
     await shortcut.page.waitForURL(destination, { timeout: 10000 });
     evidence.push({ currentWebsite: 'direct URL and launcher shortcut navigated top-level', extensionId: id, hostPermissions: await worker.evaluate(() => chrome.runtime.getManifest().host_permissions) });
-    console.log('PASS: actual deployed search; current website search/shortcut/character ChatGPT link; top-level↔iframe localStorage and IndexedDB; popup settings/alarms/heartbeat; cold restart preserves settings/stats/media; other frames ignored.');
+    console.log('PASS: actual deployed search; current website search/shortcut/in-page character chat; top-level↔iframe localStorage and IndexedDB; popup settings/alarms/heartbeat; cold restart preserves settings/stats/media; other frames ignored.');
   } finally {
     if (context) await context.close();
     fs.writeFileSync(path.join(root, '.impeccable/review/round6-extension-integration.json'), JSON.stringify({ profile, evidence }, null, 2));

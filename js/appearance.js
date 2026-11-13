@@ -176,29 +176,20 @@
         textColor.addEventListener('change', function () { update('text', textColor.value); });
         textRow.appendChild(textColor); fields.appendChild(textRow);
         var animation = null;
-        var chatUrl = null;
-        var chatError = null;
         if (widget.type === 'companion' && global.NewtabWidgets.setCompanionOptions) {
             var animationRow = document.createElement('label'); animationRow.className = 'appearance-tint'; animationRow.textContent = '角色動畫';
-            animation = document.createElement('input'); animation.type = 'checkbox'; animation.checked = !(widget.options && widget.options.animation === false);
+            animation = document.createElement('select');
+            animation.innerHTML = '<option value="auto">跟隨系統偏好</option><option value="on">開啟動畫</option><option value="off">靜態角色</option>';
+            var options = widget.options || {};
+            animation.value = options.animationMode || (options.animation === true ? 'on' : options.animation === false ? 'off' : 'auto');
             animation.setAttribute('aria-label', '角色動畫');
-            animation.addEventListener('change', function () { global.NewtabWidgets.setCompanionOptions(id, { animation: animation.checked }); });
+            animation.addEventListener('change', function () { global.NewtabWidgets.setCompanionOptions(id, { animationMode: animation.value }); });
             animationRow.appendChild(animation); fields.appendChild(animationRow);
-            var chatLabel = document.createElement('label'); chatLabel.className = 'appearance-chat-label'; chatLabel.htmlFor = 'appearance-chat-url'; chatLabel.textContent = 'ChatGPT 對話網址';
-            chatUrl = document.createElement('input'); chatUrl.type = 'url'; chatUrl.id = 'appearance-chat-url'; chatUrl.className = 'appearance-chat-url'; chatUrl.placeholder = 'https://chatgpt.com/';
-            chatUrl.value = widget.options && widget.options.chatUrl || ''; chatUrl.setAttribute('aria-describedby', 'appearance-chat-hint');
-            chatError = document.createElement('p'); chatError.id = 'appearance-chat-hint'; chatError.className = 'appearance-hint'; chatError.setAttribute('role', 'status');
-            chatError.textContent = '留白開啟 ChatGPT，或貼上你現有的 ChatGPT 對話網址。';
-            chatUrl.addEventListener('change', function () {
-                var raw = chatUrl.value.trim();
-                var valid = !raw;
-                try { var url = new URL(raw); valid = url.protocol === 'https:' && url.hostname === 'chatgpt.com' && !url.port && !url.username && !url.password; } catch (_) { /* Show inline guidance for invalid URLs. */ }
-                chatUrl.setAttribute('aria-invalid', valid ? 'false' : 'true');
-                if (!valid) { chatError.textContent = '請輸入 https://chatgpt.com/ 開頭的對話網址。'; return; }
-                global.NewtabWidgets.setCompanionOptions(id, { chatUrl: raw });
-                chatError.textContent = '已儲存。點選角色會在新分頁開啟 ChatGPT。';
-            });
-            fields.append(chatLabel, chatUrl, chatError);
+            var motionHint = document.createElement('p'); motionHint.className = 'appearance-hint';
+            motionHint.textContent = '角色會眨眼與輕輕呼吸。選擇「開啟動畫」可在系統減少動態效果時仍播放；拖移、調整外觀或離開分頁時暫停。';
+            var chatHint = document.createElement('p'); chatHint.className = 'appearance-hint';
+            chatHint.textContent = '點選角色即可在這裡與 GPT 對話，首次使用請在對話面板登入 ChatGPT。';
+            fields.append(motionHint, chatHint);
         }
         var actions = document.createElement('footer');
         var reset = document.createElement('button'); reset.type = 'button'; reset.className = 'appearance-reset'; reset.textContent = '恢復預設';
@@ -207,10 +198,7 @@
         var panel = dialog;
         function finish() { panel.close(); }
         close.addEventListener('click', finish);
-        done.addEventListener('click', function () {
-            if (chatUrl && chatUrl.getAttribute('aria-invalid') === 'true') { chatUrl.focus(); return; }
-            finish();
-        });
+        done.addEventListener('click', finish);
         panel.addEventListener('close', function () {
             panel.remove();
             if (dialog === panel) {
@@ -234,12 +222,8 @@
             textColor.value = values.text;
             if (imageControl) { imageControl.element.remove(); imageControl = null; }
             if (animation) {
-                animation.checked = true;
-                var savedWidget = widgetById(id);
-                chatUrl.value = savedWidget && savedWidget.options && savedWidget.options.chatUrl || '';
-                chatUrl.removeAttribute('aria-invalid');
-                chatError.textContent = '已恢復外觀與動畫預設，保留你的對話網址。';
-                global.NewtabWidgets.setCompanionOptions(id, { animation: true });
+                animation.value = 'auto';
+                global.NewtabWidgets.setCompanionOptions(id, { animationMode: 'auto' });
             }
         });
         document.body.appendChild(panel); panel.showModal();
