@@ -11,7 +11,8 @@
         { type: 'notes', label: '備註', desc: '快捷便利貼', icon: 'fa-sticky-note' },
         { type: 'countdown', label: '倒數日', desc: '重要日子倒數', icon: 'fa-hourglass-half' },
         { type: 'todo', label: '待辦', desc: '簡易清單', icon: 'fa-list-check' },
-        { type: 'bookmarks', label: '書籤列', desc: '常用連結橫列', icon: 'fa-bookmark' }
+        { type: 'bookmarks', label: '書籤列', desc: '常用連結橫列', icon: 'fa-bookmark' },
+        { type: 'companion', label: '角色夥伴', desc: '可以移動的動態角色', icon: 'fa-cat', category: 'personalize' }
     ];
 
     function listComponents() {

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta name="newtab-release" content="2026.11.14.1">
+    <meta name="newtab-release" content="2026.11.14.2">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ashbery 新分頁 — 可自訂瀏覽器起始頁</title>
@@ -1686,6 +1686,7 @@
     <link rel="stylesheet" href="css/companion.css">
     <link rel="stylesheet" href="css/clock.css">
     <link rel="stylesheet" href="css/home-editor.css">
+    <link rel="stylesheet" href="css/appearance.css">
 </head>
 <body>
     <video id="video-background" autoplay muted loop playsinline preload="metadata"></video>
@@ -1734,14 +1735,6 @@
             </div>
         </div>
     </main>
-    <aside id="home-companion" class="home-companion" aria-label="貓貓陪伴">
-        <button id="companion-trigger" class="companion-trigger" type="button" aria-label="和貓貓打招呼" aria-describedby="companion-message">
-            <span class="companion-orbit" aria-hidden="true"></span>
-            <img class="companion-portrait" src="assets/character/nacho-companion.webp" alt="" width="1086" height="1448" decoding="async">
-            <span class="companion-flourish" aria-hidden="true"></span>
-        </button>
-        <p id="companion-message" class="companion-message" role="status" aria-live="polite" aria-atomic="true">今天也陪著你。</p>
-    </aside>
     <div class="home-announcement sr-only" id="home-announcement" role="status"></div>
 
     <!-- 右上快捷列：Elgato Nachoneko Icon Pack -->
@@ -1947,6 +1940,8 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
     <script src="js/app-registry.js"></script>
     <script src="js/layout-engine.js"></script>
     <script src="js/clock.js"></script>
+    <script src="js/appearance.js"></script>
+    <script src="js/companion.js"></script>
     <script src="js/widget-host.js"></script>
     <script src="js/widget-catalog.js"></script>
     <script src="js/folder-ui.js"></script>
@@ -1955,7 +1950,6 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
     <script src="js/search.js"></script>
     <script src="js/background.js"></script>
     <script src="js/experience.js"></script>
-    <script src="js/companion.js"></script>
     <script src="js/motion.js"></script>
     <script>
         // Google應用圖標功能

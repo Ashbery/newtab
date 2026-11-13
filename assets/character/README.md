@@ -6,7 +6,15 @@ Direction: silver-grey long hair, aqua eyes, cat ears and charcoal three-eyed ca
 
 The generated portrait is separate from the existing Elgato / Nachoneko MIT icon pack. Character reference: Nachoneko, illustrated by Amashiro Natsuki. This personal theme is not presented as an official collaboration.
 
-paw.svg is an authored interface motif. Runtime animation uses short pointer/click feedback and stops under reduced-motion preferences.
+paw.svg is an authored interface motif.
+
+## Animated companion
+
+`nacho-blink.png` is a registered 1086×1448 closed-eye alternate frame generated from `nacho-companion.webp` on 2026-11-14. The prompt requested only relaxed, closed eyelids while preserving placement, face, hair, clothes, plush, and transparency. `nacho-blink.webp` is the alpha-preserving local WebP version (236,092 bytes).
+
+The runtime uses a small WebGL 1 mesh to deform hair, ears, breathing, and head posture independently. Feathered eye regions from the illustrated alternate frame supply natural blinks; the rest of the portrait always uses the original texture. The renderer prepares mipmapped textures in memory to avoid sparkling edges at small widget sizes. This is a procedural 2D character rig, not a Live2D model or a generated video.
+
+Rendering is limited to 30 frames per second, pauses when hidden, outside the viewport, arranging the home screen, or in focus mode, and stops under reduced-motion preferences or the widget's animation switch. Missing WebGL support restores the still portrait. Removing the widget releases the animation, observers, and graphics resources. Clicking the character opens ChatGPT in a separate tab; it does not imply embedded AI, an account connection, microphone access, or a live conversation inside the widget.
 
 ## Character launcher icons
 

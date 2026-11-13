@@ -351,6 +351,28 @@ test('submit control and public API submit safely without depending on suggestio
     assert.equal(withoutButton.window.location.href, 'https://example.com/');
 });
 
+test('hovering a suggestion never changes the query submitted by Search or Enter', () => {
+    for (const submit of ['button', 'enter']) {
+        const page = createPage();
+        page.type('motion check');
+        page.advance(260);
+        page.respond(['motion check videos', 'motion check images']);
+        const row = page.list.children[0];
+        row.dispatch('mouseenter');
+        if (row.onmouseenter) row.onmouseenter();
+        if (submit === 'button') page.submitButton.dispatch('click');
+        else page.key('Enter');
+        assert.equal(page.window.location.href, 'https://www.google.com/search?q=motion%20check');
+    }
+    const page = createPage();
+    page.type('motion check');
+    page.advance(260);
+    page.respond(['motion check videos']);
+    page.key('ArrowDown');
+    page.submitButton.dispatch('click');
+    assert.equal(page.window.location.href, 'https://www.google.com/search?q=motion%20check%20videos', 'explicit keyboard selection is retained');
+});
+
 test('refocusing a pending query restarts its request rather than treating the local action as a cached response', () => {
     const page = createPage();
     page.type('cat');

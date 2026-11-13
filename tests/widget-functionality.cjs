@@ -285,9 +285,9 @@ async function applications(page, mobile) {
     const use12 = (await options(page, 'clock')).hour12 === false;
     await tools(page, '個人化');
     await page.locator('#arrange-home').click();
-    const clockOptions = page.getByRole('button', { name: '時鐘設定', exact: true });
-    if (mobile) await clockOptions.tap();
-    else { await clockOptions.focus(); await page.keyboard.press('Enter'); }
+    const clockWidget = page.locator('.widget[data-type=clock]');
+    if (mobile) { await clockWidget.tap(); await page.locator('#editor-widget-settings').tap(); }
+    else { await clockWidget.focus(); await page.keyboard.press('Shift+F10'); }
     await page.getByRole('menuitem', { name: '時間制', exact: true }).click();
     await page.getByRole('menuitemradio', { name: use12 ? '12 小時制' : '24 小時制', exact: true }).click();
     assert.equal((await options(page, 'clock')).hour12, use12);
@@ -298,7 +298,7 @@ async function applications(page, mobile) {
         const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
         const end = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
         await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
-        await page.waitForTimeout(80);
+        await page.waitForTimeout(620);
         for (let step = 1; step <= 10; step++) {
             await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{
                 x: start.x + (end.x - start.x) * step / 10, y: start.y + (end.y - start.y) * step / 10 }] });
@@ -312,6 +312,7 @@ async function applications(page, mobile) {
     } else {
         await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
         await page.mouse.down();
+        await page.waitForTimeout(620);
         await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
         await page.waitForTimeout(750);
         await page.mouse.up();
@@ -343,7 +344,8 @@ async function applications(page, mobile) {
     await page.locator('.folder-overlay').waitFor({ state: 'hidden' });
     await tools(page, '個人化');
     await page.locator('#arrange-home').click();
-    await page.getByRole('button', { name: '資料夾設定', exact: true }).click();
+    await page.locator('.widget[data-type=folder]').click();
+    await page.locator('#editor-widget-settings').click();
     await page.getByRole('menuitem', { name: '解散資料夾', exact: true }).click();
     await done(page);
     assert.equal(await apps.count(), 4);

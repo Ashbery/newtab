@@ -31,6 +31,7 @@ async function drag(page, id, target, hold = 0) {
     const box = await page.locator('.widget[data-id="'+id+'"]').boundingBox();
     await page.mouse.move(box.x + box.width/2, box.y + box.height/2);
     await page.mouse.down();
+    await page.waitForTimeout(620);
     await page.mouse.move(target.x,target.y,{steps:12});
     if (hold) await delay(hold);
     const preview = await page.locator('#home-drop-preview').evaluate(el=>({
@@ -61,7 +62,7 @@ async function size(page,width,height) {
             // Targets derive from visible free space, not from the snap implementation.
             for (const id of ['clock-1','search-1','app-images']) {
                 const original=before[id];
-                const target=id==='clock-1'?{x:width-stageLeft-original.width/2-4,y:original.top+original.height/2}:
+                const target=id==='clock-1'?{x:original.left+original.width/2,y:stageTop+24+original.height/2}:
                     id==='search-1'?{x:width/2,y:stageTop+72}:{x:stageLeft+48,y:stageTop+64};
                 await drag(page,id,target);
                 await drag(page,id,{x:original.left+original.width/2,y:original.top+original.height/2});

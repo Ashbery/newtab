@@ -21,7 +21,7 @@
                 button.setAttribute('aria-pressed', String(enabled));
                 button.querySelector('span').textContent = enabled ? '結束專注' : '專注片刻';
             }
-            document.querySelectorAll('.widget[data-type="app"], .widget[data-type="folder"]').forEach(function (element) { element.inert = enabled; });
+            document.querySelectorAll('.widget[data-type="app"], .widget[data-type="folder"], .widget[data-type="companion"]').forEach(function (element) { element.inert = enabled; });
         }
         function focusMode(enabled) {
             document.body.classList.toggle('is-focus-mode', enabled);

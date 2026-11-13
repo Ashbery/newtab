@@ -37,10 +37,6 @@ body.has-custom-background .landscape-shade { background: rgba(238, 244, 249, .1
 body.has-custom-background .landscape-shade::before, body.has-custom-background .landscape-shade::after { display: none; }
 body.has-custom-background .home-brand { padding: 9px 13px; border-radius: 16px; background: #f8fbfd; }
 body.has-custom-background .home-help { padding: 0 12px; border-radius: 12px; background: #f8fbfd; }
-body.has-custom-background .widget[data-type="clock"][data-layout] .clock-glass { padding: 14px; border: 1px solid #d5e0e8; border-radius: 20px; background: #f8fbfd; }
-body.has-custom-background .widget[data-type="app"] .app-tile-label,
-body.has-custom-background .widget[data-type="folder"] .folder-label { padding: 2px; border-radius: 6px; background: #f8fbfd; }
-body.has-custom-background .home-companion:not(.is-docked) .companion-message { top: calc(100% + 4px); left: 50%; width: max-content; max-width: 100%; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: #f8fbfd; }
 .home-header, .home-footer {
     position: fixed; left: var(--home-edge); right: var(--home-edge); z-index: 42;
     display: flex; align-items: center; justify-content: space-between; gap: 20px;
@@ -231,6 +227,7 @@ body.is-arranging .home-help, body.is-arranging .home-tools { visibility: hidden
 /* Focus is reversible; hidden controls cannot retain keyboard focus. */
 .widget[data-type="app"], .widget[data-type="folder"] { transition: opacity 240ms ease, visibility 240ms; }
 body.is-focus-mode .widget[data-type="app"],
+body.is-focus-mode .widget[data-type="companion"],
 body.is-focus-mode .widget[data-type="folder"] { opacity: 0; visibility: hidden; pointer-events: none; }
 .focus-button[aria-pressed="true"] { background: #dceaf3; color: #17394e; border-color: transparent; }
 .home-brand.is-obstructed { visibility: hidden; pointer-events: none; }

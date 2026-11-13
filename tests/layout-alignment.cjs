@@ -19,7 +19,7 @@ async function menu(page, name) {
 async function add(page, name) {await menu(page,'應用');await page.getByRole('button',{name:'新增'+name,exact:true}).click();if(await page.evaluate(()=>NewtabSideRail.isOpen()))await page.locator('#side-rail-close').click();}
 async function drag(page,id,x,y) {
   const b=await page.locator('.widget[data-id="'+id+'"]').boundingBox();
-  await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(x,y,{steps:14});
+  await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.waitForTimeout(620);await page.mouse.move(x,y,{steps:14});
   const preview=await page.locator('#home-drop-preview').evaluate(e=>({left:parseFloat(e.style.left),top:parseFloat(e.style.top),state:e.dataset.state}));
   await page.mouse.up();await page.mouse.move(1400,50);await delay(350);return preview;
 }

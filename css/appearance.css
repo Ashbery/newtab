@@ -1,0 +1,92 @@
+/* One appearance layer: backgrounds stay separate from readable content. */
+:root { --background-visibility: 1; --background-blur: 0px; --background-scale: 1; }
+#video-background, #image-background {
+    opacity: var(--background-visibility);
+    filter: blur(var(--background-blur));
+    transform: scale(var(--background-scale));
+}
+body.has-custom-background .landscape-shade { background: transparent; }
+
+body .widget[data-type][data-layout] .widget-surface,
+body.has-custom-background .widget[data-type="clock"][data-layout] .clock-glass,
+body .widget[data-type="clock"][data-layout] .clock-glass,
+body .widget[data-type="search"][data-layout] .search-input-wrapper,
+body .widget[data-type="search"][data-layout] .search-box:focus-within .search-input-wrapper,
+body .widget[data-type="app"][data-layout] .app-tile-icon,
+body .widget[data-type="folder"][data-layout] .folder-preview {
+    background-color: var(--widget-fill, rgba(248, 251, 253, .3));
+    background-image: var(--widget-image, none);
+    border: 1px solid var(--widget-edge, transparent);
+    border-radius: var(--widget-corner, 18px);
+    box-shadow: var(--widget-shadow, none);
+    backdrop-filter: blur(var(--widget-frost, 0px));
+    -webkit-backdrop-filter: blur(var(--widget-frost, 0px));
+}
+body .widget[data-type="companion"][data-layout] .companion-surface {
+    background-color: var(--widget-fill, transparent); border-color: var(--widget-edge, transparent);
+    box-shadow: var(--widget-shadow, none); backdrop-filter: blur(var(--widget-frost, 0px));
+}
+body .widget :is(.notes-body textarea, .todo-item, .countdown-title-input, .countdown-date-input) { background: transparent; }
+body .widget[data-appearance-image][data-type][data-layout] .widget-surface { position: relative; isolation: isolate; background-image: none; }
+body .widget[data-appearance-image] .widget-surface::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+    background-image: var(--widget-image); background-size: cover; background-position: center;
+    opacity: var(--widget-image-alpha, .35); pointer-events: none;
+}
+body .widget[data-type="clock"][data-layout] .clock-glass,
+body.has-custom-background .widget[data-type="clock"][data-layout] .clock-glass { padding: 8px 5px; }
+body.has-custom-background .widget[data-type="app"] .app-tile-label,
+body.has-custom-background .widget[data-type="folder"] .folder-label,
+body .widget[data-type="app"] .app-tile-label,
+body .widget[data-type="folder"] .folder-label {
+    background: transparent; border: 0; box-shadow: none; padding: 0;
+}
+.widget[data-appearance-text="light"] { --appearance-ink: #f4f8fc; --appearance-muted: #e0eaf2; }
+.widget[data-appearance-text="dark"] { --appearance-ink: #303945; --appearance-muted: #536477; }
+body .widget[data-appearance-text] :is(.widget-surface, .clock-glass, .time, .date, .clock-time, .clock-date, .home-greeting, .app-tile-label, .folder-label, .search-input, .notes-body textarea, .todo-label, .countdown-title-input, .weather-temp, .weather-city, .weather-meta, .weather-status, .countdown-value, .countdown-label, .countdown-date-input, .todo-add-input, .bookmark-chip) {
+    color: var(--appearance-ink);
+}
+body .widget[data-appearance-text] :is(input, textarea)::placeholder { color: var(--appearance-muted); }
+body .widget[data-appearance-text] .widget-empty-title { color: var(--appearance-ink); }
+body .widget[data-appearance-text] .widget-empty-hint { color: var(--appearance-muted); }
+body .widget[data-appearance-text] #clock,
+body .widget[data-appearance-text] #clock :is(.date, .clock-period, .clock-weekday, .clock-seconds, .clock-divider),
+body .widget[data-appearance-text] :is(.todo-text, .countdown-days, .countdown-unit, .countdown-date) { color: var(--appearance-ink); }
+
+.background-appearance { margin: 22px 0 18px; padding-top: 4px; }
+.appearance-control { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; margin: 14px 0; }
+.appearance-control > label { font-size: 13px; line-height: 1.5; }
+.appearance-number-wrap { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
+.appearance-number-wrap input {
+    width: 62px; min-height: 40px; box-sizing: border-box; border: 1px solid #bdd0dd; border-radius: 9px;
+    background: #fff; color: #304a5b; padding: 6px; font: 500 14px var(--font-ui); text-align: center;
+}
+.appearance-control > input[type="range"] { grid-column: 1 / -1; width: 100%; height: 30px; margin: 1px 0 0; accent-color: #4a809c; cursor: pointer; }
+.appearance-hint { font-size: 12px; line-height: 1.6; color: #587082; margin: 10px 0 16px; }
+.appearance-reset { min-height: 44px; padding: 9px 12px; border: 1px solid #678699; border-radius: 10px; background: transparent; color: inherit; font: 500 13px var(--font-ui); cursor: pointer; }
+.appearance-reset:hover { background: rgb(120 157 182 / .12); }
+.appearance-dialog {
+    width: min(380px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 24px;
+    box-sizing: border-box; overflow-y: auto; border: 1px solid #c4d5df; border-radius: 24px;
+    background: #f6fafd; color: #304a5b; font-family: var(--font-ui);
+    box-shadow: 0 22px 80px rgb(20 41 60 / .25);
+}
+.appearance-dialog::backdrop { background: rgb(11 27 39 / .25); }
+.appearance-dialog header, .appearance-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.appearance-dialog h2 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -.025em; }
+.appearance-dialog .appearance-close { width: 44px; height: 44px; margin: -10px -10px -10px 0; border: 0; border-radius: 50%; background: transparent; color: #526d7f; font: 26px var(--font-ui); cursor: pointer; }
+.appearance-dialog .appearance-close:hover { background: #e4eef5; }
+.appearance-dialog .appearance-hint { color: #587082; margin-top: 14px; }
+.appearance-dialog .appearance-number-wrap input { color: #304a5b; border-color: #bdd0dd; background: #fff; }
+.appearance-dialog .appearance-control > input[type="range"] { accent-color: #4a809c; }
+.appearance-dialog .appearance-tint { display: flex; align-items: center; justify-content: space-between; font-size: 13px; margin: 12px 0 20px; }
+.appearance-dialog input[type="color"] { width: 65px; height: 40px; padding: 4px; border: 1px solid #bdd0dd; border-radius: 9px; background: #fff; cursor: pointer; }
+.appearance-dialog select { min-height: 40px; padding: 6px 10px; border: 1px solid #bdd0dd; border-radius: 9px; background: #fff; color: #304a5b; font: inherit; }
+.appearance-dialog input[type="checkbox"] { width: 22px; height: 22px; accent-color: #396b87; }
+.appearance-chat-label { display: block; margin: 18px 0 8px; font-size: 13px; }
+.appearance-chat-url { width: 100%; min-height: 44px; padding: 8px 10px; box-sizing: border-box; border: 1px solid #bdd0dd; border-radius: 9px; background: #fff; color: #304a5b; font: 12px var(--font-ui); }
+.appearance-chat-url[aria-invalid="true"] { border-color: #a84848; }
+.appearance-dialog .appearance-done { min-height: 44px; padding: 9px 26px; border: 0; border-radius: 10px; background: #396b87; color: #fff; font: 500 13px var(--font-ui); cursor: pointer; }
+.appearance-dialog .appearance-done:hover { background: #2c5870; }
+.appearance-dialog :focus-visible { outline: 2px solid #417a99; outline-offset: 3px; }
+@media (max-width: 380px) { .appearance-dialog { padding: 18px; border-radius: 20px; } }

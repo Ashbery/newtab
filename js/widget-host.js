@@ -27,7 +27,8 @@
         notes: { w: 200, h: 144 },
         countdown: { w: 144, h: 112 },
         todo: { w: 200, h: 176 },
-        bookmarks: { w: 360, h: 64 }
+        bookmarks: { w: 360, h: 64 },
+        companion: { w: 280, h: 360 }
     };
 
     var L = null;
@@ -92,7 +93,7 @@
     function isChromeTarget(t) {
         if (!t || !t.closest) return false;
         return !!(
-            t.closest('.home-companion') ||
+            t.closest('.appearance-dialog') ||
             t.closest('.home-header') ||
             t.closest('.home-footer') ||
             t.closest('#side-rail') ||
@@ -131,6 +132,7 @@
     }
 
     function guardAppearance(opts) {
+        if (global.NewtabAppearance) return NewtabAppearance.normalizeWidget(opts);
         if (!opts || typeof opts !== 'object') return {};
         var p = opts.preset;
         if (['glass', 'solid', 'clear'].indexOf(p) < 0) p = undefined;
@@ -154,6 +156,7 @@
 
     function applyAppearance(el, w) {
         if (!el || !w) return;
+        if (global.NewtabAppearance) { NewtabAppearance.applyWidget(el, w); return; }
         var types = { bookmarks: 1, todo: 1, countdown: 1, notes: 1 };
         if (!types[w.type]) {
             el.removeAttribute('data-appearance-preset');
@@ -276,6 +279,11 @@
             el.appendChild(buildTodoBody(w));
         } else if (w.type === 'bookmarks') {
             el.appendChild(buildBookmarksBody(w));
+        } else if (w.type === 'companion') {
+            var companionBody = document.createElement('div');
+            companionBody.className = 'widget-body companion-widget-body';
+            el.appendChild(companionBody);
+            mountCompanion(el, w);
         }
 
         // lock badge (visibility via CSS .is-pinned)
@@ -287,6 +295,16 @@
 
         canvas.appendChild(el);
         return el;
+    }
+
+    function mountCompanion(el, w) {
+        if (!global.NewtabCompanion || !NewtabCompanion.mount) return;
+        var optionsKey = JSON.stringify({ animation: !w.options || w.options.animation !== false,
+            greeting: w.options && w.options.greeting || '', chatUrl: w.options && w.options.chatUrl || '' });
+        if (el._companionOptions === optionsKey) return;
+        if (typeof el._companionCleanup === 'function') el._companionCleanup();
+        el._companionOptions = optionsKey;
+        el._companionCleanup = NewtabCompanion.mount(el.querySelector('.companion-widget-body'), w);
     }
 
     function buildAppBody(appId) {
@@ -1272,6 +1290,7 @@
             var id = el.getAttribute('data-id');
             if (!present[id]) {
                 if (el.getAttribute('data-type') !== 'clock' && el.getAttribute('data-type') !== 'search') {
+                    if (typeof el._companionCleanup === 'function') el._companionCleanup();
                     el.remove();
                     return;
                 }
@@ -1285,6 +1304,7 @@
                 el.setAttribute('data-active', 'true');
                 ensureLockBadge(el);
                 var w = present[id];
+                if (w.type === 'companion') mountCompanion(el, w);
                 if (w.type === 'folder') refreshFolderBody(el, w);
                 if (w.type === 'app') {
                     var body = el.querySelector('.widget-body');
@@ -1450,10 +1470,31 @@
         });
         var w = id && findWidget(id);
         var meta = w && global.NewtabCatalog && NewtabCatalog.get(w.type);
-        editorMessage(w ? '已選擇' + (meta ? meta.label : w.type === 'folder' ? '資料夾' : '應用') + '；拖曳或點一下空位移動' : '點選要移動的項目；按住圖示可建立資料夾');
+        editorMessage(w ? '已選擇' + (meta ? meta.label : w.type === 'folder' ? '資料夾' : '應用') + '；長按後拖移，方向鍵也能移動' : '長按項目後拖移；圖示重疊停留可建立資料夾');
         $$('#home-editor-toolbar [data-editor-resize]').forEach(function (button) {
             button.disabled = !w || w.pinned || !handlesForType(w.type).length;
         });
+        var settings = $('#editor-widget-settings');
+        if (settings) settings.disabled = !w;
+    }
+
+    function moveById(id, dx, dy) {
+        var w = findWidget(id);
+        if (!w || w.pinned) return { ok: false, error: 'locked' };
+        if (!state.editor) enterArrange();
+        selectEditorWidget(id);
+        var rect = Object.assign({}, state.editor.rects[id]);
+        rect.left += Math.sign(Number(dx) || 0) * state.editor.grid.pitchX;
+        rect.top += Math.sign(Number(dy) || 0) * state.editor.grid.pitchY;
+        var snapped = snapEditorRect(w, rect, false);
+        if (!L.homeFits(snapped, otherPixelRects(id))) {
+            editorMessage('這個方向已有項目');
+            return { ok: false, error: 'occupied' };
+        }
+        commitEditorRect(id, snapped); applyPositions();
+        editorMessage('已移動；完成後儲存');
+        revealEditorSelection();
+        return { ok: true };
     }
 
     function showAlignmentGuides(rect, visible) {
@@ -1626,8 +1667,13 @@
             toolbar = document.createElement('div'); toolbar.id = 'home-editor-toolbar';
             toolbar.setAttribute('role', 'toolbar'); toolbar.setAttribute('aria-label', '排列主畫面');
             toolbar.innerHTML = '<p id="editor-status" role="status" aria-live="polite">點選要移動的項目</p>' +
-                '<div class="editor-actions"><button type="button" data-editor-resize="-1" disabled>縮小</button><button type="button" data-editor-resize="1" disabled>放大</button>' +
+                '<div class="editor-actions"><button type="button" id="editor-widget-settings" disabled>設定</button><button type="button" data-editor-resize="-1" disabled>縮小</button><button type="button" data-editor-resize="1" disabled>放大</button>' +
                 '<button type="button" id="arrange-cancel">取消</button></div>';
+            toolbar.querySelector('#editor-widget-settings').addEventListener('click', function (e) {
+                e.stopPropagation();
+                var widget = state.editor && document.querySelector('.widget[data-id="' + state.editor.selected + '"]');
+                if (widget && global.NewtabContextMenu && NewtabContextMenu.openWidget) NewtabContextMenu.openWidget(widget);
+            });
             toolbar.querySelector('#arrange-cancel').addEventListener('click', function (e) { e.stopPropagation(); cancelArrange(); });
             toolbar.querySelectorAll('[data-editor-resize]').forEach(function (button) {
                 button.addEventListener('click', function (e) { e.stopPropagation(); resizeSelected(Number(button.getAttribute('data-editor-resize'))); });
@@ -1765,22 +1811,23 @@
     }
 
     function armLongPress(el, e) {
-        if (state.arranging) return;
         if (e.button != null && e.button !== 0) return;
         if (document.body.classList.contains('is-catalog-placing')) return;
         if (isChromeTarget(e.target)) return;
         // Form controls receive their complete pointer/click sequence without
         // arming arrange mode. App links retain a visual-only long-press hint.
-        if (e.target.closest && e.target.closest('input, textarea, select, button, [contenteditable]:not([contenteditable="false"]), .suggestions-container, .suggestions-list')) {
+        if (!state.arranging && e.target.closest && e.target.closest('input, textarea, select, button:not(.folder-tile):not(.companion-button), [contenteditable]:not([contenteditable="false"]), .suggestions-container, .suggestions-list') && !el.matches('[data-type="companion"]')) {
             return;
         }
         if (e.target.closest && e.target.closest(
-            'button.folder-tile, button.todo-check, button.todo-add, button.bookmark-add, button.bookmark-add-tile, button.weather-retry, a.bookmark-chip, a.bookmark-tile, .bookmark-add-pop, .countdown-title-input, .countdown-date-input'
+            'button.todo-check, button.todo-add, button.bookmark-add, button.bookmark-add-tile, button.weather-retry, a.bookmark-chip, a.bookmark-tile, .bookmark-add-pop, .countdown-title-input, .countdown-date-input'
         )) {
             return;
         }
 
         var id = el.getAttribute('data-id');
+        var widget = findWidget(id);
+        if (!widget || widget.pinned) return;
         clearLongPress();
         state.longPress = {
             id: id,
@@ -1807,7 +1854,7 @@
             if (targetEl) targetEl.classList.remove('is-longpress-hint');
             state.longPress = null;
 
-            enterArrange();
+            if (!state.arranging) enterArrange();
             bringToFront(targetId);
             state.suppressBlankUntil = Date.now() + SUPPRESS_BLANK_MS;
             if (targetEl) beginDrag(targetEl, pseudo);
@@ -2323,6 +2370,7 @@
         state.layout = res.layout;
         if (state.editor) { delete state.editor.rects[id]; if (state.editor.selected === id) state.editor.selected = null; }
         applyPositions();
+        if (state.editor) selectEditorWidget(state.editor.selected);
         persist();
         return { ok: true };
     }
@@ -2388,6 +2436,7 @@
 
     function resetLayout() {
         state.layout = L.defaultLayout();
+        migrateCompanionWidget(false);
         if (state.editor) { state.editor.rects = {}; state.editor.selected = null; state.editor.geometryDirty = true; }
         applyPositions();
         if (state.editor) { state.editor.rects = L.clone(state.renderedRects); state.layout.widgets.forEach(function (w) { commitEditorRect(w.id, state.editor.rects[w.id]); }); }
@@ -2411,6 +2460,7 @@
     }
 
     function onViewportResize() {
+        clearLongPress(); clearBlankLP();
         endDrag(true); endResize(true);
         if (state.editor) {
             var editor = state.editor, canvas = $('#widget-canvas');
@@ -2586,7 +2636,7 @@
         if (state.bound) return;
         state.bound = true;
 
-        // Capture pointerdown: long-press idle OR resize/drag arrange
+        // The same hold gesture starts a drag both at rest and in the editor.
         document.addEventListener('pointerdown', function (e) {
             if (isChromeTarget(e.target)) return;
 
@@ -2598,7 +2648,10 @@
                     return;
                 }
                 var widgetDrag = e.target.closest && e.target.closest('.widget[data-active="true"]');
-                if (widgetDrag) beginDrag(widgetDrag, e);
+                if (widgetDrag && (e.button == null || e.button === 0)) {
+                    selectEditorWidget(widgetDrag.getAttribute('data-id'));
+                    armLongPress(widgetDrag, e);
+                }
                 return;
             }
 
@@ -2635,7 +2688,7 @@
             }
         }, true);
 
-        // An empty-cell tap moves the selected item; only Done commits edits.
+        // Blank space clears selection; only a held drag or keyboard move changes geometry.
         document.addEventListener('click', function (e) {
             if (!state.arranging) return;
             if (Date.now() < state.suppressBlankUntil) return;
@@ -2651,16 +2704,7 @@
                 e.target.closest('.bookmark-add-pop')
             )) return;
             e.preventDefault();
-            var selected = state.editor && findWidget(state.editor.selected);
-            if (!selected || selected.pinned) return;
-            var current = state.editor.rects[selected.id];
-            var canvas = $('#widget-canvas');
-            var next = snapEditorRect(selected, Object.assign({}, current, {
-                left: e.clientX - current.width / 2,
-                top: e.clientY + (canvas.scrollTop || 0) - current.height / 2
-            }), false);
-            if (L.homeFits(next, otherPixelRects(selected.id))) { commitEditorRect(selected.id, next); applyPositions(); editorMessage('已移動；完成後儲存'); }
-            else editorMessage('這個位置已有項目，請選擇空位');
+            selectEditorWidget(null);
         }, true);
 
         document.addEventListener('focusin', function (e) {
@@ -2702,11 +2746,7 @@
                 var amount = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
                 var vertical = e.key === 'ArrowUp' || e.key === 'ArrowDown';
                 if (e.shiftKey) { resizeSelected(amount, vertical ? 'y' : 'x'); return; }
-                var rect = Object.assign({}, state.editor.rects[id]);
-                if (vertical) rect.top += amount * state.editor.grid.pitchY; else rect.left += amount * state.editor.grid.pitchX;
-                var snapped = snapEditorRect(w, rect, false);
-                if (L.homeFits(snapped, otherPixelRects(id))) { commitEditorRect(id, snapped); applyPositions(); editorMessage('已移動；完成後儲存'); }
-                else editorMessage('這個方向已有項目');
+                moveById(id, vertical ? 0 : amount, vertical ? amount : 0);
                 return;
             }
             if (!e.isComposing && e.keyCode !== 229 && !e.defaultPrevented &&
@@ -2757,7 +2797,10 @@
         });
         window.addEventListener('pagehide', function () { if (state.layout) persist(); });
         document.addEventListener('visibilitychange', function () {
-            if (document.hidden) { if (state.layout) persist(); }
+            if (document.hidden) {
+                clearLongPress(); clearBlankLP(); endDrag(true); endResize(true);
+                if (state.layout) persist();
+            }
             else refreshCountdowns();
         });
         setInterval(refreshCountdowns, 60000);
@@ -2801,10 +2844,47 @@
         migrateDom();
         state.layout = L.loadLayout();
         state.initialViewport = L.viewport();
+        migrateCompanionWidget();
         bindEvents();
         applyPositions();
         syncClockHour12Bridge();
         emitChange();
+    }
+
+    function migrateCompanionWidget(persistMigration) {
+        if (state.layout.companionMigrated) return;
+        state.layout.companionMigrated = true;
+        if (!state.layout.widgets.some(function (w) { return w.type === 'companion'; })) {
+            var added = L.addWidget(state.layout, 'companion', { options: { animation: true } });
+            if (added.ok) {
+                added.widget.options.homeSeed = 'companion';
+                state.layout = added.layout;
+            }
+        }
+        // Save the one-time marker with the layout, so removing the character
+        // stays removed and layout export/import retains that decision.
+        if (persistMigration !== false) L.saveLayout(state.layout);
+    }
+
+    function setCompanionOptions(id, partial) {
+        var w = findWidget(id);
+        if (!w || w.type !== 'companion') return { ok: false };
+        if (!w.options) w.options = {};
+        if (partial && typeof partial.chatUrl === 'string') {
+            var chatUrl = partial.chatUrl.trim();
+            if (chatUrl) {
+                try {
+                    var parsedChat = new URL(chatUrl);
+                    if (parsedChat.origin !== 'https://chatgpt.com' || parsedChat.username || parsedChat.password) return { ok: false, error: 'invalid-chat-url' };
+                    chatUrl = parsedChat.href;
+                } catch (error) { return { ok: false, error: 'invalid-chat-url' }; }
+            }
+            w.options.chatUrl = chatUrl;
+        }
+        if (partial && typeof partial.animation === 'boolean') w.options.animation = partial.animation;
+        if (partial && typeof partial.greeting === 'string') w.options.greeting = partial.greeting.slice(0, 100);
+        applyPositions(); persist();
+        return { ok: true };
     }
 
     function setClockHour12(hour12) {
@@ -2889,6 +2969,7 @@
         isArranging: isArranging,
         isEditing: isArranging,
         bringToFront: bringToFront,
+        moveById: moveById,
         applyPositions: applyPositions,
         addFromCatalog: addFromCatalog,
         previewCatalog: previewCatalog,
@@ -2910,6 +2991,7 @@
         setAppSize: setAppSize,
         setFolderGrid: setFolderGrid,
         setAppearance: setAppearance,
+        setCompanionOptions: setCompanionOptions,
         addAppToFolder: addAppToFolder,
         refreshWeather: refreshWeather,
         openSearchExpand: openSearchExpand,

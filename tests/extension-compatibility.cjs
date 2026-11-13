@@ -104,6 +104,19 @@ async function seedWebsite(page) {
     await reread.close();
     evidence.push({ websiteStorage: preserved, bidirectionalLocalStorage: true });
 
+    // The character's explicit ChatGPT link opens independently; the native
+    // new-tab wrapper and its background remain in the original tab.
+    await context.route('https://chatgpt.com/**', r => r.fulfill({ contentType: 'text/html', body: '<title>ChatGPT destination</title>' }));
+    const characterPage = context.waitForEvent('page');
+    await modern.frame.locator('.companion-trigger').click();
+    const chat = await characterPage;
+    await chat.waitForLoadState('domcontentloaded');
+    assert.equal(chat.url(), 'https://chatgpt.com/');
+    assert.equal(await chat.evaluate(() => window.opener), null);
+    assert(modern.page.url().endsWith('/newtab.html'));
+    await chat.close();
+    evidence.push({ companionChat: 'separate ChatGPT tab without opener; original native wrapper retained' });
+
     const stats = () => popup.evaluate(() => chrome.runtime.sendMessage({ action: 'getActivationStats' })).then(r => r.stats);
     assert.equal((await stats()).isActive, true);
     await popup.locator('label:has(#keepAliveToggle)').click();
@@ -146,7 +159,7 @@ async function seedWebsite(page) {
     await app.click();
     await shortcut.page.waitForURL(destination, { timeout: 10000 });
     evidence.push({ currentWebsite: 'direct URL and launcher shortcut navigated top-level', extensionId: id, hostPermissions: await worker.evaluate(() => chrome.runtime.getManifest().host_permissions) });
-    console.log('PASS: actual deployed search; current website search/shortcut; top-level↔iframe localStorage and IndexedDB; popup settings/alarms/heartbeat; cold restart preserves settings/stats/media; other frames ignored.');
+    console.log('PASS: actual deployed search; current website search/shortcut/character ChatGPT link; top-level↔iframe localStorage and IndexedDB; popup settings/alarms/heartbeat; cold restart preserves settings/stats/media; other frames ignored.');
   } finally {
     if (context) await context.close();
     fs.writeFileSync(path.join(root, '.impeccable/review/round6-extension-integration.json'), JSON.stringify({ profile, evidence }, null, 2));

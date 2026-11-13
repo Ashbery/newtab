@@ -1331,6 +1331,7 @@
             '<i class="fas fa-rotate-left" aria-hidden="true"></i>重設版面</button>' +
             '<button type="button" class="rail-action" data-action="open-bg" id="background-home"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.2" fill="#b7d9e9"/><path d="m8 5-3-3v6l3-3 3-3v6Z" fill="#b7d9e9" stroke-linejoin="round"/></svg><span>更換背景</span></button>' +
             '<button type="button" class="rail-action focus-button" data-action="focus" id="focus-home" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M9 14c0-3 6-3 6 0 0 2-2 1-3 1s-3 1-3-1Z" fill="#b7d9e9" stroke-width="1.2"/><g fill="currentColor" stroke="none"><circle cx="8.5" cy="10" r="1.1"/><circle cx="12" cy="8.5" r="1.1"/><circle cx="15.5" cy="10" r="1.1"/></g></svg><span>專注片刻</span></button>' +
+            '<section class="background-appearance" id="background-appearance" aria-label="背景外觀"></section>' +
             '<p class="rail-hint" id="rail-media-status">目前使用貓貓主題。</p>' +
             '<button type="button" class="rail-action" data-action="play-pause">' +
             '<i class="fas fa-play" aria-hidden="true"></i>播放／暫停背景</button>' +
@@ -1415,6 +1416,7 @@
         }
 
         document.addEventListener('keydown', function (e) {
+            if ($('.appearance-dialog[open]')) return;
             var crop = $('.icon-crop-modal.is-open:not([inert])');
             var appModal = $('.custom-app-modal.is-open:not([inert])');
             var dialog = crop || appModal;
@@ -1467,6 +1469,7 @@
             return;
         }
         ensureMarkup();
+        if (global.NewtabAppearance) global.NewtabAppearance.mountBackground($('#background-appearance'));
         bind();
 
         var rs = NewtabWidgets.getRailState ? NewtabWidgets.getRailState() : defaultRailLike();

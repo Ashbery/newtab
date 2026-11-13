@@ -22,6 +22,34 @@ test('phone grid has four equal cells and desktop uses predictable 96 by 104 pit
     assert.equal(L.homeGrid(1440,900).pitchX,96);
     assert.equal(L.homeGrid(1440,900).pitchY,104);
 });
+
+test('the default character balances the desktop group and uses a separate lower row on narrow screens', () => {
+    for (const width of [320, 390, 600, 601, 800, 1000, 1099, 1100, 1280, 1440, 1920, 3440, 5120]) {
+        const grid = L.homeGrid(width, 900);
+        const character = L.homeDefaultRect({ type: 'companion', options: { homeSeed: 'companion' } }, grid);
+        const existing = L.defaultLayout().widgets.map(widget => L.homeDefaultRect(widget, grid));
+        assert(L.homeFits(character, existing), 'character must not cover defaults at ' + width);
+        assert(character.left >= 16 && character.left + character.width <= width - 16);
+        if (width >= 1100) {
+            const clock = existing[0];
+            assert.equal((clock.left + character.left + character.width) / 2, width / 2, 'character and clock share a centered composition');
+        } else {
+            assert(character.top >= Math.max(...existing.map(r => r.top + r.height)) + 16, 'narrow character follows the shortcuts');
+        }
+    }
+});
+
+test('the fresh phone character fits a 390px first view without resizing saved portraits', () => {
+    const grid = L.homeGrid(390, 844);
+    const fresh = L.homeDefaultRect({ type: 'companion', options: { homeSeed: 'companion' } }, grid);
+    assert.equal(fresh.width, 160);
+    assert.equal(fresh.height, 208);
+    assert.equal(fresh.top + fresh.height, 824, 'portrait has a 20px lower margin');
+    const saved = L.homePlacement({ left: 50, top: 616, width: 280, height: 360 }, 'companion', grid);
+    const restored = L.homePlacementRect(saved, 'companion', grid);
+    assert.equal(restored.width, 280, 'existing custom width remains intact');
+    assert.equal(restored.height, 360, 'existing custom height remains intact');
+});
 test('widget resize uses meaningful spans and snapping is idempotent',()=>{
     for(const width of [320,390,1440]) {
         const grid=L.homeGrid(width,900);

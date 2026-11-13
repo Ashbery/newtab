@@ -24,7 +24,7 @@
 
     var WIDGET_TYPES = [
         'clock', 'search', 'app', 'folder',
-        'weather', 'notes', 'countdown', 'todo', 'bookmarks'
+        'weather', 'notes', 'countdown', 'todo', 'bookmarks', 'companion'
     ];
 
     // Default size fractions by type
@@ -37,7 +37,8 @@
         notes: { w: 0.16, h: 0.18 },
         countdown: { w: 0.12, h: 0.14 },
         todo: { w: 0.16, h: 0.22 },
-        bookmarks: { w: 0.3, h: 0.08 }
+        bookmarks: { w: 0.3, h: 0.08 },
+        companion: { w: 0.24, h: 0.45 }
     };
 
     // Absolute min sizes at ~1200×800 reference; scaled with viewport
@@ -50,7 +51,8 @@
         notes: { w: 140, h: 100 },
         countdown: { w: 120, h: 80 },
         todo: { w: 140, h: 120 },
-        bookmarks: { w: 200, h: 48 }
+        bookmarks: { w: 200, h: 48 },
+        companion: { w: 160, h: 200 }
     };
 
     /** Discrete size steps @1200×800 (3 tiers S/M/L) */
@@ -61,7 +63,8 @@
         notes:      [{ w: 160, h: 120 }, { w: 200, h: 160 }, { w: 280, h: 220 }],
         countdown:  [{ w: 120, h: 100 }, { w: 160, h: 130 }, { w: 200, h: 180 }],
         bookmarks:  [{ w: 280, h: 88 }, { w: 400, h: 88 }, { w: 560, h: 88 }],
-        todo:       [{ w: 180, h: 140 }, { w: 200, h: 180 }, { w: 240, h: 240 }]
+        todo:       [{ w: 180, h: 140 }, { w: 200, h: 180 }, { w: 240, h: 240 }],
+        companion:  [{ w: 192, h: 260 }, { w: 280, h: 360 }, { w: 376, h: 480 }]
     };
 
     var APP_SIZE_PX = {
@@ -85,6 +88,7 @@
         weather: FREE_RESIZE_HANDLES.slice(),
         notes: FREE_RESIZE_HANDLES.slice(),
         countdown: FREE_RESIZE_HANDLES.slice(),
+        companion: FREE_RESIZE_HANDLES.slice(),
         app: [],
         folder: []
     };
@@ -98,14 +102,16 @@
         notes: { w: 0.6, h: 0.5 },
         countdown: { w: 0.35, h: 0.35 },
         todo: { w: 0.5, h: 0.55 },
-        bookmarks: { w: 0.8, h: 0.18 }
+        bookmarks: { w: 0.8, h: 0.18 },
+        companion: { w: 0.7, h: 0.9 }
     };
 
     var SINGLETON_TYPES = {
         clock: true,
         search: true,
         weather: true,
-        bookmarks: true
+        bookmarks: true,
+        companion: true
     };
 
     function clone(obj) {
@@ -458,11 +464,13 @@
                 z: 51, options: { appId: 'gmail' }
             }));
         }
-        return {
+        var normalized = {
             v: SCHEMA_VERSION,
             rail: normalizeRail(raw.rail),
             widgets: widgets
         };
+        if (raw.companionMigrated === true) normalized.companionMigrated = true;
+        return normalized;
     }
 
     function migrateFromV1(raw) {
@@ -522,11 +530,13 @@
         // saved fractions here used to move right-edge shortcuts on mobile load
         // or even on an unrelated save (such as opening the settings panel).
 
-        return {
+        var normalized = {
             v: SCHEMA_VERSION,
             rail: normalizeRail(raw.rail),
             widgets: widgets
         };
+        if (raw.companionMigrated === true) normalized.companionMigrated = true;
+        return normalized;
     }
 
     function recognizePreviousDefault(layout) {
@@ -587,6 +597,7 @@
                 };
             })
         };
+        if (normalized.companionMigrated) payload.companionMigrated = true;
         try {
             global.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
             return true;
@@ -1154,6 +1165,7 @@
         else if (type === 'search') id = 'search-1';
         else if (type === 'weather') id = 'weather-1';
         else if (type === 'bookmarks') id = 'bookmarks-1';
+        else if (type === 'companion') id = 'companion-1';
         else if (type === 'app') id = 'app-' + opts.appId;
         else {
             var prefix = type + '-' + Date.now();
@@ -1184,6 +1196,7 @@
         else if (type === 'bookmarks') defaultOpts = { links: [] };
         else if (type === 'weather') defaultOpts = { lat: null, lon: null, city: '' };
         else if (type === 'folder') defaultOpts = { name: '資料夾', grid: 2, children: [] };
+        else if (type === 'companion') defaultOpts = { animation: true };
         else defaultOpts = opts.options || {};
         if (type === 'app') {
             defaultOpts.size = (opts.options && opts.options.size) || 'm';
@@ -1245,6 +1258,16 @@
 
     function homeDefaultRect(widget, grid) {
         var seed = widget.options && widget.options.homeSeed;
+        if (seed === 'companion') {
+            var character = homeNewFootprint('companion', widget.options, grid);
+            var clockSpan = Math.min(grid.columns, 6);
+            var clockCol = grid.width < 1100 ? Math.floor((grid.columns - clockSpan) / 2) : Math.max(0, Math.floor(grid.columns * 0.365 - clockSpan / 2));
+            var companionCol = clockCol + clockSpan + 1;
+            var besideClock = !grid.narrow && companionCol + 3 <= grid.columns;
+            return { left: besideClock ? grid.left + companionCol * grid.pitchX + 4 : (grid.width - character.width) / 2,
+                top: grid.top + (besideClock ? 1 : grid.narrow && grid.height < 760 ? 4 : 5) * grid.pitchY,
+                width: character.width, height: character.height };
+        }
         if (seed !== 'clock' && seed !== 'search' && !(typeof seed === 'number' && seed >= 0 && seed < 4)) return null;
         var span = Math.min(grid.columns, grid.narrow ? 4 : 6);
         var base = grid.narrow ? 0 : grid.width < 1100 ? Math.floor((grid.columns - span) / 2) : Math.max(0, Math.floor(grid.columns * 0.365 - span / 2));
@@ -1265,6 +1288,7 @@
 
     function homeNewFootprint(type, options, grid) {
         options = options || {};
+        if (type === 'companion') return { width: grid.narrow ? 160 : Math.min(280, grid.columns * grid.pitchX - grid.gap), height: grid.narrow ? 208 : 360 };
         if (type === 'app') {
             var app = APP_SIZE_PX[options.size || 'm'] || APP_SIZE_PX.m;
             return { width: grid.narrow && grid.width <= 350 && app.w <= 68 ? Math.min(64, app.w) : app.w, height: app.h };

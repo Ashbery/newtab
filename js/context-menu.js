@@ -79,6 +79,7 @@
             t.closest('.bookmark-modal') ||
             t.closest('.icon-crop-modal') ||
             t.closest('.custom-app-modal') ||
+            t.closest('.appearance-dialog') ||
             t.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]')
         );
     }
@@ -137,9 +138,9 @@
                     if (item.action) item.action();
                     // Removal can delete the settings button that just regained
                     // focus. Keep keyboard users on a visible editing control.
-                    if (opener && opener.classList.contains('widget-options')) requestAnimationFrame(function () {
+                    if (opener) requestAnimationFrame(function () {
                         var active = document.activeElement;
-                        var openerGone = !opener.isConnected || !opener.getClientRects().length || !!opener.closest('[hidden], [inert], [data-active="false"]');
+                        var openerGone = !opener.isConnected || opener.disabled || !opener.getClientRects().length || !!opener.closest('[hidden], [inert], [data-active="false"]');
                         if (active !== document.body && !(active === opener && openerGone)) return;
                         var next = document.getElementById('arrange-done-bar');
                         if (!next || !next.getClientRects().length) next = document.getElementById('side-rail-tab');
@@ -258,6 +259,15 @@
                 action: function () { W.togglePin(id); }
             });
             if (!w.pinned) {
+                items.push({
+                    label: '移動',
+                    children: [
+                        { label: '上移一格', action: function () { if (W.moveById) W.moveById(id, 0, -1); } },
+                        { label: '下移一格', action: function () { if (W.moveById) W.moveById(id, 0, 1); } },
+                        { label: '左移一格', action: function () { if (W.moveById) W.moveById(id, -1, 0); } },
+                        { label: '右移一格', action: function () { if (W.moveById) W.moveById(id, 1, 0); } }
+                    ]
+                });
                 items.push({
                     label: '移到最上層',
                     action: function () {
@@ -382,36 +392,13 @@
             });
         }
 
-        if (type === 'bookmarks' || type === 'todo' || type === 'countdown' || type === 'notes') {
-            var curPreset = (w && w.options && w.options.appearance && w.options.appearance.preset) || 'glass';
-            items.push({ sep: true });
-            items.push({
-                label: '外觀',
-                children: [
-                    {
-                        label: '玻璃',
-                        checked: curPreset === 'glass',
-                        action: function () {
-                            if (W.setAppearance) W.setAppearance(id, { preset: 'glass' });
-                        }
-                    },
-                    {
-                        label: '實色',
-                        checked: curPreset === 'solid',
-                        action: function () {
-                            if (W.setAppearance) W.setAppearance(id, { preset: 'solid' });
-                        }
-                    },
-                    {
-                        label: '透明',
-                        checked: curPreset === 'clear',
-                        action: function () {
-                            if (W.setAppearance) W.setAppearance(id, { preset: 'clear' });
-                        }
-                    }
-                ]
-            });
-        }
+        items.push({ sep: true });
+        items.push({
+            label: '自訂組件外觀',
+            action: function () {
+                if (global.NewtabAppearance) global.NewtabAppearance.openWidget(id);
+            }
+        });
 
         items.push({ sep: true });
         items.push({
@@ -537,24 +524,10 @@
 
     function syncWidgetButtons() {
         $$('#widget-canvas .widget[data-active="true"]').forEach(function (widget) {
-            if (widget.querySelector('.widget-options')) return;
-            var type = widget.getAttribute('data-type');
-            var meta = global.NewtabCatalog && NewtabCatalog.get(type);
-            var label = meta ? meta.label : type === 'folder' ? '資料夾' : '應用';
-            var button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'widget-options';
-            button.setAttribute('aria-label', label + '設定');
-            button.setAttribute('aria-haspopup', 'menu');
-            button.title = label + '設定';
-            button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
-            button.addEventListener('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                var rect = button.getBoundingClientRect();
-                openAt(rect.right, rect.bottom + 6, widgetMenuItems(widget));
-            });
-            widget.appendChild(button);
+            var oldButton = widget.querySelector('.widget-options');
+            if (oldButton) oldButton.remove();
+            if (!widget.hasAttribute('tabindex')) widget.tabIndex = 0;
+            widget.setAttribute('aria-keyshortcuts', 'Shift+F10');
         });
     }
 
@@ -570,6 +543,16 @@
             close();
         });
         document.addEventListener('keydown', function (e) {
+            if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+                var widget = e.target.closest && e.target.closest('.widget');
+                if (widget && !e.target.closest('input, textarea, select, [contenteditable="true"]')) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    var rect = widget.getBoundingClientRect();
+                    openAt(rect.left + Math.min(30, rect.width / 2), rect.top + Math.min(30, rect.height / 2), widgetMenuItems(widget));
+                    return;
+                }
+            }
             if (!menuEl || menuEl.hidden) return;
             var current = document.activeElement;
             var container = current && current.closest && current.closest('.ctx-sub, .ctx-menu');
@@ -604,6 +587,11 @@
     global.NewtabContextMenu = {
         init: init,
         close: close,
+        openWidget: function (widget) {
+            if (!widget) return;
+            var rect = widget.getBoundingClientRect();
+            openAt(rect.right, rect.top + Math.min(30, rect.height), widgetMenuItems(widget));
+        },
         openAt: openAt,
         openItems: openAt
     };

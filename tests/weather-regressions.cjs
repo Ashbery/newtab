@@ -63,6 +63,9 @@ async function addWeather(page, options) {
     }), options);
     assert.equal(result.ok, true);
     await page.locator('.weather-body').waitFor();
+    // This fixture adds through the host API rather than the catalog's Add
+    // action. Scroll to its free slot, which may be below the character widget.
+    await page.locator('.widget[data-type="weather"]').scrollIntoViewIfNeeded();
 }
 
 async function ready(page, value = '24°') {

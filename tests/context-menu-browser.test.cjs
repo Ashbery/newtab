@@ -16,7 +16,7 @@ before(async () => {
 after(async () => { if (browser) await browser.close(); });
 
 // A real persisted clock in the lower-right quadrant. It needs no remote data.
-// Opening its native settings button forces both horizontal and vertical clamping.
+// Keyboard context menus and the shared touch toolbar must clamp at both edges.
 const cornerLayout = {
     v: 4,
     rail: { open: false, width: 300, tab: 'personalize' },
@@ -46,20 +46,20 @@ async function assertMenuFits(page, selector) {
     assert.ok(rect.bottom <= view.bottom - 7.5, description);
 }
 
-async function openFromButton(page, button, input) {
+async function openSettings(page, widget, input) {
     if (input === 'keyboard') {
-        await button.focus();
-        await page.keyboard.press('Enter');
+        await widget.focus();
+        await page.keyboard.press('Shift+F10');
     } else {
-        await button.tap();
+        await widget.tap();
+        await page.locator('#editor-widget-settings').tap();
     }
     await assertMenuFits(page, '.ctx-menu.is-visible');
 }
 
 async function openTimeSubmenu(page, input) {
     if (input === 'keyboard') {
-        await page.keyboard.press('ArrowDown');
-        await page.keyboard.press('ArrowDown');
+        for (let i = 0; i < 8 && !/時間制/.test(await page.evaluate(() => document.activeElement.textContent)); i++) await page.keyboard.press('ArrowDown');
         assert.match(await page.evaluate(() => document.activeElement.textContent), /時間制/);
         await page.keyboard.press('ArrowRight');
     } else {
@@ -94,22 +94,23 @@ for (const [width, height] of [[320, 640], [390, 844]]) {
                     await page.locator('#arrange-home').tap();
                     await page.waitForTimeout(300);
 
-                    const button = page.getByRole('button', { name: '時鐘設定', exact: true });
-                    const trigger = await button.boundingBox();
+                    const widget = page.locator('.widget[data-id="clock-1"]');
+                    const trigger = await widget.boundingBox();
                     // The shared phone grid keeps a 24px outer inset. The
                     // expanded menu must still clamp to its separate 8px margin.
                     assert.ok(trigger.x + trigger.width > width - 32, 'fixture must open beside the right edge: ' + JSON.stringify(trigger));
                     assert.ok(trigger.y > height * .7, 'fixture must open near the bottom');
-                    assert.equal(await button.evaluate(element => element.tagName), 'BUTTON');
+                    assert.equal(await page.locator('.widget-options').count(), 0, 'per-widget ellipsis buttons are removed');
 
-                    await openFromButton(page, button, input);
+                    await openSettings(page, widget, input);
                     await openTimeSubmenu(page, input);
                     await page.keyboard.press('Escape');
                     assert.equal(await page.locator('.ctx-menu').isVisible(), false);
                     assert.equal(await page.locator('.ctx-sub').isVisible(), false);
-                    assert.equal(await button.evaluate(element => document.activeElement === element), true, 'Escape returns to the native settings button');
+                    const opener = input === 'keyboard' ? widget : page.locator('#editor-widget-settings');
+                    assert.equal(await opener.evaluate(element => document.activeElement === element), true, 'Escape returns to the invoking control');
 
-                    await openFromButton(page, button, input);
+                    await openSettings(page, widget, input);
                     await openTimeSubmenu(page, input);
                     if (input === 'keyboard') await page.keyboard.press('Enter');
                     else await page.getByRole('menuitemradio', { name: '12 小時制', exact: true }).tap();
@@ -124,7 +125,7 @@ for (const [width, height] of [[320, 640], [390, 844]]) {
                     await page.getByRole('tab', { name: '個人化', exact: true }).tap();
                     await page.locator('#arrange-home').tap();
 
-                    await openFromButton(page, button, input);
+                    await openSettings(page, widget, input);
                     if (input === 'keyboard') {
                         await page.keyboard.press('End');
                         await page.keyboard.press('Enter');

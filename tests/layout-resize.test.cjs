@@ -29,7 +29,7 @@ function loadLayout() {
 
 test('every free-size component exposes edge and corner handles', () => {
     const layout = loadLayout();
-    for (const type of ['clock', 'search', 'weather', 'notes', 'countdown', 'todo', 'bookmarks']) {
+    for (const type of ['clock', 'search', 'weather', 'notes', 'countdown', 'todo', 'bookmarks', 'companion']) {
         assert.deepEqual(Array.from(layout.HANDLE_MATRIX[type]), ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']);
     }
 });
@@ -62,6 +62,7 @@ test('corner resize changes width and height together', () => {
 function loadWidgetHost(options = {}) {
     const savedLayout = {
         v: 4, rail: { open: false, width: 300, tab: 'personalize' },
+        companionMigrated: !options.unmigrated,
         widgets: [
             { id: 'clock-1', type: 'clock', x: 0.02, y: 0.025, w: 0.22, h: 0.14, z: 1, options: {} },
             { id: 'search-1', type: 'search', x: 0.26, y: 0.03, w: 0.36, h: 0.09, z: 2, options: {} },
@@ -188,6 +189,22 @@ test('resize reflows the view without changing or saving the user layout', () =>
     host.resize(1440, 900);
     assert.deepEqual(host.widgets.get('clock-1').getBoundingClientRect(), desktopGeometry);
     assert.equal(JSON.stringify(api.getLayout()), before);
+});
+
+test('the companion migration is saved once without changing existing widgets', () => {
+    const host = loadWidgetHost({ unmigrated: true });
+    const layout = host.window.NewtabWidgets.getLayout();
+    assert.equal(layout.companionMigrated, true);
+    assert.equal(layout.widgets.filter(w => w.type === 'companion').length, 1);
+    assert.equal(host.writes(), 1);
+    assert.equal(layout.widgets.find(w => w.id === 'app-images').x, 0.84);
+    host.resize(390, 844);
+    assert.equal(host.writes(), 1, 'resizing never repeats migration');
+    const saved = JSON.parse(host.storage.get('nt_layout_v1'));
+    assert.equal(saved.companionMigrated, true);
+    const removed = host.window.NewtabLayout.removeWidget(layout, 'companion-1').layout;
+    assert.equal(removed.companionMigrated, true, 'removing the character preserves migration decision');
+    assert.equal(removed.widgets.some(w => w.type === 'companion'), false);
 });
 
 test('desktop search shortcuts focus the inline field and respect text entry and IME', () => {

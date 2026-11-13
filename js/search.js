@@ -145,11 +145,10 @@
             else item.removeAttribute('aria-label');
             item.innerHTML = '<div class="suggestion-icon"><i class="fas fa-search" aria-hidden="true"></i></div>' +
                 '<span class="suggestion-text">' + highlightMatch(suggestion, query) + '</span>';
-            item.onmouseenter = function () {
-                if (!wantsSuggestions || query !== input.value.trim()) return;
-                selectedIndex = index;
-                updateSelection();
-            };
+            // Hover is only a CSS highlight. Suggestions can appear beneath a
+            // stationary pointer, or while it travels to the Search button;
+            // neither action chooses a different query. Keyboard selection
+            // and an explicit click on a row remain deliberate choices.
             item.onclick = function () {
                 if (composing || query !== input.value.trim()) return;
                 input.value = suggestion;

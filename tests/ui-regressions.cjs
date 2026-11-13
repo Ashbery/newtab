@@ -294,82 +294,55 @@ async function exercisePersonalization(page, mobile) {
 
 async function exerciseCompanion(page, mobile, reducedMotion) {
     await home(page);
-    await page.waitForFunction(() => document.querySelector('#home-companion')?.dataset.ready === 'true');
-    const companion = page.locator('#home-companion');
-    const trigger = page.locator('#companion-trigger');
-    const message = page.locator('#companion-message');
+    const widget = page.locator('.widget[data-type="companion"]');
+    const companion = widget.locator('.home-companion');
+    const trigger = widget.locator('.companion-trigger');
+    await trigger.waitFor();
     await page.waitForFunction(() => {
         const image = document.querySelector('.companion-portrait');
         return image && image.complete && image.naturalWidth > 0;
     });
-    assert.equal(await companion.evaluate((element) => element.classList.contains('is-docked')), mobile,
-        mobile ? 'phone uses a compact companion' : 'fresh desktop layout keeps the full portrait');
-    if (mobile) {
-        assert.equal(await companion.evaluate((element) => element.classList.contains('is-top-avatar')), true,
-            'fresh phone layout gives the companion an unobstructed top position');
+    assert.equal(await widget.count(), 1, 'character is a singleton real widget');
+    assert.equal(await trigger.getAttribute('href'), 'https://chatgpt.com/');
+    assert.equal(await trigger.getAttribute('target'), '_blank');
+    assert.match(await trigger.getAttribute('rel'), /noopener/);
+    assert.equal(await page.locator('.widget-settings').count(), 0, 'per-widget three-dot buttons are removed');
+    const geometry = await widget.evaluate(element => {
+        const own = element.getBoundingClientRect();
+        const other = [...document.querySelectorAll('.widget[data-active="true"]')].filter(e => e !== element);
+        const overlaps = other.filter(e => {
+            const r = e.getBoundingClientRect();
+            return own.left < r.right && own.right > r.left && own.top < r.bottom && own.bottom > r.top;
+        });
+        return { overlaps: overlaps.map(e => e.dataset.id), within: own.left >= 0 && own.right <= innerWidth };
+    });
+    assert.deepEqual(geometry.overlaps, [], 'character occupies its own free layout space');
+    assert.equal(geometry.within, true, 'character fits its viewport');
+    await trigger.scrollIntoViewIfNeeded();
+    await hitTest(page, '.companion-trigger');
+    await page.context().route('https://chatgpt.com/**', route => route.fulfill({ contentType: 'text/html', body: '<title>ChatGPT destination fixture</title>' }));
+    for (const activate of [() => mobile ? trigger.tap() : trigger.click(), async () => { await trigger.focus(); await page.keyboard.press('Enter'); }]) {
+        const popupPromise = page.waitForEvent('popup');
+        await activate();
+        const popup = await popupPromise;
+        await popup.waitForLoadState('domcontentloaded');
+        assert.equal(popup.url(), 'https://chatgpt.com/');
+        await popup.close();
     }
-    await hitTest(page, '#companion-trigger');
-    await hitTest(page, '#search-input');
-    const original = await message.textContent();
-    if (mobile) await trigger.tap();
-    else await trigger.click();
-    assert.notEqual(await message.textContent(), original, 'greeting activation changes the visible message');
     if (reducedMotion === 'reduce') {
-        assert.equal(await companion.evaluate((element) => element.classList.contains('is-greeting')), false);
-        assert.equal(await page.locator('.companion-portrait').evaluate((image) => getComputedStyle(image).animationName), 'none',
-            'reduced motion suppresses the portrait greeting animation');
+        assert.equal(await companion.getAttribute('data-motion'), 'reduced', 'system preference stops character motion');
     }
-    const clicked = await message.textContent();
-    await trigger.focus();
-    await page.keyboard.press('Enter');
-    assert.notEqual(await message.textContent(), clicked, 'the native button also activates with Enter');
-
     await openTools(page);
     await page.locator('#focus-home').click();
-    await page.waitForFunction(() => document.querySelector('#home-companion').inert);
-    assert.equal(await companion.getAttribute('aria-hidden'), 'true');
-    assert.equal(await companion.isVisible(), false, 'focus mode hides the companion as well as removing it from keyboard access');
+    assert.equal(await widget.evaluate(e => e.inert), true);
+    assert.equal(await widget.isVisible(), false, 'focus mode removes the companion and its keyboard target');
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('#home-companion').inert);
-    assert.equal(await companion.getAttribute('aria-hidden'), 'false');
-
-    // Simulate a user-positioned widget. A visible fixture exercises the same
-    // collision observer as dragging an actual widget, without persisting it.
-    await page.evaluate((mobile) => {
-        const portrait = document.querySelector('.companion-footprint').getBoundingClientRect();
-        const fixture = document.createElement('div');
-        fixture.id = 'companion-collision-fixture';
-        fixture.className = 'widget';
-        fixture.setAttribute('data-active', 'true');
-        fixture.setAttribute('aria-hidden', 'true');
-        Object.assign(fixture.style, {
-            position: 'fixed', display: 'block', visibility: 'visible', pointerEvents: 'none',
-            left: (mobile ? innerWidth / 2 - 40 : portrait.left + 30) + 'px',
-            top: (mobile ? 106 : portrait.top + 30) + 'px', width: '80px', height: '60px'
-        });
-        document.querySelector('#widget-canvas').appendChild(fixture);
-    }, mobile);
-    await page.waitForFunction((mobile) => {
-        const element = document.querySelector('#home-companion');
-        return element.classList.contains('is-docked') && (!mobile || !element.classList.contains('is-top-avatar'));
-    }, mobile);
-    await hitTest(page, '#search-input');
-    await hitTest(page, '#companion-trigger');
-    assert.equal(await companion.isVisible(), true, 'collision docks the companion instead of removing it');
-    await page.evaluate(() => document.getElementById('companion-collision-fixture').remove());
-    await page.waitForFunction((mobile) => {
-        const element = document.querySelector('#home-companion');
-        if (!mobile) return !element.classList.contains('is-docked');
-        const avatar = document.getElementById('companion-trigger').getBoundingClientRect();
-        return !element.inert && [...document.querySelectorAll('.widget[data-active="true"]')].every((widget) => {
-            const rect = widget.getBoundingClientRect();
-            return rect.right <= avatar.left || rect.left >= avatar.right || rect.bottom <= avatar.top || rect.top >= avatar.bottom;
-        });
-    }, mobile);
+    assert.equal(await widget.evaluate(e => e.inert), false);
+    await page.locator('#search-input').scrollIntoViewIfNeeded();
     await page.locator('#search-input').click();
     await page.waitForFunction(() => document.activeElement.id === 'search-input');
     await hitTest(page, '#search-input');
-    assert.equal(await page.locator('#search-input').isEditable(), true, 'the companion never blocks entering a search');
+    assert.equal(await page.locator('#search-input').isEditable(), true, 'the character never blocks entering a search');
     await page.keyboard.press('Escape');
 }
 

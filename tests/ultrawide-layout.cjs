@@ -41,7 +41,7 @@ async function appParts(page,id) {
 function sameRect(actual,expected,label) {for(const key of ['left','top','width','height'])closeEnough(actual[key],expected[key],label+' '+key);}
 async function drag(page,id,x,y) {
     const b=await page.locator('.widget[data-id="'+id+'"]').boundingBox();
-    await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(x,y,{steps:14});
+    await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.waitForTimeout(620);await page.mouse.move(x,y,{steps:14});
     const preview=await page.locator('#home-drop-preview').evaluate(el=>({left:parseFloat(el.style.left),top:parseFloat(el.style.top),width:parseFloat(el.style.width),height:parseFloat(el.style.height),state:el.dataset.state}));
     assert.equal(preview.state,'place','genuinely valid target');
     await page.mouse.up();await page.mouse.move(60,60);await delay(60);
@@ -87,13 +87,23 @@ async function clickHitTest(page,selector) {
             await clickHitTest(page,'.weather-retry');await clickHitTest(page,'.weather-locate');
             assert(await page.locator('.weather-meta').evaluate(el=>{const b=el.getBoundingClientRect(),w=el.closest('.widget').getBoundingClientRect();return b.bottom<=w.bottom+1;}),'weather details fit200px height');
             await menu(page,'個人化');await page.locator('#arrange-home').click();
+            if (legacy) {
+                // The old row extends 34px below the current grid phase. Move
+                // the optional weather card one cell right before extending
+                // that row; otherwise its corner genuinely occupies the target.
+                await page.locator('.widget[data-type=weather]').focus();
+                await page.keyboard.press('ArrowRight');
+            }
             const old=await appParts(page,'app-images'),last=await appParts(page,'app-maps');
             const stageLeft=(entry.viewport.width-1344)/2,stageTop=Math.max(0,(entry.viewport.height-760)/2);
             await drag(page,'app-play',stageLeft+720,old.shell.top+45);
             const row=await appParts(page,'app-play');
             for(const part of ['shell','icon','label'])closeEnough(row[part].top,old[part].top,'new/old row '+part);
             closeEnough(row.shell.left-last.shell.left,legacy?92:96,'row pitch survives ultrawide');
-            await drag(page,'app-news',stageLeft+336,old.shell.top+149);
+            // The character now occupies its own desktop cells, so optional
+            // cards can use the old below-row target. Use the free row above
+            // the clock to verify the same launcher column without overlap.
+            await drag(page,'app-news',stageLeft+336,stageTop+64);
             const column=await appParts(page,'app-news');
             for(const part of ['shell','icon','label'])closeEnough(column[part].left,old[part].left,'new/old column '+part);
             await drag(page,'app-youtube',5,stageTop+272);

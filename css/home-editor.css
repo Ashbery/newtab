@@ -23,6 +23,7 @@ body.is-arranging .widget.is-editor-selected .widget-select-ring { opacity: 1; b
 body.is-arranging .widget-options { opacity: .8; }
 body.is-arranging .widget.is-editor-selected .widget-options { opacity: 1; }
 @media (max-width: 600px) { #home-editor-toolbar { bottom: max(12px, env(safe-area-inset-bottom)); padding: 10px 12px; } #editor-status { max-width: 32ch; } #home-editor-toolbar button { min-width: 54px; padding-inline: 10px; } }
+@media (max-width: 400px) { #home-editor-toolbar { padding: 10px 8px; } .editor-actions { gap: 4px; } #home-editor-toolbar button { min-width: 44px; padding-inline: 8px; } }
 @media (prefers-reduced-motion: reduce) { #home-editor-toolbar, #home-drop-preview, body.is-arranging .widget { animation: none !important; transition: none !important; } }
 
 body.side-rail-open #home-editor-toolbar { visibility: hidden; pointer-events: none; }
