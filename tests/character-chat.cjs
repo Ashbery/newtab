@@ -10,6 +10,10 @@ async function boot(page) {
     assert.equal(await page.evaluate(() => typeof window.NewtabCharacterChat?.open), 'function', 'page includes chat without fixture injection');
     await page.evaluate(() => {
         window.chatTest = { available: true, connected: true, mode: 'normal', calls: [], reactions: [], loginCalls: 0, disconnectCalls: 0 };
+        window.chatBackdropBefore = ['html', 'body', '#widget-canvas', '#image-background', '#video-background'].map(selector => {
+            const el = document.querySelector(selector), style = getComputedStyle(el);
+            return { selector, filter: style.filter, opacity: style.opacity };
+        });
         document.addEventListener('newtab:chat-state', e => chatTest.reactions.push(e.detail));
         window.NewtabChatTransport = {
             async status() { return { capabilities: { characterPrompt: true }, available: chatTest.available, connected: chatTest.connected, canChat: chatTest.available && chatTest.connected,
@@ -42,7 +46,47 @@ async function send(page, text) {
     await page.locator('#character-chat-input').fill(text);
     await page.getByRole('button', { name: '傳送', exact: true }).click();
 }
-async function complete(page) { await page.getByRole('status').filter({ hasText: '回覆完成。' }).waitFor(); }
+async function complete(page) {
+    await page.waitForFunction(() => document.querySelector('.character-chat-stop')?.hidden &&
+        document.querySelectorAll('.character-chat-message.is-assistant').length > 0 &&
+        Array.from(document.querySelectorAll('.character-chat-message.is-assistant .character-chat-message-note')).at(-1)?.textContent === '' &&
+        chatTest.reactions.at(-1)?.state === 'idle');
+}
+async function openSettings(page) {
+    const gear = page.getByRole('button', { name: '對話設定', exact: true });
+    if (await gear.getAttribute('aria-expanded') !== 'true') await gear.click();
+    await page.locator('.character-chat-settings').waitFor({ state: 'visible' });
+}
+async function closeSettings(page) {
+    const gear = page.getByRole('button', { name: '對話設定', exact: true });
+    if (await gear.getAttribute('aria-expanded') === 'true') await gear.click();
+    await page.locator('.character-chat-settings').waitFor({ state: 'hidden' });
+}
+
+async function checkQuietChat(page) {
+    for (const selector of ['.character-chat-settings', '.character-chat-connection', '.character-chat-connect', '.character-chat-refresh', '.character-chat-disconnect']) {
+        assert.equal(await page.locator(selector).isVisible(), false, selector + ' is confined to settings');
+    }
+    assert.equal(await page.locator('.character-chat-clear,.character-chat-confirm').count(), 0, 'clear conversation controls have been removed');
+    assert.equal(await page.locator('.character-chat-header').innerText(), 'Nacho', 'header contains no account or login details');
+    assert.equal(await page.locator('.character-chat-status-row').evaluate(el => el.classList.contains('is-quiet')), true, 'routine success announcements occupy no visible row');
+    assert.equal(await page.locator('.character-chat-status-row').evaluate(el => getComputedStyle(el).clipPath), 'inset(50%)', 'routine announcements remain accessible without visual clutter');
+    const backdrop = await page.locator('.character-chat-dialog').evaluate(el => {
+        const style = getComputedStyle(el, '::backdrop');
+        return { background: style.backgroundColor, filter: style.backdropFilter };
+    });
+    assert.equal(backdrop.background, 'rgba(0, 0, 0, 0)', 'opening chat does not tint the page');
+    assert.equal(backdrop.filter, 'none', 'opening chat does not blur the page');
+    assert.deepEqual(await page.evaluate(() => chatBackdropBefore.map(before => {
+        const style = getComputedStyle(document.querySelector(before.selector));
+        return { selector: before.selector, filter: style.filter, opacity: style.opacity };
+    })), await page.evaluate(() => chatBackdropBefore), 'opening chat preserves background/widget filters and opacity');
+    const composer = await page.locator('.character-chat-composer').boundingBox();
+    assert(composer.height <= 68, 'empty composer stays compact');
+    assert.equal(await page.locator('#character-chat-input').getAttribute('rows'), '1');
+    const send = await page.locator('.character-chat-send').boundingBox();
+    assert(send.width >= 44 && send.height >= 44, 'compact send remains a usable touch target');
+}
 
 async function checkPersonaMigration(browser) {
     const defaults = require('../js/character-persona.js');
@@ -77,7 +121,7 @@ async function checkPersonaMigration(browser) {
         const errors = []; page.on('pageerror', error => errors.push(error.message));
         try {
             await boot(page);
-            const edit = () => page.getByRole('button', { name: '角色設定', exact: true }).click();
+            const edit = () => openSettings(page);
             const prompt = page.getByRole('textbox', { name: '角色提示詞', exact: true });
             await edit(); assert.equal(await prompt.inputValue(), sample.expected, sample.name + ': editor uses the correct active prompt');
             await page.getByRole('button', { name: '取消', exact: true }).click();
@@ -113,7 +157,7 @@ async function checkPersona(browser) {
     const page = await context.newPage();
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     await boot(page);
-    const edit = () => page.getByRole('button', { name: '角色設定', exact: true }).click();
+    const edit = () => openSettings(page);
     const prompt = page.getByRole('textbox', { name: '角色提示詞', exact: true });
     const save = () => page.getByRole('button', { name: '儲存設定', exact: true }).click();
     await edit();
@@ -237,7 +281,9 @@ async function checkConnectionLifecycle(browser) {
     await page.locator('.character-chat-retry').waitFor();
     const sentBeforeDisconnect = await page.evaluate(() => chatTest.calls.length);
     await page.evaluate(() => { NewtabChatTransport.disconnect = () => new Promise(resolve => connectionProbe.disconnect = resolve); });
+    await openSettings(page);
     await page.getByRole('button', { name: '登出', exact: true }).click();
+    await closeSettings(page);
     await page.locator('#character-chat-input').fill('登出途中不得傳送');
     assert.equal(await page.locator('.character-chat-send').isDisabled(), true);
     assert.equal(await page.locator('.character-chat-retry').isDisabled(), true);
@@ -253,6 +299,7 @@ async function checkConnectionLifecycle(browser) {
 
     // A late old login must not change the reopened panel or start a poll.
     await page.evaluate(() => { NewtabChatTransport.login = () => new Promise(resolve => connectionProbe.login = resolve); });
+    await openSettings(page);
     await page.getByRole('button', { name: '使用 ChatGPT 登入', exact: true }).click();
     await page.evaluate(() => {
         NewtabCharacterChat.close();
@@ -311,29 +358,110 @@ async function checkLazyTransportAndPlacement(browser) {
         await page.setViewportSize(viewport);
         const dialog = await page.locator('.character-chat-dialog').boundingBox();
         const character = await page.locator('.widget[data-type="companion"]').boundingBox();
-        assert.equal(dialog.height, 700, 'desktop sheet stays compact');
+        assert.equal(dialog.height, 600, 'desktop sheet stays compact');
         assert(dialog.x >= 0 && dialog.y >= 24 && dialog.x + dialog.width <= viewport.width && dialog.y + dialog.height <= viewport.height - 24, 'sheet stays within screen');
         assert(dialog.x + dialog.width <= character.x || dialog.x >= character.x + character.width, 'sheet sits beside the character');
         await page.screenshot({ path: `.impeccable/review/chat-desktop-${viewport.width}.png` });
     }
     assert.deepEqual(serviceCalls, ['/v1/status'], 'resizing never starts login or another request');
+    await page.getByRole('button', { name: '前往設定', exact: true }).click();
+    assert.equal(await page.locator('.character-chat-settings').isVisible(), true, 'disconnected chat has a direct settings entry');
+    assert.equal(await page.getByRole('button', { name: '使用 ChatGPT 登入', exact: true }).isVisible(), true);
+    assert.equal(await page.getByRole('button', { name: '重新確認', exact: true }).isVisible(), true);
+    assert.deepEqual(serviceCalls, ['/v1/status'], 'opening settings alone does not start login or access the account');
     await context.close();
     console.log('PASS integrated chat: lazy local access, compact adjacent sheet at 16:9 / 21:9 / 32:9');
 }
 
-(async () => {
-    const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
+async function checkCloseDuringStream(browser) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
+    const page = await context.newPage();
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
     try {
+        await boot(page);
+        await page.evaluate(() => { chatTest.mode = 'hold'; });
+        await send(page, '關閉設定中的進行中回覆');
+        await openSettings(page);
+        await page.getByRole('textbox', { name: '角色提示詞', exact: true }).fill('這段未儲存草稿不可套用。');
+        await page.getByRole('button', { name: '關閉對話', exact: true }).click();
+        await page.waitForFunction(() => !NewtabCharacterChat.isOpen() && chatTest.reactions.at(-1)?.state === 'idle');
+        await page.waitForTimeout(100);
+        await page.evaluate(() => NewtabCharacterChat.open('companion-1'));
+        await page.waitForFunction(() => document.querySelector('.character-chat-connection').dataset.connected === 'true');
+        assert.equal(await page.locator('.character-chat-message-note').last().textContent(), '已停止');
+        assert.equal(await page.locator('.character-chat-text').last().textContent(), '正在輸出的內容', 'late aborted chunks do not mutate the reopened conversation');
+        assert.equal(await page.locator('.character-chat-settings').isVisible(), false, 'reopening returns to chat, not an abandoned settings draft');
+        await openSettings(page);
+        assert.equal(await page.getByRole('textbox', { name: '角色提示詞', exact: true }).inputValue(), await page.evaluate(() => NewtabCharacterPersona.defaultPrompt));
+        assert.equal(await page.evaluate(() => chatTest.loginCalls + chatTest.disconnectCalls), 0);
+        assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+    console.log('PASS settings during stream: closing aborts, stale chunks fenced, history retained, unsaved persona discarded');
+}
+
+async function checkSideRailKeyboard(browser) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
+    const page = await context.newPage();
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    try {
+        await boot(page);
+        await page.evaluate(() => {
+            NewtabCharacterChat.close(); NewtabSideRail.open(); NewtabCharacterChat.open('companion-1');
+            window.chatSearchFocusEvents = 0;
+            document.querySelector('.search-input').addEventListener('focus', () => chatSearchFocusEvents++);
+        });
+        assert.equal(await page.evaluate(() => NewtabSideRail.isOpen()), true);
+        assert.equal(await page.locator('.character-chat-dialog').getAttribute('role'), 'dialog');
+        for (const key of [...Array(14).fill('Tab'), ...Array(14).fill('Shift+Tab')]) {
+            await page.keyboard.press(key);
+            assert.equal(await page.evaluate(() => !!document.activeElement.closest('.character-chat-dialog')), true,
+                'open side rail never takes keyboard focus from chat');
+        }
+        const gear = page.getByRole('button', { name: '對話設定', exact: true });
+        await gear.focus(); await page.keyboard.press('Control+k');
+        assert.equal(await page.evaluate(() => chatSearchFocusEvents), 0, 'Ctrl+K in chat never focuses the new-tab search');
+        await gear.focus();
+        assert.equal(await gear.evaluate(el => el.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'k', code: 'KeyK', ctrlKey: true, bubbles: true, cancelable: true
+        }))), true, 'the page search handler does not consume Ctrl+K from a dialog control');
+        assert.equal(await gear.evaluate(el => document.activeElement === el), true);
+        await openSettings(page); await page.keyboard.press('Tab');
+        assert.equal(await page.evaluate(() => !!document.activeElement.closest('.character-chat-dialog')), true);
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.character-chat-settings').isVisible(), false);
+        assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen() && NewtabSideRail.isOpen()), true,
+            'first Escape returns to chat without changing the underlying rail');
+        await page.keyboard.press('Escape');
+        assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), false);
+        assert.equal(await page.evaluate(() => NewtabSideRail.isOpen()), true, 'closing chat does not also dismiss the rail');
+        await page.keyboard.press('Escape');
+        assert.equal(await page.evaluate(() => NewtabSideRail.isOpen()), false, 'the underlying rail resumes its own keyboard handling after chat closes');
+        assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+    console.log('PASS stacked keyboard: open rail preserves chat Tab loop, Escape hierarchy and Ctrl+K isolation');
+}
+
+(async () => {
+    const browser = await chromium.launch(process.env.NEWTAB_BROWSER_PATH ? { headless: true, executablePath: process.env.NEWTAB_BROWSER_PATH } :
+        { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
+    try {
+        if (process.argv.includes('--keyboard-only')) { await checkSideRailKeyboard(browser); return; }
         await checkPersonaMigration(browser);
         await checkPersona(browser);
         await checkConnectionLifecycle(browser);
         await checkLazyTransportAndPlacement(browser);
+        await checkCloseDuringStream(browser);
+        await checkSideRailKeyboard(browser);
         for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 640 }]) {
             const context = await browser.newContext({ viewport, isMobile: viewport.width < 600, hasTouch: viewport.width < 600, reducedMotion: 'reduce' });
             await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
             const page = await context.newPage(); page.setDefaultTimeout(5000);
             const errors = []; page.on('pageerror', e => errors.push(e.message));
             await boot(page);
+            await checkQuietChat(page);
+            await page.screenshot({ path: `.impeccable/review/chat-quiet-${viewport.width}.png` });
             assert.equal(await page.evaluate(() => document.activeElement.id), 'character-chat-input');
             await page.getByRole('button', { name: '關閉對話', exact: true }).focus();
             await page.keyboard.press('Shift+Tab');
@@ -368,42 +496,43 @@ async function checkLazyTransportAndPlacement(browser) {
                 await page.evaluate(() => { chatTest.mode = 'normal'; });
                 await send(page, '長回覆後繼續'); await complete(page);
                 assert.equal(await page.evaluate(() => chatTest.calls.at(-1).messages.every(m => m.content.length <= 12000)), true, 'next question stays within the service per-message context limit');
-                await page.getByRole('button', { name: '清除對話', exact: true }).click();
-                await page.getByRole('button', { name: '確認清除', exact: true }).click();
-                await send(page, '中文確認'); await complete(page);
             }
+            const expectedBase = viewport.width === 1440 ? 3 : 1;
             await page.evaluate(() => { chatTest.mode = 'failure'; });
             await send(page, '第二個問題');
             await page.getByRole('button', { name: '重試', exact: true }).waitFor();
             assert.match(await page.locator('.character-chat-status').textContent(), /中斷/);
             await page.evaluate(() => { chatTest.mode = 'normal'; });
             await page.getByRole('button', { name: '重試', exact: true }).click(); await complete(page);
-            assert.equal(await page.locator('.character-chat-message.is-user').count(), 2, 'retry does not duplicate the question');
+            assert.equal(await page.locator('.character-chat-message.is-user').count(), expectedBase + 1, 'retry does not duplicate the question');
             assert.equal(await page.evaluate(() => chatTest.calls.at(-1).messages.some(m => m.content === '部分內容')), false, 'partial failed answer is not sent as complete model context');
             await page.evaluate(() => { chatTest.mode = 'hold'; });
             await send(page, '停止測試');
+            await openSettings(page);
+            assert.equal(await page.locator('.character-chat-disconnect').isDisabled(), true, 'account actions are locked while a response is active');
+            await closeSettings(page);
+            assert.equal(await page.locator('.character-chat-stop').isVisible(), true, 'returning from settings keeps Stop reachable');
             await page.locator('.character-chat-stop').click();
             await page.waitForFunction(() => document.querySelector('.character-chat-status').textContent === '已停止回覆。');
             assert.equal(await page.locator('.character-chat-message-note').last().textContent(), '已停止');
             await page.waitForTimeout(90);
             assert.equal(await page.locator('.character-chat-text').last().textContent(), '正在輸出的內容', 'late stream chunks after cancellation are ignored');
-            await page.getByRole('button', { name: '清除對話', exact: true }).click();
+            await openSettings(page);
             await page.keyboard.press('Escape');
-            assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), true, 'Escape dismisses clear confirmation before closing chat');
-            assert.equal(await page.locator('.character-chat-message.is-user').count(), 3);
+            assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), true, 'Escape returns from settings before closing chat');
+            assert.equal(await page.locator('.character-chat-message.is-user').count(), expectedBase + 2, 'settings preserve conversation history');
             await page.keyboard.press('Escape');
             assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), false);
             assert.equal(await page.evaluate(() => document.activeElement.classList.contains('companion-trigger')), true, 'close returns focus to character');
             await boot(page);
-            assert.equal(await page.locator('.character-chat-message.is-user').count(), 3, 'history survives reload in current tab');
-            await page.getByRole('button', { name: '清除對話', exact: true }).click();
-            await page.getByRole('button', { name: '確認清除', exact: true }).click();
-            assert.equal(await page.locator('.character-chat-message').count(), 0);
+            assert.equal(await page.locator('.character-chat-message.is-user').count(), expectedBase + 2, 'history survives reload in current tab');
+            await openSettings(page);
             await page.getByRole('button', { name: '登出', exact: true }).click();
             assert.equal(await page.evaluate(() => chatTest.disconnectCalls), 1);
             await page.getByRole('button', { name: '使用 ChatGPT 登入', exact: true }).click();
             await page.waitForFunction(() => document.querySelector('.character-chat-connection').dataset.connected === 'true');
             assert.equal(await page.evaluate(() => chatTest.loginCalls), 1);
+            await closeSettings(page);
             await page.evaluate(() => { chatTest.available = false; NewtabCharacterChat.refresh(); });
             await page.waitForFunction(() => document.querySelector('.character-chat-connection').dataset.connected === 'false');
             await page.locator('#character-chat-input').fill('離線內容');
@@ -412,7 +541,7 @@ async function checkLazyTransportAndPlacement(browser) {
             assert.deepEqual(errors, []);
             await page.screenshot({ path: `.impeccable/review/chat-${viewport.width}.png` });
             await context.close();
-            console.log(`PASS chat ${viewport.width}×${viewport.height}: sizing, IME, streaming, literal rendering, retry/stop, history/clear, Nacho identity/prompt contract, focus`);
+            console.log(`PASS chat ${viewport.width}×${viewport.height}: quiet settings, transparent backdrop, compact composer, IME, streaming, retry/stop, history preservation, prompt contract, focus`);
         }
     } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
