@@ -63,6 +63,19 @@ Cult UI's **Halo Switch**, **Direction-Aware Tabs**, **Popover**, **Side Panel**
 
 Acceptance uses real-browser interaction, screenshots, interruption/reopening, narrow and ultrawide layouts, state persistence and mocked-service error cases. Award-level craft is an aspiration; no award or universal frame-rate claim is made.
 
+### Continuous interaction refinement — 2026.11.15.1
+
+The owner found the first motion pass too rigid. The principal problem was discontinuity: old content disappeared before the next view arrived, and an interrupted action restarted an entrance. The revised system carries the current position and velocity into a new target. One shared requestAnimationFrame driver integrates damped springs; it stops once all activity settles. There is no perpetual decorative loop or new startup delay.
+
+- Drawer tabs use adjacent, opaque live pages. Outgoing content remains visually present but immediately becomes inert; scroll position is preserved per page. The active pill has a leading and trailing spring edge, while the toggle thumb stretches gently toward its destination. Repeated selection cannot snap the traveling pill to its endpoint.
+- Dialogs and context menus reverse from their visible pose. Their dismissal deactivates input immediately, with completion guards preventing an old close from hiding a reopened surface. Context-menu selection has one moving background plate; focus rings and pointer targets stay fixed.
+- Appearance disclosure animates the actual field region and keeps saved values intact. The Done button compresses its inner face, never the hit box. Folder contents remain present when an in-progress close reverses.
+- Chat settings and conversation use real retained views with a reversible fade-through handoff, avoiding overlapping text. The composer changes height continuously, including an interrupted shrink. Closing aborts transport immediately; reopening can inherit the visual exit pose without delaying control response.
+- Weather keeps labels and controls stable. Only forecast curves crossfade, while the active data cursor belongs to a single overlay. Metric and unit indicators travel with a restrained spring. Repeated changes must preserve visible geometry and clean up obsolete curves.
+- Reduced motion, a newly hidden document, and removed owners resolve pending animation cleanup. Native controls, focus ownership and synchronous preference writes remain authoritative.
+
+DesignBookmark's actual Toggle switch, Tab pill and Spring dropdown examples informed the physical response. Cult UI's actual Direction-Aware Tabs and Popover sources informed directional continuity and restrained settling. This implementation keeps interactions interruptible instead of blocking input until an animation finishes. Review uses normal-speed recordings, intermediate frames, rapid reversals and functional tests; the target is a dependable finished product, not an award claim.
+
 ## Functional refinement after owner review
 Tapping Add creates an immediately usable widget and brings it into view on phones. Arrangement is explicit in Tools or entered through a deliberate long press. Right-click and Shift+F10 open the selected widget's menu; touch users can select it during editing and use the shared toolbar's Settings action. Individual three-dot buttons have been removed at the owner's request.
 

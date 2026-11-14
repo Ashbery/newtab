@@ -122,6 +122,16 @@
         }
 
         var el = ensure();
+        // A reversed dismissal is the same view. Retain its contents and let
+        // the panel's existing transition return from its rendered position.
+        if (currentFolderId === folderId && closeTimer) {
+            clearTimeout(closeTimer);
+            closeTimer = null;
+            transitionId++;
+            el.classList.add('is-open', 'is-visible');
+            el.querySelector('.folder-overlay-panel').focus({ preventScroll: true });
+            return;
+        }
         if (currentFolderId) commitName();
         else previousFocus = document.activeElement;
         clearTimeout(closeTimer);

@@ -39,8 +39,7 @@
             button.setAttribute('aria-label', unit === 'C' ? '攝氏' : '華氏');
             button.addEventListener('click', function () {
                 if (state.unit === unit) return;
-                state.unit = unit; options.onUnit(unit); updateTemperatures(); updateChart(true);
-                if (global.NewtabMotion) global.NewtabMotion.enter(temp, { y: 3, scale: 1, duration: 180 });
+                state.unit = unit; options.onUnit(unit); updateTemperatures(true); updateChart(true);
             });
             units.appendChild(button);
         });
@@ -115,6 +114,49 @@
             dayStrip.appendChild(button);
         });
         var selected = [];
+        var unitPosition = state.unit === 'F' ? 1 : 0;
+        var metricPosition = ['temp', 'rain', 'wind'].indexOf(state.metric);
+        var graphLayers = new Map(), graphOverlay;
+        function svgLayer(className) {
+            var layer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            layer.setAttribute('viewBox', '0 0 624 104'); layer.setAttribute('preserveAspectRatio', 'none'); layer.setAttribute('aria-hidden', 'true');
+            layer.classList.add(className); return layer;
+        }
+        function drawGraph(markup, animate) {
+            var first = !graphOverlay;
+            if (!graphOverlay) {
+                graphOverlay = svgLayer('weather-chart-overlay');
+                graphOverlay.innerHTML = '<path class="weather-chart-grid" d="M12 84H612 M12 20H612"/><line class="weather-chart-cursor" y1="6" y2="100"/><circle class="weather-chart-dot" r="3.5"/>';
+                chart.appendChild(graphOverlay);
+            }
+            // Each geometry has a stable identity. Rapid third-state changes
+            // never overwrite a still-visible SVG, and reversing reuses it.
+            // The first timestamp also covers today's rolling hourly cutoff.
+            // Keys are bounded by 3 metrics × 2 units × source hourly records;
+            // inactive layers are removed as soon as their <=400ms fade ends.
+            var key = state.date + '|' + state.metric + '|' + state.unit + '|' + selected[0].at;
+            var incoming = graphLayers.get(key);
+            if (!incoming) {
+                var layer = svgLayer('weather-chart-curve'); layer.innerHTML = markup; layer.style.opacity = '0';
+                layer.dataset.curveKey = key; chart.insertBefore(layer, graphOverlay);
+                incoming = { layer: layer, opacity: 0, revision: 0 }; graphLayers.set(key, incoming);
+            }
+            graphLayers.forEach(function (entry, entryKey) {
+                var layer = entry.layer, target = entry === incoming ? 1 : 0, revision = ++entry.revision;
+                layer.dataset.active = String(entry === incoming);
+                function removeInactive(complete) {
+                    if (complete && !target && entry.revision === revision) { layer.remove(); graphLayers.delete(entryKey); }
+                }
+                if (!animate || first || !global.NewtabMotion) {
+                    if (global.NewtabMotion) global.NewtabMotion.cancelSpring(layer);
+                    entry.opacity = target; layer.style.opacity = String(target); removeInactive(true); return;
+                }
+                global.NewtabMotion.spring(layer, 'forecast-curve', { opacity: target }, {
+                    from: { opacity: entry.opacity }, stiffness: 560, damping: 44, precision: .003, maxDuration: 400,
+                    update: function (pose) { entry.opacity = Math.max(0, Math.min(1, pose.opacity)); layer.style.opacity = entry.opacity; }
+                }).then(removeInactive);
+            });
+        }
         function value(hour) {
             if (state.metric === 'temp') return number(hour.temp) ? (state.unit === 'F' ? hour.temp * 9 / 5 + 32 : hour.temp) : null;
             if (state.metric === 'wind') return hour.wind;
@@ -127,9 +169,13 @@
             if (state.metric === 'wind') return decimal(val) + ' m/s · ' + direction(hour.direction);
             return hasProbability ? Math.round(val) + '%' : decimal(val) + ' mm（' + (hour.intervalHours || 1) + ' 小時）';
         }
-        function updateTemperatures() {
+        function updateTemperatures(animate) {
             temp.textContent = temperature(data.temp);
             units.dataset.unit = state.unit;
+            var target = state.unit === 'F' ? 1 : 0;
+            function move(pose) { unitPosition = pose.value; units.style.setProperty('--weather-unit-shift', (unitPosition * 100) + '%'); }
+            if (animate && global.NewtabMotion) global.NewtabMotion.spring(units, 'weather-unit', { value: target }, { from: { value: unitPosition }, update: move, stiffness: 500, damping: 32, precision: .002 });
+            else move({ value: target });
             units.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.unit === state.unit)); });
             var todayForecast = days.find(function (day) { return day.date === today; });
             var high = todayForecast ? todayForecast.high : data.high, low = todayForecast ? todayForecast.low : data.low;
@@ -156,17 +202,19 @@
                 reading.textContent = clock(h.precipStart, zone) + '–' + clock(h.precipEnd, zone) + ' · ' + valueLabel(h);
             }
             chart.setAttribute('aria-valuenow', state.index); chart.setAttribute('aria-valuetext', state.date + ' ' + reading.textContent);
-            var cursor = chart.querySelector('.weather-chart-cursor');
+            var cursor = graphOverlay && graphOverlay.querySelector('.weather-chart-cursor');
             if (cursor) { cursor.setAttribute('x1', point(state.index)); cursor.setAttribute('x2', point(state.index)); }
-            var dot = chart.querySelector('.weather-chart-dot');
+            var dot = graphOverlay && graphOverlay.querySelector('.weather-chart-dot');
             if (dot) { dot.setAttribute('cx', point(state.index)); dot.setAttribute('cy', chart._weatherY(value(h))); dot.style.display = number(value(h)) ? '' : 'none'; }
             reading.setAttribute('aria-live', announce ? 'polite' : 'off');
         }
         function updateChart(animate, direction) {
-            if (animate && global.NewtabMotion) global.NewtabMotion.enter(panel, { x: (direction || 0) * 6, y: 0, scale: 1, duration: 200 });
             var metricIndex = ['temp', 'rain', 'wind'].indexOf(state.metric);
             intervalNote.textContent = state.metric === 'rain' && !hasProbability ? '雨量依各預報區間顯示，時長見上方數值。' : '';
             tabs.style.setProperty('--weather-tab', metricIndex);
+            function moveMetric(pose) { metricPosition = pose.value; indicator.style.transform = 'translateX(' + (metricPosition * 100) + '%)'; }
+            if (animate && global.NewtabMotion) global.NewtabMotion.spring(indicator, 'weather-metric', { value: metricIndex }, { from: { value: metricPosition }, update: moveMetric, stiffness: 500, damping: 34, precision: .002 });
+            else moveMetric({ value: metricIndex });
             tabs.querySelectorAll('button').forEach(function (b) { var active = b.dataset.metric === state.metric; b.setAttribute('aria-selected', String(active)); b.tabIndex = active ? 0 : -1; });
             panel.setAttribute('aria-labelledby', panelId + '-' + state.metric);
             selected = hours.filter(function (h) { return dateKey(h.at, zone) === state.date && (state.date !== today || h.at >= Date.now() - 3600000); });
@@ -188,7 +236,8 @@
             var fill = '', group = [];
             function closeGroup() { if (!group.length) return; fill += 'M' + point(group[0]) + ' 100 ' + group.map(function (i) { return 'L' + point(i) + ' ' + y(value(selected[i])); }).join(' ') + ' L' + point(group[group.length - 1]) + ' 100 Z '; group = []; }
             selected.forEach(function (h, i) { if (number(value(h))) group.push(i); else closeGroup(); }); closeGroup();
-            chart.innerHTML = '<svg viewBox="0 0 624 104" preserveAspectRatio="none" aria-hidden="true"><path class="weather-chart-grid" d="M12 84H612 M12 20H612"/><path class="weather-chart-fill" d="' + fill + '"/><path class="weather-chart-line" d="' + path + '"/><line class="weather-chart-cursor" y1="6" y2="100"/><circle class="weather-chart-dot" r="3.5"/></svg>';
+            drawGraph('<path class="weather-chart-fill" d="' + fill + '"/><path class="weather-chart-line" d="' + path + '"/>', animate);
+            var previousRange = chart.querySelector('.weather-chart-range'); if (previousRange) previousRange.remove();
             var range = node('span', 'weather-chart-range', (state.metric === 'temp' ? Math.round(max) + '° / ' + Math.round(min) + '°' : decimal(max) + (state.metric === 'wind' ? ' m/s' : hasProbability ? '%' : ' mm')));
             chart.appendChild(range);
             chart.setAttribute('aria-valuemin', '0'); chart.setAttribute('aria-valuemax', selected.length - 1);

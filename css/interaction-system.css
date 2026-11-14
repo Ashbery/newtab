@@ -1,11 +1,11 @@
 /* One calm motion language: powder-blue selection, silver rims, legible ink.
    Motion belongs to the control's state, never to its pointer hit target. */
 :root {
-    --motion-fast: 120ms;
-    --motion-control: 180ms;
-    --motion-panel: 320ms;
+    --motion-fast: 140ms;
+    --motion-control: 220ms;
+    --motion-panel: 380ms;
     --motion-ease: cubic-bezier(.22, 1, .36, 1);
-    --motion-spring: linear(0, .22 10%, .61 25%, .88 43%, 1.015 66%, 1.005 84%, 1);
+    --motion-spring: linear(0, .12 7%, .39 17%, .72 31%, .94 46%, 1.035 64%, 1.018 80%, 1);
     --control-ink: #36596e;
     --control-track: #dce5eb;
     --control-selected: #b7d6e4;
@@ -72,6 +72,14 @@
 .ctx-chevron { display: inline-block; transition: translate var(--motion-control) var(--motion-ease); }
 .ctx-item.is-open .ctx-chevron { translate: 2px 0; }
 .ctx-item:active { background-color: #c8dfed; }
+.ctx-highlight {
+    position: absolute; inset: 0 6px auto; height: 40px; z-index: 0; pointer-events: none;
+    border-radius: 9px; opacity: 0; background: var(--ctx-highlight-fill, #dceaf2);
+    transition: background-color 160ms ease;
+}
+.has-motion-highlight .ctx-item { position: relative; z-index: 1; }
+.has-motion-highlight .ctx-item:is(:hover, :focus-visible, .is-open) { background: transparent; }
+.has-motion-highlight .ctx-item:active { box-shadow: inset 0 0 0 1px #547d9326; }
 
 /* Search feedback stays inside the customized surface. */
 .suggestion-item { transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease; }
@@ -95,16 +103,16 @@
 .has-forecast .weather-metric-indicator {
     bottom: 2px; height: calc(100% - 4px); border-radius: 10px;
     background: color-mix(in srgb, currentColor 9%, transparent);
-    transition: transform var(--motion-panel) var(--motion-spring);
+    transition: none;
 }
 .has-forecast .weather-units { position: relative; isolation: isolate; }
 .has-forecast .weather-units::before {
     content: ''; position: absolute; pointer-events: none; z-index: -1;
     top: 7px; bottom: 0; left: 0; width: 50%; border-radius: 8px;
     background: color-mix(in srgb, currentColor 8%, transparent);
-    translate: 0 0; transition: translate var(--motion-panel) var(--motion-spring);
+    translate: var(--weather-unit-shift, 0%) 0;
 }
-.has-forecast .weather-units[data-unit="F"]::before { translate: 100% 0; }
+.has-forecast .weather-units[data-unit="F"]::before { translate: var(--weather-unit-shift, 100%) 0; }
 .has-forecast .weather-unit[aria-pressed="true"] { background: transparent; }
 .has-forecast :is(.weather-day, .weather-metric, .weather-unit) { transition: background-color var(--motion-control) ease, color var(--motion-control) ease; }
 .has-forecast .weather-day { border-radius: 12px; }
@@ -118,9 +126,8 @@
 /* Folder disclosure stays anchored without flying across a wide monitor. */
 .folder-overlay-panel { transition: opacity 180ms ease, transform 280ms var(--motion-ease); }
 .folder-overlay.is-open:not(.is-visible) .folder-overlay-panel { transform: translateY(12px) scale(.975); }
-.folder-overlay.is-visible .folder-open-item { animation: nacho-folder-item 240ms var(--motion-ease) both; }
-.folder-overlay.is-visible .folder-open-item:nth-child(n+5) { animation-delay: 90ms; }
-@keyframes nacho-folder-item { from { opacity: 0; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
+/* Keep the contents on the panel: a quick reversal must not replay each icon. */
+.folder-overlay.is-visible .folder-open-item { animation: none; }
 
 /* Small task states: preserve labels and editable backgrounds. */
 .todo-item input[type="checkbox"] { accent-color: #698da5; cursor: pointer; }
@@ -154,12 +161,24 @@ body.is-focus-mode .widget:is([data-type="app"], [data-type="folder"], [data-typ
 .appearance-dialog[open] { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
 .appearance-dialog .appearance-fields { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 8px; margin-right: -8px; }
 .appearance-dialog > footer { padding-top: 16px; border-top: 1px solid #d0dfe8; }
-.appearance-dialog::backdrop, .weather-location-dialog::backdrop { background: #172d4026; }
+.appearance-weather-custom { display: grid; grid-template-rows: 0fr; }
+.appearance-weather-custom-inner { min-height: 0; overflow: hidden; padding: 0 4px; margin: 0 -4px; }
+.appearance-weather-custom[inert] { pointer-events: none; }
+.appearance-done { position: relative; isolation: isolate; }
+.appearance-dialog .appearance-done, .appearance-dialog .appearance-done:hover { background: transparent; }
+.appearance-done::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+    background: #396b87; box-shadow: 0 1px 2px #244b601a;
+    transition: scale 300ms var(--motion-spring), background-color 160ms ease, box-shadow 160ms ease;
+}
+.appearance-done:hover::before { background: #315f79; box-shadow: 0 3px 8px #244b6026; }
+.appearance-done:active::before { scale: .95 .94; box-shadow: none; transition-duration: 80ms; }
+.appearance-dialog::backdrop, .weather-location-dialog::backdrop { background: #172d4026; opacity: var(--motion-presence, 1); }
 
 @media (prefers-reduced-motion: reduce) {
     :root { --motion-fast: 0ms; --motion-control: 0ms; --motion-panel: 0ms; }
-    .folder-overlay.is-visible .folder-open-item { animation: none; }
     .weather-retry:disabled svg { animation: none; }
     .appearance-dialog input[type="checkbox"]:active::before { scale: 1; }
+    .appearance-done:active::before { scale: 1; }
     :is(.appearance-dialog, .background-appearance, .side-rail, .icon-crop-modal) input[type="range"]:active::-webkit-slider-thumb { scale: 1; }
 }

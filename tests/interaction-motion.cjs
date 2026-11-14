@@ -145,3 +145,144 @@ test('an exiting background sheet cannot intercept Escape or steal focus from a 
         assert.deepEqual(errors, []);
     } finally { await context.close(); }
 });
+
+test('reversing the same appearance dialog keeps the currently displayed pose', async () => {
+    const { context, page, errors } = await fixture();
+    try {
+        const id = await page.evaluate(() => NewtabWidgets.getLayout().widgets.find(w => w.type === 'clock').id);
+        await page.evaluate(id => NewtabAppearance.openWidget(id), id);
+        await page.waitForFunction(() => +getComputedStyle(document.querySelector('.appearance-dialog[open]')).opacity > .999);
+        await page.getByRole('spinbutton', { name: '組件背景透明度', exact: true }).fill('73');
+        const reversal = await page.evaluate(async id => {
+            function pose() {
+                const el = document.querySelector('.appearance-dialog[open]'), rect = el.getBoundingClientRect();
+                return { opacity: +getComputedStyle(el).opacity, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            }
+            document.querySelector('.appearance-close').click();
+            await new Promise(resolve => setTimeout(resolve, 30));
+            const before = pose();
+            NewtabAppearance.openWidget(id);
+            return { before, after: pose() };
+        }, id);
+        assert(reversal.before.opacity > .1, 'the reversal occurs while the old panel is still visibly exiting');
+        assert(Math.abs(reversal.after.opacity - reversal.before.opacity) < .04, 'reopening does not restart from transparent');
+        for (const key of ['x', 'y', 'width', 'height']) {
+            assert(Math.abs(reversal.after[key] - reversal.before[key]) < .6, 'reopening preserves the visible ' + key);
+        }
+        await page.waitForFunction(() => +getComputedStyle(document.querySelector('.appearance-dialog[open]')).opacity > .999);
+        assert.equal(await page.getByRole('spinbutton', { name: '組件背景透明度', exact: true }).inputValue(), '73');
+        assert.equal(await page.locator('.appearance-dialog[open]').evaluate(el => el.inert), false);
+        assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+});
+
+test('a context menu reverses from its visible pose and releases its hit layer promptly', async () => {
+    const { context, page, errors } = await fixture();
+    try {
+        await page.evaluate(() => NewtabContextMenu.openWidget(document.querySelector('.widget[data-type="clock"]')));
+        await page.waitForFunction(() => +getComputedStyle(document.querySelector('.ctx-menu')).opacity > .999);
+        const result = await page.evaluate(async () => {
+            function pose() {
+                const el = document.querySelector('.ctx-menu'), rect = el.getBoundingClientRect();
+                return { opacity: +getComputedStyle(el).opacity, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            }
+            NewtabContextMenu.close();
+            await new Promise(resolve => setTimeout(resolve, 30));
+            const before = pose();
+            NewtabContextMenu.openWidget(document.querySelector('.widget[data-type="clock"]'));
+            return { before, after: pose() };
+        });
+        assert(result.before.opacity > .1);
+        assert(Math.abs(result.after.opacity - result.before.opacity) < .04, 'a repeated context action does not flash the menu out');
+        for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(result.after[key] - result.before[key]) < .6, 'menu pose remains continuous: ' + key);
+        await page.waitForFunction(() => +getComputedStyle(document.querySelector('.ctx-menu')).opacity > .999);
+        const closeMs = await page.evaluate(async () => {
+            const menu = document.querySelector('.ctx-menu'), start = performance.now();
+            NewtabContextMenu.close();
+            if (!menu.inert) throw new Error('exiting menu must stop accepting input immediately');
+            while (!menu.hidden && performance.now() - start < 1500) await new Promise(requestAnimationFrame);
+            if (!menu.hidden) throw new Error('menu did not finish closing');
+            return performance.now() - start;
+        });
+        assert(closeMs < 600, 'the menu exit does not keep an invisible shell for a long spring tail: ' + closeMs.toFixed(1) + 'ms');
+        assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+});
+
+test('weather custom controls reverse their disclosure without losing values or trapping hidden inputs', async () => {
+    for (const width of [1440, 390]) {
+        const { context, page, errors } = await fixture(width, width < 600);
+        try {
+            const id = await page.evaluate(() => {
+                const result = NewtabWidgets.addFromCatalog('weather', { left: 16, top: 16,
+                    options: { lat: 25.033, lon: 121.565, city: '測試城市', locationSource: 'manual', timeZone: 'Asia/Taipei' } });
+                if (!result.ok) throw new Error('weather fixture did not fit');
+                NewtabAppearance.openWidget(result.widget.id);
+                return result.widget.id;
+            });
+            const mode = page.getByRole('combobox', { name: '按鈕外觀', exact: true });
+            const custom = page.locator('.appearance-weather-custom');
+            assert.equal(await custom.evaluate(el => el.hidden), true);
+            await mode.selectOption('custom'); await page.waitForTimeout(90);
+            const reversal = await page.evaluate(() => {
+                const panel = document.querySelector('.appearance-weather-custom');
+                const select = document.querySelector('.appearance-weather-mode select');
+                const height = panel.getBoundingClientRect().height;
+                select.value = 'inherit'; select.dispatchEvent(new Event('change', { bubbles: true }));
+                return { before: height, after: panel.getBoundingClientRect().height, inert: panel.inert, hidden: panel.hidden };
+            });
+            assert(reversal.before > 5, 'the controls have visibly started expanding');
+            assert(Math.abs(reversal.after - reversal.before) < .6, 'changing direction keeps the visible disclosure height');
+            assert.equal(reversal.inert, true, 'outgoing controls immediately stop receiving input');
+            await page.waitForTimeout(60); await mode.selectOption('custom');
+            await page.waitForFunction(() => {
+                const el = document.querySelector('.appearance-weather-custom');
+                return !el.hidden && !el.inert && +getComputedStyle(el).opacity === 1 &&
+                    el.getBoundingClientRect().height >= el.firstElementChild.scrollHeight - 2;
+            });
+            await page.getByRole('spinbutton', { name: '按鈕背景透明度', exact: true }).fill('73');
+            await mode.selectOption('inherit'); await page.waitForTimeout(30);
+            await page.emulateMedia({ reducedMotion: 'reduce' });
+            await page.waitForFunction(() => document.querySelector('.appearance-weather-custom').hidden);
+            assert.equal(await custom.getAttribute('aria-hidden'), 'true');
+            await mode.selectOption('custom');
+            assert.equal(await custom.evaluate(el => el.hidden || el.inert), false);
+            assert.equal(await custom.evaluate(el => getComputedStyle(el).opacity), '1');
+            assert.equal(await page.getByRole('spinbutton', { name: '按鈕背景透明度', exact: true }).inputValue(), '73');
+            await page.getByRole('button', { name: '完成', exact: true }).click();
+            await page.locator('.appearance-dialog').waitFor({ state: 'hidden' });
+            const saved = await page.evaluate(id => NewtabWidgets.getLayout().widgets.find(w => w.id === id).options.appearance, id);
+            assert.equal(saved.weatherButtonMode, 'custom'); assert.equal(saved.weatherButtonAlpha, .27);
+            assert.deepEqual(errors, []);
+        } finally { await context.close(); }
+    }
+});
+
+test('reopening the same folder does not replay its contents from invisible', async () => {
+    const { context, page, errors } = await fixture();
+    try {
+        const id = await page.evaluate(() => {
+            const result = NewtabWidgets.addFromCatalog('folder', { left: 16, top: 16,
+                options: { name: '我的收藏', children: [{ appId: 'gmail' }, { appId: 'youtube' }] } });
+            if (!result.ok) throw new Error('folder fixture did not fit');
+            NewtabFolderUI.open(result.widget.id); return result.widget.id;
+        });
+        await page.waitForFunction(() => +getComputedStyle(document.querySelector('.folder-open-item')).opacity === 1);
+        const reversal = await page.evaluate(async id => {
+            function opacity() { return +getComputedStyle(document.querySelector('.folder-open-item')).opacity; }
+            NewtabFolderUI.close();
+            await new Promise(resolve => setTimeout(resolve, 30));
+            const before = opacity();
+            NewtabFolderUI.open(id);
+            await new Promise(requestAnimationFrame);
+            return { before, after: opacity() };
+        }, id);
+        assert(reversal.before > .95);
+        assert(reversal.after >= reversal.before - .04, 'the existing apps stay visible during a reversed folder dismissal');
+        assert.equal(await page.getByRole('textbox', { name: '資料夾名稱', exact: true }).inputValue(), '我的收藏');
+        assert.equal(await page.locator('.folder-open-item').count(), 2);
+        await page.getByRole('button', { name: '關閉資料夾', exact: true }).click();
+        await page.waitForFunction(() => !NewtabFolderUI.isOpen());
+        assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+});

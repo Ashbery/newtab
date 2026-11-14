@@ -339,3 +339,54 @@ test('ultrawide edge placement preserves the dashboard and custom appearance', a
         assert.deepEqual(errors, []);
     } finally { await context.close(); }
 });
+
+test('rapid forecast changes preserve visible curves and one current keyboard cursor, then clean up every inactive layer', async () => {
+    const { context, page, errors, requests } = await fixture();
+    try {
+        const calls = { ...requests };
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        const result = await page.evaluate(async () => {
+            const chart = document.querySelector('.weather-chart');
+            const choose = metric => document.querySelector('.weather-metric[data-metric="' + metric + '"]').click();
+            const layers = () => Array.from(chart.querySelectorAll('.weather-chart-curve'));
+            choose('rain'); await new Promise(resolve => setTimeout(resolve, 55));
+            const before = layers().map(layer => ({ layer, markup: layer.innerHTML, opacity: +getComputedStyle(layer).opacity }));
+            choose('wind');
+            const unchanged = before.every(record => record.layer.isConnected && record.markup === record.layer.innerHTML &&
+                Math.abs(record.opacity - +getComputedStyle(record.layer).opacity) < .0001);
+            const countAfterThird = layers().length;
+            const incomingOpacity = +getComputedStyle(chart.querySelector('.weather-chart-curve[data-active="true"]')).opacity;
+            chart.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+            const cursor = chart.querySelector('.weather-chart-cursor');
+            const cursorState = { count: chart.querySelectorAll('.weather-chart-cursor').length,
+                dotCount: chart.querySelectorAll('.weather-chart-dot').length, x: +cursor.getAttribute('x1'),
+                opacity: +getComputedStyle(cursor.closest('svg')).opacity, now: +chart.getAttribute('aria-valuenow'),
+                max: +chart.getAttribute('aria-valuemax'), label: chart.getAttribute('aria-valuetext') };
+            let maxAlphaError = 0;
+            for (let i = 0; i < 16; i++) {
+                await new Promise(requestAnimationFrame);
+                maxAlphaError = Math.max(maxAlphaError, Math.abs(layers().reduce((sum, layer) => sum + +getComputedStyle(layer).opacity, 0) - 1));
+            }
+            for (let i = 0; i < 60; i++) choose(['temp', 'rain', 'wind'][i % 3]);
+            return { unchanged, countAfterThird, incomingOpacity, cursorState, maxAlphaError, repeatedCount: layers().length };
+        });
+        assert.equal(result.unchanged, true, 'a third target never replaces the paths or opacity of an already visible curve');
+        assert.equal(result.countAfterThird, 3); assert.equal(result.incomingOpacity, 0, 'new curve begins transparently');
+        assert.deepEqual({ count: result.cursorState.count, dotCount: result.cursorState.dotCount, x: result.cursorState.x,
+            opacity: result.cursorState.opacity }, { count: 1, dotCount: 1, x: 612, opacity: 1 });
+        assert.equal(result.cursorState.now, result.cursorState.max); assert.match(result.cursorState.label, /m\/s/);
+        assert(result.maxAlphaError < .01, 'curve handoff keeps the total curve opacity stable');
+        assert(result.repeatedCount <= 3, 'repeated reversals reuse finite state keys rather than accumulate snapshots');
+        await page.waitForFunction(() => document.querySelectorAll('.weather-chart-curve').length === 1);
+        await page.evaluate(() => {
+            document.querySelector('.weather-metric[data-metric="temp"]').click();
+            document.querySelector('.weather-metric[data-metric="rain"]').click();
+        });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.waitForFunction(() => document.querySelectorAll('.weather-chart-curve').length === 1);
+        assert.equal(await page.locator('.weather-chart-curve').getAttribute('data-active'), 'true');
+        assert.equal(await page.locator('.weather-chart-overlay').count(), 1);
+        assert.deepEqual(requests, calls, 'view transitions do not fetch additional provider data');
+        assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+});

@@ -198,6 +198,10 @@
     function openWidget(id) {
         var widget = widgetById(id);
         if (!widget) return;
+        if (dialog && dialog.open && dialog.dataset.widgetId === id && dialog._resume) {
+            dialog._resume();
+            return;
+        }
         if (dialog) {
             if (global.NewtabMotion) global.NewtabMotion.cancel(dialog);
             dialog.close();
@@ -205,6 +209,7 @@
         var opener = document.activeElement;
         dialog = document.createElement('dialog');
         dialog.className = 'appearance-dialog';
+        dialog.dataset.widgetId = id;
         dialog.setAttribute('role', 'dialog');
         dialog.setAttribute('aria-labelledby', 'appearance-title');
         var header = document.createElement('header');
@@ -295,19 +300,41 @@
             mode.addEventListener('change', function () { update('weatherButtonMode', mode.value); });
             modeRow.appendChild(mode); weatherSection.appendChild(modeRow);
             var customFields = document.createElement('div'); customFields.className = 'appearance-weather-custom'; weatherSection.appendChild(customFields);
+            var customInner = document.createElement('div'); customInner.className = 'appearance-weather-custom-inner'; customFields.appendChild(customInner);
+            var customExpanded = null, disclosure = 0;
+            function showCustomFields(expanded) {
+                if (customExpanded === expanded) return;
+                var first = customExpanded === null;
+                customExpanded = expanded;
+                customFields.inert = !expanded; customFields.setAttribute('aria-hidden', String(!expanded));
+                if (first || !global.NewtabMotion) {
+                    disclosure = expanded ? 1 : 0; customFields.hidden = !expanded;
+                    customFields.style.gridTemplateRows = disclosure + 'fr'; customFields.style.opacity = disclosure;
+                    return;
+                }
+                customFields.hidden = false;
+                global.NewtabMotion.spring(customFields, 'appearance-disclosure', { progress: expanded ? 1 : 0 }, {
+                    from: { progress: disclosure }, stiffness: 420, damping: 38, precision: .003, maxDuration: 520,
+                    update: function (pose) {
+                        disclosure = Math.max(0, Math.min(1, pose.progress));
+                        customFields.style.gridTemplateRows = disclosure + 'fr';
+                        customFields.style.opacity = Math.min(1, disclosure * 1.6);
+                    }
+                }).then(function (complete) { if (complete && !customExpanded) customFields.hidden = true; });
+            }
             function weatherColor(label, key) {
                 var row = document.createElement('label'); row.className = 'appearance-tint'; row.textContent = label;
                 var input = document.createElement('input'); input.type = 'color'; input.setAttribute('aria-label', label);
                 input.addEventListener('input', function () { update(key, input.value); });
-                row.appendChild(input); customFields.appendChild(row); return input;
+                row.appendChild(input); customInner.appendChild(row); return input;
             }
             var weatherTint = weatherColor('按鈕背景色', 'weatherButtonTint');
-            var weatherAlpha = control(customFields, '按鈕背景透明度', (1 - values.weatherButtonAlpha) * 100, function (v) { update('weatherButtonAlpha', (100 - v) / 100); });
+            var weatherAlpha = control(customInner, '按鈕背景透明度', (1 - values.weatherButtonAlpha) * 100, function (v) { update('weatherButtonAlpha', (100 - v) / 100); });
             var weatherInk = weatherColor('按鈕圖示顏色', 'weatherButtonText');
-            var weatherRadius = control(customFields, '按鈕圓角', values.weatherButtonRadius, function (v) { update('weatherButtonRadius', v); }, 22, 'px');
+            var weatherRadius = control(customInner, '按鈕圓角', values.weatherButtonRadius, function (v) { update('weatherButtonRadius', v); }, 22, 'px');
             var weatherReset = document.createElement('button'); weatherReset.type = 'button'; weatherReset.className = 'appearance-reset'; weatherReset.textContent = '恢復按鈕預設';
             weatherUI = { paint: function (value) {
-                mode.value = value.weatherButtonMode; customFields.hidden = value.weatherButtonMode !== 'custom';
+                mode.value = value.weatherButtonMode; showCustomFields(value.weatherButtonMode === 'custom');
                 applySurface(weatherPreview, value); applyWeatherButtons(weatherPreview, value);
             }, set: function (value) {
                 weatherTint.value = value.weatherButtonTint; weatherInk.value = value.weatherButtonText;
@@ -340,10 +367,16 @@
         actions.append(reset, done); dialog.appendChild(actions);
         var panel = dialog;
         var closing = false;
+        panel._resume = function () {
+            if (!closing) return;
+            closing = false; panel.inert = false;
+            if (global.NewtabMotion) global.NewtabMotion.enter(panel, { y: 12, scale: .975, duration: 360 });
+            close.focus({ preventScroll: true });
+        };
         function finish() {
             if (closing) return;
             closing = true; panel.inert = true;
-            if (global.NewtabMotion) global.NewtabMotion.exit(panel, { y: 6, scale: .99, duration: 140 }).then(function (complete) { if (complete && panel.open) panel.close(); });
+            if (global.NewtabMotion) global.NewtabMotion.exit(panel, { y: 6, scale: .99, duration: 180 }).then(function (complete) { if (complete && closing && panel.open) panel.close(); });
             else panel.close();
         }
         close.addEventListener('click', finish);
@@ -378,7 +411,7 @@
             }
         });
         document.body.appendChild(panel); panel.showModal();
-        if (global.NewtabMotion) global.NewtabMotion.enter(panel, { y: 12, scale: .985, duration: 280 });
+        if (global.NewtabMotion) global.NewtabMotion.enter(panel, { y: 12, scale: .975, duration: 360 });
         document.dispatchEvent(new CustomEvent('newtab:appearance-dialog', { detail: { open: true } }));
         close.focus();
     }

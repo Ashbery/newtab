@@ -12,26 +12,87 @@
         characterPrompt: persona.defaultPrompt, personaEditing: false, personaGeneration: 0, personaImporting: false, personaReadError: '' };
     var ui = {};
     var motionPreference = global.matchMedia('(prefers-reduced-motion: reduce)');
-    var motions = new Map(), ghosts = new Set();
+    var motions = new Map(), springs = new Map(), ghosts = new Set(), viewRevision = 0, viewBlend = 0;
 
     function reducedMotion() { return motionPreference.matches || !!(global.NewtabMotion && global.NewtabMotion.reduced()); }
     function cancelMotion(el) { var animation = motions.get(el); if (animation) { motions.delete(el); animation.cancel(); } }
+    function springMotion(owner, key, target, from, update, settings) {
+        var group = springs.get(owner);
+        if (!group) { group = new Map(); springs.set(owner, group); }
+        var record = {}; group.set(key, record); owner.dataset.chatMotion = Array.from(group.keys()).join(' ');
+        var promise = global.NewtabMotion.spring(owner, key, target, Object.assign({ from: from, update: update,
+            stiffness: 420, damping: 36, precision: .002, maxDuration: 1000 }, settings));
+        return promise.then(function (complete) {
+            if (group.get(key) === record) {
+                group.delete(key);
+                if (!group.size) { springs.delete(owner); delete owner.dataset.chatMotion; }
+                else owner.dataset.chatMotion = Array.from(group.keys()).join(' ');
+            }
+            return complete;
+        });
+    }
+    function visualPose(el) {
+        var style = getComputedStyle(el), matrix = new DOMMatrixReadOnly(style.transform === 'none' ? undefined : style.transform);
+        return { opacity: parseFloat(style.opacity), x: matrix.m41, y: matrix.m42, scale: matrix.a };
+    }
+    function paintPose(el, pose) {
+        el.style.opacity = Math.max(0, Math.min(1, pose.opacity));
+        el.style.transform = 'translate(' + pose.x + 'px,' + pose.y + 'px) scale(' + pose.scale + ')';
+    }
+    function panelMotion(el, from, exiting) {
+        var to = { opacity: exiting ? 0 : 1, x: 0, y: exiting ? 8 : 0, scale: exiting ? .985 : 1 };
+        if (global.NewtabMotion && global.NewtabMotion.spring) {
+            // Both directions keep one owner, even while native dialog.close()
+            // releases focus and its inert visual handoff finishes outside it.
+            return springMotion(state.dialog, 'chat-panel', to, from, function (pose) { paintPose(el, pose); },
+                { stiffness: exiting ? 560 : 380, damping: exiting ? 42 : 36 }).then(function (complete) {
+                    if (complete && el === state.dialog) { el.style.removeProperty('opacity'); el.style.removeProperty('transform'); }
+                    return complete;
+                });
+        }
+        return animate(el, [{ opacity: from.opacity, transform: 'translate(' + from.x + 'px,' + from.y + 'px) scale(' + from.scale + ')' },
+            { opacity: to.opacity, transform: 'translateY(' + to.y + 'px) scale(' + to.scale + ')' }], exiting ? 'control' : 'panel');
+    }
     function animate(el, frames, token) {
+        // Reversing a transition starts at its rendered state, never its old
+        // keyframe. This also keeps rapid textarea growth/shrink continuous.
+        if (el && motions.has(el)) {
+            var current = getComputedStyle(el), first = Object.assign({}, frames[0]);
+            Object.keys(first).forEach(function (key) { if (key !== 'offset') first[key] = current[key]; });
+            frames = [first].concat(frames.slice(1));
+        }
         cancelMotion(el);
-        if (!el || !el.isConnected || reducedMotion() || !el.animate) return Promise.resolve();
+        if (!el || !el.isConnected || reducedMotion() || !el.animate) return Promise.resolve(true);
         var style = getComputedStyle(el), value = style.getPropertyValue('--motion-' + token).trim();
         var duration = parseFloat(value) * (/ms$/.test(value) ? 1 : 1000);
         if (!isFinite(duration)) duration = token === 'panel' ? 320 : token === 'fast' ? 120 : 180;
         var animation;
         try { animation = el.animate(frames, { duration: duration,
             easing: style.getPropertyValue('--motion-ease').trim() || 'cubic-bezier(.22,1,.36,1)' }); }
-        catch (_) { return Promise.resolve(); }
+        catch (_) { return Promise.resolve(true); }
         motions.set(el, animation);
-        function finish() { if (motions.get(el) === animation) motions.delete(el); }
-        return animation.finished.then(finish, finish);
+        function finish(completed) { if (motions.get(el) === animation) motions.delete(el); return completed; }
+        return animation.finished.then(function () { return finish(true); }, function () { return finish(false); });
     }
-    function clearGhosts() { ghosts.forEach(function (el) { cancelMotion(el); el.remove(); }); ghosts.clear(); }
-    function cancelAllMotion() { motions.forEach(function (animation) { animation.cancel(); }); motions.clear(); clearGhosts(); }
+    function clearGhosts(except) { ghosts.forEach(function (el) { if (el !== except) { cancelMotion(el); el.remove(); ghosts.delete(el); } }); }
+    function settleViews() {
+        if (!ui.stage) return;
+        viewRevision++;
+        viewBlend = state.personaEditing ? 1 : 0;
+        [ui.settings, ui.conversation].forEach(function (el) {
+            var visible = el === ui.settings ? state.personaEditing : !state.personaEditing;
+            el.hidden = !visible; el.inert = !visible; el.setAttribute('aria-hidden', String(!visible));
+            el.style.removeProperty('opacity'); el.style.removeProperty('transform');
+        });
+    }
+    function cancelAllMotion(except, keepPanel) {
+        motions.forEach(function (animation) { animation.cancel(); }); motions.clear();
+        springs.forEach(function (group, owner) {
+            if (keepPanel && group.has('chat-panel')) return;
+            global.NewtabMotion.finishSpring(owner);
+        });
+        clearGhosts(except); settleViews();
+    }
     function snapshot(el, className, parent) {
         if (reducedMotion()) return null;
         var clone = el.cloneNode(true);
@@ -43,23 +104,59 @@
         clone.querySelectorAll('textarea').forEach(function (field, index) { field.value = fields[index].value; });
         parent.appendChild(clone); ghosts.add(clone);
         var sourceScroll = [el].concat(Array.from(el.querySelectorAll('*')));
-        [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function (node, index) { node.scrollTop = sourceScroll[index].scrollTop; });
+        [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function (node, index) {
+            var source = sourceScroll[index]; node.scrollTop = source.scrollTop;
+            if (motions.has(source) || springs.has(source)) {
+                var style = getComputedStyle(source);
+                node.style.opacity = style.opacity; node.style.transform = style.transform;
+                if (source === ui.input) node.style.height = style.height;
+            }
+        });
         return clone;
     }
     function switchView(settings) {
         if (!ui.stage) return;
-        if (!state.dialog.open) { ui.settings.hidden = !settings; state.dialog.classList.toggle('is-settings', settings); return; }
-        clearGhosts();
-        var old = settings ? ui.conversation : ui.settings;
-        var next = settings ? ui.settings : ui.conversation;
-        var oldStyle = getComputedStyle(old);
-        var oldFrame = { opacity: oldStyle.opacity, transform: oldStyle.transform };
-        var ghost = state.dialog.open ? snapshot(old, 'character-chat-view-ghost', ui.stage) : null;
-        ui.settings.hidden = !settings; state.dialog.classList.toggle('is-settings', settings);
-        var direction = settings ? 1 : -1;
-        if (ghost) animate(ghost, [oldFrame, { opacity: 0, transform: 'translateX(' + (-direction * 12) + 'px)' }], 'control')
-            .then(function () { ghost.remove(); ghosts.delete(ghost); });
-        animate(next, [{ opacity: 0, transform: 'translateX(' + (direction * 14) + 'px)' }, { opacity: 1, transform: 'translateX(0)' }], 'panel');
+        state.dialog.classList.toggle('is-settings', settings);
+        if (!state.dialog.open || reducedMotion()) { cancelMotion(ui.settings); cancelMotion(ui.conversation); settleViews(); return; }
+        var revision = ++viewRevision;
+        var fade;
+        if (global.NewtabMotion && global.NewtabMotion.spring) {
+            // Fade through the quiet paper between two dense text surfaces.
+            // One reversible blend prevents overlapping paragraphs even when
+            // a second click interrupts the first switch mid-flight.
+            fade = springMotion(ui.stage, 'chat-view-fade', { blend: settings ? 1 : 0 }, { blend: viewBlend }, function (pose) {
+                viewBlend = Math.max(0, Math.min(1, pose.blend));
+                ui.conversation.style.opacity = Math.max(0, 1 - viewBlend / .46);
+                ui.settings.style.opacity = Math.max(0, (viewBlend - .54) / .46);
+            }, { stiffness: 1100, damping: 58 });
+        }
+        // Keep both real panes during a switch. A quick reversal reuses their
+        // current positions, scroll and streamed text instead of stale clones.
+        [ui.settings, ui.conversation].forEach(function (el) {
+            var visible = el === ui.settings ? settings : !settings;
+            var side = el === ui.settings ? 1 : -1;
+            var style = getComputedStyle(el);
+            var from = el.hidden ? { opacity: 0, transform: 'translateX(' + (side * 16) + 'px)' } : { opacity: style.opacity, transform: style.transform };
+            var to = { opacity: visible ? 1 : 0, transform: 'translateX(' + (visible ? 0 : side * 16) + 'px)' };
+            el.hidden = false; el.inert = !visible; el.setAttribute('aria-hidden', String(!visible));
+            // The semantic view and pointer action change immediately; only
+            // the inert outgoing pixels remain while the transition settles.
+            cancelMotion(el);
+            var complete;
+            if (global.NewtabMotion && global.NewtabMotion.spring) {
+                var matrix = new DOMMatrixReadOnly(from.transform === 'none' ? undefined : from.transform);
+                complete = Promise.all([
+                    springMotion(el, 'chat-view-position', { x: visible ? 0 : side * 16 }, { x: matrix.m41 },
+                        function (pose) { el.style.transform = 'translateX(' + pose.x + 'px)'; }, { stiffness: 420, damping: 36 }),
+                    fade
+                ]).then(function (results) { return results.every(Boolean); });
+            } else {
+                el.style.opacity = to.opacity; el.style.transform = to.transform; complete = animate(el, [from, to], 'panel');
+            }
+            complete.then(function (completed) {
+                if (completed && revision === viewRevision && !visible) el.hidden = true;
+            });
+        });
         if (!settings) resizeComposer(false);
     }
     function resizeComposer(motion) {
@@ -68,7 +165,11 @@
         cancelMotion(ui.input); ui.input.style.height = 'auto';
         var height = Math.max(44, Math.min(132, ui.input.scrollHeight));
         ui.input.style.height = height + 'px'; ui.input.style.overflowY = ui.input.scrollHeight > height ? 'auto' : 'hidden';
-        if (motion !== false && Math.abs(before - height) > 1) animate(ui.input, [{ height: before + 'px' }, { height: height + 'px' }], 'control');
+        if (motion !== false && (Math.abs(before - height) > 1 || springs.has(ui.input))) {
+            if (global.NewtabMotion && global.NewtabMotion.spring) springMotion(ui.input, 'composer-height', { height: height }, { height: before },
+                function (pose) { ui.input.style.height = pose.height + 'px'; }, { stiffness: 480, damping: 42, precision: .1 });
+            else animate(ui.input, [{ height: before + 'px' }, { height: height + 'px' }], 'control');
+        } else if (springs.has(ui.input)) global.NewtabMotion.cancelSpring(ui.input, 'composer-height');
     }
     motionPreference.addEventListener('change', function () { if (reducedMotion()) cancelAllMotion(); });
     document.addEventListener('visibilitychange', function () { if (document.hidden) cancelAllMotion(); });
@@ -257,6 +358,8 @@
         var busyChanged = ui.lastBusy !== undefined && ui.lastBusy !== state.busy;
         var oldAction = state.busy ? ui.send : ui.stop;
         var actionFocused = document.activeElement === oldAction;
+        var actionGhost = busyChanged && state.dialog.open && !oldAction.hidden ?
+            snapshot(oldAction.querySelector('svg'), 'character-chat-action-ghost', ui.actions) : null;
         ui.send.disabled = !state.canChat || state.busy || state.checking || !ui.input.value.trim();
         ui.stop.hidden = !state.busy;
         ui.send.hidden = state.busy;
@@ -270,9 +373,12 @@
         ui.openSettings.hidden = state.canChat || state.checking || state.busy;
         ui.input.setAttribute('aria-describedby', 'character-chat-status character-chat-input-hint');
         ui.composer.dataset.busy = String(state.busy);
+        ui.composer.dataset.hasText = String(!!ui.input.value.trim());
         if (busyChanged && state.dialog.open) {
             var newAction = state.busy ? ui.stop : ui.send;
-            animate(newAction.querySelector('svg'), [{ opacity: 0, transform: 'scale(.7) rotate(-18deg)' }, { opacity: 1, transform: 'scale(1) rotate(0)' }], 'control');
+            if (actionGhost) animate(actionGhost, [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(.65) rotate(12deg)' }], 'fast')
+                .then(function () { actionGhost.remove(); ghosts.delete(actionGhost); });
+            animate(newAction.querySelector('svg'), [{ opacity: 0, transform: 'scale(.75) rotate(-12deg)' }, { opacity: 1, transform: 'scale(1) rotate(0)' }], 'control');
             if (actionFocused && !state.personaEditing) (state.busy ? ui.stop : ui.input).focus({ preventScroll: true });
         }
         ui.lastBusy = state.busy;
@@ -446,17 +552,18 @@
     function close() {
         if (!state.dialog || !state.dialog.open) return;
         var visual = getComputedStyle(state.dialog);
-        var from = { opacity: visual.opacity, transform: visual.transform };
+        var from = visualPose(state.dialog);
         var rect = { left: parseFloat(visual.left), top: parseFloat(visual.top), width: state.dialog.offsetWidth, height: state.dialog.offsetHeight };
-        cancelAllMotion();
+        clearGhosts();
         var ghost = snapshot(state.dialog, 'character-chat-exit-ghost', document.body);
+        cancelAllMotion(ghost, true);
         if (ghost) { ghost.style.inset = 'auto'; ghost.style.left = rect.left + 'px'; ghost.style.top = rect.top + 'px'; ghost.style.width = rect.width + 'px'; ghost.style.height = rect.height + 'px'; }
         if (state.busy) stop();
         state.connectionGeneration++; state.checking = false; stopLoginPolling();
         state.dialog.close();
         if (state.personaEditing) closePersona(false);
-        if (ghost) animate(ghost, [from, { opacity: 0, transform: 'translateY(8px) scale(.985)' }], 'control')
-            .then(function () { ghost.remove(); ghosts.delete(ghost); });
+        if (ghost) panelMotion(ghost, from, true)
+            .then(function (completed) { if (completed) { ghost.remove(); ghosts.delete(ghost); } });
     }
     function place() {
         if (!state.dialog) return;
@@ -543,7 +650,7 @@
             if (event.key !== 'Enter' || event.shiftKey || event.isComposing || state.composing || event.keyCode === 229) return;
             event.preventDefault(); send();
         });
-        var composeActions = element('div', 'character-chat-compose-actions');
+        var composeActions = element('div', 'character-chat-compose-actions'); ui.actions = composeActions;
         var inputHint = element('span', 'sr-only', 'Enter 傳送 · Shift+Enter 換行'); inputHint.id = 'character-chat-input-hint';
         ui.send = button('', 'character-chat-send'); ui.send.type = 'submit'; ui.send.setAttribute('aria-label', '傳送'); ui.send.title = '傳送（Enter）';
         ui.send.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 10 15-5.5L14 19.5l-3-6.5-6.5-3Z"/><path d="m11 13 8.5-8.5"/></svg>';
@@ -558,7 +665,7 @@
         dialog.addEventListener('keydown', function (event) {
             if (event.key === 'Tab') {
                 var focusable = Array.from(dialog.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]'))
-                    .filter(function (el) { return el.getClientRects().length > 0 && !el.closest('[hidden]'); });
+                    .filter(function (el) { return el.getClientRects().length > 0 && !el.closest('[hidden], [inert]'); });
                 var first = focusable[0], last = focusable[focusable.length - 1];
                 if (first && event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
                 else if (first && !event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
@@ -584,10 +691,13 @@
     }
     function open(widgetId) {
         create(); state.widgetId = widgetId || 'companion-1';
+        var departing = Array.from(ghosts).find(function (el) { return el.classList.contains('character-chat-exit-ghost'); });
+        var resumeFrame;
+        if (departing) resumeFrame = visualPose(departing);
         clearGhosts();
         if (!state.dialog.open) {
             state.connectionGeneration++; state.checking = false; state.loginUntil = 0; state.opener = document.activeElement; place(); state.dialog.showModal();
-            animate(state.dialog, [{ opacity: 0, transform: 'translateY(10px) scale(.985)' }, { opacity: 1, transform: 'translateY(0) scale(1)' }], 'panel');
+            panelMotion(state.dialog, resumeFrame || { opacity: 0, x: 0, y: 10, scale: .985 }, false);
         }
         refresh();
         ui.input.focus({ preventScroll: true }); resizeComposer(false); scrollLatest(true);

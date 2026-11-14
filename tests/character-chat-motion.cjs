@@ -9,11 +9,13 @@ fs.mkdirSync(output, { recursive: true });
 
 async function settled(page) {
     await page.waitForFunction(() => !document.querySelector('.character-chat-view-ghost,.character-chat-exit-ghost') &&
+        !document.querySelector('[data-chat-motion]') &&
         document.getAnimations().filter(a => a.effect?.target?.closest?.('.character-chat-dialog') && a.effect.getTiming().iterations !== Infinity).every(a => a.playState === 'finished'));
 }
 async function setup(browser, viewport) {
     const context = await browser.newContext({ viewport, reducedMotion: 'no-preference', hasTouch: viewport.width < 600,
-        isMobile: viewport.width < 600, serviceWorkers: 'block' });
+        isMobile: viewport.width < 600, serviceWorkers: 'block',
+        ...(process.env.NEWTAB_RECORD_MOTION ? { recordVideo: { dir: output, size: viewport } } : {}) });
     await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === new URL(base).origin ? route.continue() : route.abort());
     const page = await context.newPage();
     const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -55,6 +57,16 @@ async function setup(browser, viewport) {
             await input.fill('今天想把步調放慢一點。\n可以陪我整理一下\n接下來的計畫嗎？');
             await settled(page);
             const tall = await input.boundingBox(); assert(tall.height > 70 && tall.height <= 132);
+            const resizeContinuity = await page.evaluate(async () => {
+                const input = document.querySelector('#character-chat-input');
+                input.value = '第一行'; input.dispatchEvent(new Event('input', { bubbles: true }));
+                await new Promise(resolve => setTimeout(resolve, 60));
+                const before = input.getBoundingClientRect().height;
+                input.value = '第一行\n第二行\n第三行'; input.dispatchEvent(new Event('input', { bubbles: true }));
+                return { before, after: input.getBoundingClientRect().height };
+            });
+            assert(Math.abs(resizeContinuity.before - resizeContinuity.after) < 1, 'composer reverses from its rendered height, without jumping to either endpoint');
+            await settled(page);
             await page.screenshot({ path: `${output}/composer-${viewport.width}.png` });
             await page.getByRole('button', { name: '傳送', exact: true }).click();
             assert.equal(await page.evaluate(() => chatMotion.calls), 1, 'send action is immediate, before animation ends');
@@ -97,13 +109,44 @@ async function setup(browser, viewport) {
             await settled(page);
             assert.equal(await page.locator('.character-chat-exit-ghost').count(), 0);
             assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), true, 'old exit completion cannot close a reopened panel');
+            const reopenContinuity = await page.evaluate(async () => {
+                NewtabCharacterChat.close(); await new Promise(resolve => setTimeout(resolve, 70));
+                const ghost = document.querySelector('.character-chat-exit-ghost');
+                const before = getComputedStyle(ghost);
+                const values = { opacity: +before.opacity, transform: before.transform };
+                NewtabCharacterChat.open('companion-1');
+                const after = getComputedStyle(document.querySelector('.character-chat-dialog[open]'));
+                return { before: values, after: { opacity: +after.opacity, transform: after.transform } };
+            });
+            assert(Math.abs(reopenContinuity.before.opacity - reopenContinuity.after.opacity) < .01, 'reopening continues the visible exit opacity');
+            assert.equal(reopenContinuity.before.transform, reopenContinuity.after.transform, 'reopening preserves the exact current panel pose');
+            await settled(page);
+            const viewContinuity = await page.evaluate(async () => {
+                const toggle = document.querySelector('.character-chat-persona-toggle');
+                const views = [document.querySelector('.character-chat-conversation'), document.querySelector('#character-chat-settings')];
+                const sample = () => views.map(view => ({ opacity: +getComputedStyle(view).opacity, transform: getComputedStyle(view).transform }));
+                toggle.click(); await new Promise(resolve => setTimeout(resolve, 90));
+                const before = sample(); toggle.click(); const after = sample();
+                let overlap = 0;
+                for (let i = 0; i < 12; i++) {
+                    await new Promise(requestAnimationFrame);
+                    const values = sample(); overlap = Math.max(overlap, Math.min(values[0].opacity, values[1].opacity));
+                }
+                return { before, after, outgoingInert: views[1].inert, currentInert: views[0].inert,
+                    ghosts: document.querySelectorAll('.character-chat-view-ghost').length, overlap };
+            });
+            assert.deepEqual(viewContinuity.after, viewContinuity.before, 'both real views retain their current rendered opacity and position when reversed');
+            assert.equal(viewContinuity.outgoingInert, true); assert.equal(viewContinuity.currentInert, false);
+            assert.equal(viewContinuity.ghosts, 0, 'view changes retain live content, never snapshots of streaming replies');
+            assert(viewContinuity.overlap < .01, 'dense settings and reply text never crossfade on top of each other');
+            await settled(page);
             const interrupted = await page.evaluate(() => {
                 NewtabCharacterChat.close(); NewtabCharacterChat.open('companion-1');
                 const dialog = document.querySelector('.character-chat-dialog[open]');
                 const before = parseFloat(getComputedStyle(dialog).opacity);
                 NewtabCharacterChat.close();
                 const ghost = document.querySelector('.character-chat-exit-ghost');
-                const first = ghost.getAnimations().find(a => a.effect.target === ghost).effect.getKeyframes()[0].opacity;
+                const first = getComputedStyle(ghost).opacity;
                 NewtabCharacterChat.open('companion-1');
                 return { before, first: Number(first) };
             });
@@ -122,7 +165,26 @@ async function setup(browser, viewport) {
             assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), false);
             assert.equal(await page.locator('.character-chat-exit-ghost').count(), 0, 'reduced motion closes without a visual clone');
             assert.deepEqual(errors, []);
+            if (process.env.NEWTAB_RECORD_MOTION) {
+                await page.emulateMedia({ reducedMotion: 'no-preference' });
+                await page.evaluate(() => NewtabCharacterChat.open('companion-1')); await settled(page);
+                await page.waitForTimeout(550);
+                await page.getByRole('button', { name: '對話設定', exact: true }).click(); await page.waitForTimeout(90);
+                await page.screenshot({ path: `${output}/continuous-settings-${viewport.width}-90.png` });
+                await settled(page); await page.waitForTimeout(650);
+                await page.keyboard.press('Escape'); await settled(page);
+                await input.fill('今天想慢一點，\n先做一件喜歡的事。'); await settled(page); await page.waitForTimeout(650);
+                await page.getByRole('button', { name: '傳送', exact: true }).click(); await page.waitForTimeout(700);
+                for (const part of ['好呀，', '先把今天最想做的一件事', '留給自己。\n\n', '我會在這裡陪你慢慢來。']) {
+                    await page.evaluate(text => chatMotion.delta(text), part); await page.waitForTimeout(340);
+                }
+                await page.evaluate(() => chatMotion.finish()); await settled(page); await page.waitForTimeout(800);
+                await page.getByRole('button', { name: '關閉對話', exact: true }).click(); await settled(page);
+                await page.waitForTimeout(350);
+            }
+            const video = page.video();
             await context.close();
+            if (video) await video.saveAs(`${output}/continuous-${viewport.width}.webm`);
             console.log(`PASS chat motion ${viewport.width}: adaptive composer, immediate send/stop, stable stream DOM, settings transition, rapid reopen, live reduced motion, cleanup`);
         }
     } finally { await browser.close(); }

@@ -1,3 +1,23 @@
+# Release 2026.11.15.1
+
+## Continuous, interruptible interface response
+
+Replaced restarted easing animations with a shared damped-spring driver that retains position and velocity when the action reverses. Drawer pages now travel alongside one another; the active tab has independently settling leading/trailing edges, and toggle thumbs stretch toward their destination. Context-menu selection uses one traveling plate. Appearance fields disclose continuously, dialog reversal preserves the current controls, and the chat settings/composer transitions retain live content with no overlapping text. Input, saving and transport cancellation do not wait for animation completion.
+
+Review against the actual Cult UI and DesignBookmark Motion examples found and fixed additional concrete defects: a repeated active-tab click snapped its pill; reopening custom-app settings during dismissal lost return focus; chat settings briefly overlaid two paragraphs; and a reopened folder replayed its icon entrances. The folder now retains its DOM during the reversal and animates only the surrounding panel. The weather review also identified visible curve buffers being overwritten during a third selection and duplicate cursors; curve layers now retain their geometry during handoff, with a single active-data overlay and removal of obsolete layers.
+
+Validation on isolated Brave profiles, using controlled data rather than personal accounts:
+
+- Shared interaction lifecycle: **9/9** cases passed. Same-task context-menu/appearance reversal checks compare rendered opacity and bounds; weather conditional fields are tested at 1440 and 390 px; folder content remains visible after closing for 30 ms and reversing. Dynamic reduced-motion cleanup, focus ownership, safe input deactivation and saved values are retained.
+- Drawer: **5/5** groups passed, including real intermediate positions, rapid reversal, repeated selection, per-page scroll, keyboard/touch, persisted appearance, custom-app/crop focus, reduced motion and 320×480, 390×600, 1440×900 and 3440×1440 viewports.
+- Chat: the existing **9** functional groups passed; the final continuous-transition implementation passed **2** normal-motion configurations (1440 and 390 px). Assertions cover same-frame panel/view reversal, no overlapping paragraph opacity across 12 frames, composer height continuity within 1 px, immediate abort, stable streaming nodes and reduced-motion cleanup. The final text handoff was refined after inspecting recorded intermediate frames.
+- General UI: all **4** desktop/mobile × normal/reduced-motion configurations passed. Existing appearance controls passed at **3** sizes; search/button/suggestion appearance at **5** sizes, including 3440 and 5120 px. Background alpha, resets, keyboard/IME, offline fallback and saved user settings remain covered.
+- Context menus: **8** browser cases passed. City/location: **9** cases passed, including request fencing, failed/late responses and small-window recovery.
+- Weather dashboard: **13/13** cases passed after the final curve-layer repair. A third selection at 55 ms preserves existing paths and opacity, the cursor immediately agrees with the active keyboard value, 60 reversals reuse at most three metric keys, and settling/reduced motion leaves one curve layer. Existing forecast values, five card/viewport configurations, resizing and provider request counts remain covered.
+- Startup: **9/9** cases passed, including delayed scripts/fonts, bounded recovery and saved geometry at 1920×1080, 3440×1440 and 5120×1440. The shared motion code adds no home-screen entrance or remote dependency.
+
+A **32.16-second normal-speed recording** of the actual UI, separate drawer/chat recordings and intermediate screenshots were inspected for continuity, clipping and focus feedback. Evidence remains local under `.impeccable/review/motion-craft-20261115/`, `rail-spring/` and `chat-motion/`. The demonstration recorder uses 25 fps; this is not a measurement of the page's rendering rate. No private Brave profile, installed extension, ChatGPT helper, user wallpaper or real authentication/model request was modified by these checks. This is a product-quality refinement with reproducible acceptance checks, not an award or universal-device performance certification.
+
 # Release 2026.11.14.19
 
 ## Shared Nacho interaction and motion system

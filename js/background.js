@@ -348,13 +348,17 @@
     }
 
     function openDialog(element) {
+        var resuming = element.style.display === 'flex' && element.inert;
         if (element.style.display !== 'flex') returnFocus.set(element, document.activeElement);
         element._motionRevision = (element._motionRevision || 0) + 1;
         element.inert = false;
-        if (global.NewtabMotion) global.NewtabMotion.cancel(element);
+        if (global.NewtabMotion && !resuming) global.NewtabMotion.cancel(element);
         closeMenu();
         element.style.display = 'flex';
-        if (global.NewtabMotion) global.NewtabMotion.enter(element.querySelector('.upload-box, .about-page') || element.firstElementChild, { y: 10, scale: .985, duration: 280 });
+        if (global.NewtabMotion) {
+            if (resuming) global.NewtabMotion.enter(element, { y: 0, scale: 1, duration: 300 });
+            else global.NewtabMotion.enter(element.querySelector('.upload-box, .about-page-box') || element.firstElementChild, { y: 14, scale: .975, duration: 360 });
+        }
         element.querySelector('button').focus();
     }
 

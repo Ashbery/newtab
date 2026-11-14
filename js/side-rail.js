@@ -159,6 +159,8 @@
         /* leave custom-app open underneath — crop is on top */
 
         var modal = ensureIconCropModal();
+        var cropSession = (modal._cropSession || 0) + 1;
+        modal._cropSession = cropSession;
         var stage = modal.querySelector('.icon-crop-stage');
         var img = stage.querySelector('img.icon-crop-img') || stage.querySelector('img');
         var frameEl = stage.querySelector('.icon-crop-frame');
@@ -260,11 +262,14 @@
             stage.classList.remove('is-panning', 'is-moving-frame');
             modal.classList.remove('is-visible');
             modal.inert = true;
-            setTimeout(function () {
+            var panel = $('.icon-crop-modal-panel', modal);
+            var closing = global.NewtabMotion ? NewtabMotion.exit(panel, { y: 12, scale: .975 }) : Promise.resolve(true);
+            closing.then(function (complete) {
+                if (!complete || modal._cropSession !== cropSession) return;
                 modal.classList.remove('is-open');
                 if (typeof cb === 'function') cb(result == null ? null : result);
                 if (cropReturnFocus && cropReturnFocus.isConnected) cropReturnFocus.focus({ preventScroll: true });
-            }, 180);
+            });
         }
 
         function hitOnHandle(t) {
@@ -430,8 +435,9 @@
         modal.inert = false;
         modal.classList.add('is-open');
         requestAnimationFrame(function () {
-            if (closed) return;
+            if (closed || modal._cropSession !== cropSession) return;
             modal.classList.add('is-visible');
+            if (global.NewtabMotion) NewtabMotion.enter($('.icon-crop-modal-panel', modal), { y: 18, scale: .975 });
             if (img.complete && img.naturalWidth) resetView();
             modal.querySelector('[data-cancel]').focus({ preventScroll: true });
         });
@@ -468,24 +474,107 @@
         return global.NewtabMotion ? NewtabMotion.reduced() : global.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
-    function cancelPanelMotion(panel) {
-        if (global.NewtabMotion) NewtabMotion.cancel(panel);
-        if (panel._railAnimation) {
-            panel._railAnimation.cancel();
-            panel._railAnimation = null;
-        }
+    // The same numeric springs own each pose throughout a reversal. No delayed
+    // display swap, opacity gap, or second animation resetting the current frame.
+    function spring(owner, key, target, options, immediate) {
+        var motion = global.NewtabMotion;
+        if (!immediate && motion && motion.spring) return motion.spring(owner, key, target, options);
+        if (motion && motion.cancelSpring) motion.cancelSpring(owner, key);
+        options.update(target);
+        return Promise.resolve(true);
     }
 
-    function revealPanel(panel, direction) {
-        if (!panel || reduceMotion()) return;
-        if (global.NewtabMotion) {
-            NewtabMotion.enter(panel, { x: direction * 10, y: 0, scale: 1, duration: 180 });
-        } else if (panel.animate) {
-            panel._railAnimation = panel.animate([
-                { opacity: .35, translate: (direction * 10) + 'px 0' },
-                { opacity: 1, translate: '0 0' }
-            ], { duration: 180, easing: 'cubic-bezier(.22,1,.36,1)' });
+    var panelSequence = 0;
+    function movePanel(panel, selected, direction, animate) {
+        var hidden = panel.hidden;
+        var token = (panel._railToken || 0) + 1;
+        panel._railToken = token;
+        panel.inert = !selected;
+        panel.setAttribute('aria-hidden', String(!selected));
+        panel.classList.toggle('is-active', selected);
+        panel.classList.toggle('is-leaving', !selected && !hidden && animate);
+        if (selected) panel.style.zIndex = String(++panelSequence);
+        if (!selected && hidden) return;
+        panel.hidden = false;
+        var target = { x: selected ? 0 : -direction };
+        return spring(panel, 'rail-panel', target, {
+            from: hidden ? { x: direction } : (panel._railPose || { x: 0 }),
+            stiffness: 420, damping: 36, precision: .001, maxDuration: 1000,
+            update: function (pose) {
+                panel._railPose = pose;
+                panel.style.setProperty('--rail-panel-x', (pose.x * 100).toFixed(4) + '%');
+            }
+        }, !animate || reduceMotion()).then(function (complete) {
+            if (!complete || token !== panel._railToken) return;
+            if (!selected) {
+                panel.hidden = true;
+                panel.classList.remove('is-leaving');
+            }
+        });
+    }
+
+    function moveIndicator(animate) {
+        var nav = $('.side-rail-tabs'), indicator = $('.rail-tab-indicator');
+        var selected = $('.side-rail-tabs button[aria-selected="true"]');
+        if (!nav || !indicator || !selected) return;
+        var left = selected.offsetLeft, right = left + selected.offsetWidth;
+        var old = indicator._railEdges;
+        var direction = !old || left >= old.target ? 1 : -1;
+        var edges = old || { left: left, right: right };
+        edges.target = left;
+        indicator._railEdges = edges;
+        function paint() {
+            indicator.style.transform = 'translate3d(' + edges.left.toFixed(3) + 'px,0,0)';
+            indicator.style.width = Math.max(1, edges.right - edges.left).toFixed(3) + 'px';
         }
+        ['left', 'right'].forEach(function (edge) {
+            var leading = direction > 0 ? edge === 'right' : edge === 'left';
+            spring(indicator, 'rail-pill-' + edge, { x: edge === 'left' ? left : right }, {
+                from: { x: edges[edge] }, stiffness: leading ? 620 : 390,
+                damping: leading ? 39 : 31, precision: .04, maxDuration: 1000,
+                update: function (pose) { edges[edge] = pose.x; paint(); }
+            }, !animate || !old || reduceMotion());
+        });
+    }
+
+    function moveDrawer(open, animate) {
+        var rail = $('#side-rail');
+        if (!rail) return;
+        var token = (rail._railToken || 0) + 1;
+        rail._railToken = token;
+        rail.dataset.motionReady = 'true';
+        rail.style.visibility = 'visible';
+        spring(rail, 'rail-drawer', { reveal: open ? 1 : 0 }, {
+            from: rail._railPose || { reveal: 0 }, stiffness: open ? 380 : 460,
+            damping: open ? 34 : 38, precision: .001, maxDuration: 1000,
+            update: function (pose) {
+                rail._railPose = pose;
+                rail.style.setProperty('--rail-hidden', (1 - pose.reveal).toFixed(5));
+            }
+        }, !animate || reduceMotion()).then(function (complete) {
+            if (complete && token === rail._railToken && !state.open) rail.style.visibility = 'hidden';
+        });
+    }
+
+    function syncToggle(button) {
+        var track = $('.rail-toggle-track', button);
+        if (!track) return;
+        var on = button.getAttribute('aria-pressed') === 'true';
+        if (track._railOn === on) return;
+        var initial = typeof track._railOn !== 'boolean';
+        track._railOn = on;
+        track.dataset.motionReady = 'true';
+        spring(track, 'rail-toggle', { value: on ? 1 : 0 }, {
+            from: { value: on ? 0 : 1 }, stiffness: 520, damping: 31,
+            precision: .001, maxDuration: 800,
+            update: function (pose) {
+                var progress = Math.max(0, Math.min(1, pose.value));
+                var stretch = Math.sin(progress * Math.PI) * 4;
+                track.style.setProperty('--rail-toggle-x', (pose.value * 14 - stretch / 2).toFixed(3) + 'px');
+                track.style.setProperty('--rail-toggle-width', (16 + stretch).toFixed(3) + 'px');
+                track.style.setProperty('--rail-toggle-on', (progress * 100).toFixed(2) + '%');
+            }
+        }, initial || !state.open || reduceMotion());
     }
 
     function syncRailControls() {
@@ -502,6 +591,7 @@
             sound.setAttribute('aria-label', '背景聲音');
             updateRailIcon(sound, video.muted ? 'muted' : 'sound');
         }
+        $$('#side-rail .rail-action[aria-pressed]').forEach(syncToggle);
     }
 
     function setOpen(open) {
@@ -519,6 +609,7 @@
             rail.inert = !state.open;
             rail.setAttribute('aria-hidden', state.open ? 'false' : 'true');
             rail.setAttribute('aria-modal', state.open ? 'true' : 'false');
+            if (was !== state.open || !rail.dataset.motionReady) moveDrawer(state.open, was !== state.open);
         }
         if (tabBtn) {
             tabBtn.setAttribute('aria-expanded', state.open ? 'true' : 'false');
@@ -556,6 +647,8 @@
         var previous = state.tab;
         var focusedPanel = document.activeElement && document.activeElement.closest('.side-rail-panel');
         state.tab = next;
+        var direction = order.indexOf(next) >= order.indexOf(previous) ? 1 : -1;
+        var animate = state.open && previous !== next;
 
         $$('.side-rail-tabs button').forEach(function (btn) {
             var name = btn.getAttribute('data-panel');
@@ -566,20 +659,22 @@
         });
         $$('.side-rail-panel').forEach(function (p) {
             var name = p.getAttribute('data-panel');
-            cancelPanelMotion(p);
-            p.classList.toggle('is-active', name === next);
-            p.hidden = name !== next;
-            p.inert = name !== next;
             p.id = 'rail-panel-' + name;
             p.setAttribute('aria-labelledby', 'rail-tab-' + name);
+            if (previous !== next || !p.dataset.motionReady) {
+                if (!p.dataset.motionReady) p.hidden = !p.classList.contains('is-active');
+                p.dataset.motionReady = 'true';
+                movePanel(p, name === next, direction, animate);
+            }
         });
+        var indicator = $('.rail-tab-indicator');
+        if (indicator && (previous !== next || !indicator._railEdges)) moveIndicator(animate);
 
         if (global.NewtabWidgets) {
             NewtabWidgets.setRailState({ open: state.open, tab: state.tab });
         }
         refreshLists();
-        if (state.open && previous !== next) {
-            revealPanel($('.side-rail-panel.is-active'), order.indexOf(next) > order.indexOf(previous) ? 1 : -1);
+        if (animate) {
             if (focusedPanel && focusedPanel.inert) $('.side-rail-tabs button[aria-selected="true"]').focus({ preventScroll: true });
         }
     }
@@ -701,7 +796,6 @@
     var faviconVersion = 0;
     var customIconChosen = false;
     var customReturnFocus = null;
-    var customCloseTimer = null;
 
     function ensureCustomModal() {
         if (customModal) return customModal;
@@ -912,11 +1006,13 @@
 
     function openCustomAppModal() {
         var m = ensureCustomModal();
-        clearTimeout(customCloseTimer);
         customSession++;
+        var openingSession = customSession;
         faviconVersion++;
         customIconChosen = false;
-        customReturnFocus = document.activeElement;
+        var opener = document.activeElement;
+        if (opener && opener !== document.body && !m.contains(opener) && !opener.closest('[inert]')) customReturnFocus = opener;
+        else if (!customReturnFocus || !customReturnFocus.isConnected || m.contains(customReturnFocus)) customReturnFocus = $('#app-add-btn');
         pendingFavicon = '';
         pendingCropMeta = null;
         state._pendingCropMeta = null;
@@ -947,7 +1043,9 @@
         m.inert = false;
         m.classList.add('is-open');
         requestAnimationFrame(function () {
+            if (customSession !== openingSession || m.inert) return;
             m.classList.add('is-visible');
+            if (global.NewtabMotion) NewtabMotion.enter($('.custom-app-modal-panel', m), { y: 18, scale: .975 });
             m.querySelector('#custom-app-name').focus({ preventScroll: true });
         });
     }
@@ -955,15 +1053,18 @@
     function closeCustomAppModal() {
         if (!customModal) return;
         customSession++;
+        var closingSession = customSession;
         faviconVersion++;
         pendingCropMeta = null;
         customModal.classList.remove('is-visible');
         customModal.inert = true;
-        customCloseTimer = setTimeout(function () {
+        var closing = global.NewtabMotion ? NewtabMotion.exit($('.custom-app-modal-panel', customModal), { y: 12, scale: .975 }) : Promise.resolve(true);
+        closing.then(function (complete) {
+            if (!complete || customSession !== closingSession) return;
             if (customModal) customModal.classList.remove('is-open');
             var target = customReturnFocus && customReturnFocus.isConnected ? customReturnFocus : $('#app-add-btn');
             if (target && state.open) target.focus({ preventScroll: true });
-        }, 200);
+        });
     }
 
     function cancelHideRailTab() {
@@ -1385,6 +1486,7 @@
             '<button type="button" class="side-rail-close" id="side-rail-close" aria-label="關閉">' +
             railIcon('close') + '</button></div>' +
             '<nav class="side-rail-tabs" role="tablist" aria-label="工具分類">' +
+            '<span class="rail-tab-indicator" aria-hidden="true"></span>' +
             '<button type="button" role="tab" data-panel="components" aria-selected="false">組件</button>' +
             '<button type="button" role="tab" data-panel="apps" aria-selected="false">應用</button>' +
             '<button type="button" role="tab" data-panel="personalize" aria-selected="true">個人化</button>' +
@@ -1468,6 +1570,9 @@
 
         // Single delegated handler on rail (survives rebuildInner of children)
         if (rail) {
+            new MutationObserver(function (records) {
+                records.forEach(function (record) { syncToggle(record.target); });
+            }).observe(rail, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] });
             rail.addEventListener('click', function () {
                 // Reset and media actions are handled by their existing owners.
                 // Read their final values once, without creating another setting.
@@ -1546,9 +1651,7 @@
         if (video) ['play', 'pause', 'volumechange', 'error', 'loadeddata', 'emptied'].forEach(function (name) {
             video.addEventListener(name, syncRailControls);
         });
-        global.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', function (event) {
-            if (event.matches) $$('.side-rail-panel').forEach(cancelPanelMotion);
-        });
+        if (global.ResizeObserver) new ResizeObserver(function () { moveIndicator(false); }).observe($('.side-rail-tabs'));
     }
 
     function init() {

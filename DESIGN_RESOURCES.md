@@ -1,6 +1,6 @@
 # 設計資源與使用界線
 
-整理日期：2026-11-14。保留原始 21 個網站資源及 4 個已安裝技能的來源，另收錄本次使用的 DesignBookmark Motion 與 Cult UI；未逐站確認所有資源目前的功能與收費。
+整理日期：2026-11-15。保留原始 21 個網站資源及 4 個已安裝技能的來源，另收錄本次使用的 DesignBookmark Motion 與 Cult UI；未逐站確認所有資源目前的功能與收費。
 
 ## 最終使用原則
 
@@ -18,6 +18,12 @@
 | [Cult UI](https://github.com/nolly-studio/cult-ui) | 檢視官方 Halo Switch、Direction-Aware Tabs、Popover、Side Panel、Prompt Composer 原始碼／文件（來源 commit `d71b1428b811c2779d46ea41b7ef8c9f9c9991c2`）。採用彈簧拇指、滑動選中面、方向感切換、自適應輸入與送出／停止交接的設計方式，改寫為原生 CSS / WAAPI；沒有引入 React 或其品牌色。其程式庫為 [MIT](https://github.com/nolly-studio/cult-ui/blob/main/LICENSE.md)，這不表示連結的其他服務或素材也適用相同授權。 |
 
 這一輪使用兩個新增來源改造操作狀態；角色圖示、立繪、色彩與現有個人化資料仍沿用本專案。具體設計及取捨見 [DESIGN.md](DESIGN.md) 的 Whole-interface motion pass。
+
+### 2026-11-15 連續動態精修
+
+再次檢視 [DesignBookmark Motion](https://designbookmark.com/motion) 的 Toggle switch、Tab pill、Spring dropdown 實際範例程式，以及 Cult UI 的 [Direction-Aware Tabs](https://github.com/nolly-studio/cult-ui/blob/main/apps/www/registry/default/ui/direction-aware-tabs.tsx) 與 [Popover](https://github.com/nolly-studio/cult-ui/blob/main/apps/www/registry/default/ui/popover.tsx) 原始碼。
+
+本次把開關的方向性伸展、選中底板前後緣的不同回彈、分頁相鄰交接及克制的浮層落點，轉化成本站自己的原生彈簧運算。快速反向會接續目前位置與速度，且操作不必等待動畫完成。另以共用選單底板、可中斷欄位展開、聊天設定的淡出後淡入、穩定文字旁的天氣曲線交接，消除單純重播淡入造成的僵硬。詳見 [DESIGN.md](DESIGN.md) 與本次 [VALIDATION.md](VALIDATION.md)。來源範例的自動展示迴圈不會在本站常駐播放；角色素材授權也不因參考動效而變更。
 
 ### 已安裝技能
 

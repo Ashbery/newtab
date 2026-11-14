@@ -97,7 +97,22 @@
     }
 
     function renderItems(container, items, closeOnAction) {
+        var oldHighlight = container.querySelector('.ctx-highlight');
+        if (oldHighlight && global.NewtabMotion) global.NewtabMotion.cancelSpring(oldHighlight);
         container.innerHTML = '';
+        var highlight = document.createElement('span'); highlight.className = 'ctx-highlight'; highlight.setAttribute('aria-hidden', 'true');
+        container.appendChild(highlight); container.classList.add('has-motion-highlight');
+        var highlightPose = null;
+        function indicate(button) {
+            if (button.disabled || container.inert) return;
+            var target = { y: button.offsetTop, height: button.offsetHeight };
+            highlight.style.setProperty('--ctx-highlight-fill', button.classList.contains('is-danger') ? '#f3e1e7' : '#dceaf2');
+            highlight.style.opacity = '1';
+            var from = highlightPose || target;
+            function paint(pose) { highlightPose = pose; highlight.style.transform = 'translateY(' + pose.y + 'px)'; highlight.style.height = pose.height + 'px'; }
+            if (global.NewtabMotion) global.NewtabMotion.spring(highlight, 'selection', target, { from: from, update: paint, stiffness: 520, damping: 36, precision: .02, maxDuration: 600 });
+            else paint(target);
+        }
         items.forEach(function (item) {
             if (item.sep) {
                 var hr = document.createElement('div');
@@ -116,6 +131,8 @@
                 (item.danger ? ' is-danger' : '') +
                 (item.children && item.children.length ? ' has-sub' : '') +
                 (item.checked ? ' is-checked' : '');
+            btn.addEventListener('pointerenter', function () { indicate(btn); });
+            btn.addEventListener('focus', function () { indicate(btn); });
             if (item.children && item.children.length) {
                 var label = document.createElement('span');
                 label.textContent = item.label;
@@ -196,7 +213,6 @@
         var sub = ensureSub();
         if (subParent === parentBtn && !sub.hidden && !sub.inert) return;
         subRevision++;
-        if (global.NewtabMotion) global.NewtabMotion.cancel(sub);
         sub.inert = false;
         $$('.ctx-item.has-sub', menuEl).forEach(function (b) {
             b.classList.remove('is-open');
@@ -232,12 +248,10 @@
 
     function openAt(x, y, items) {
         var el = ensureMenu();
-        var token = ++menuRevision;
-        if (global.NewtabMotion) global.NewtabMotion.cancel(el);
+        ++menuRevision;
         el.inert = false;
         returnFocus = document.activeElement;
         closeSub();
-        el.classList.remove('is-visible');
         renderItems(el, items, true);
         el.hidden = false;
         var pad = 8;
@@ -259,12 +273,9 @@
         var originY = y < window.innerHeight / 2 ? 'top' : 'bottom';
         el.style.setProperty('--ctx-origin', originX + ' ' + originY);
 
-        requestAnimationFrame(function () {
-            if (el.hidden || token !== menuRevision) return;
-            el.classList.add('is-visible');
-            if (global.NewtabMotion) global.NewtabMotion.enter(el, { y: 4, scale: .975, duration: 200 });
-            focusFirst(el);
-        });
+        el.classList.add('is-visible');
+        if (global.NewtabMotion) global.NewtabMotion.enter(el, { y: 7, scale: .97, duration: 300 });
+        focusFirst(el);
     }
 
     function widgetMenuItems(widget) {
