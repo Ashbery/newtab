@@ -644,10 +644,6 @@
         }
         if (dim) dim.hidden = !state.open;
 
-        if (global.NewtabWidgets) {
-            NewtabWidgets.setRailState({ open: state.open, tab: state.tab });
-        }
-
         if (state.open) {
             refreshLists();
             if (!was) {
@@ -693,9 +689,6 @@
         var indicator = $('.rail-tab-indicator');
         if (indicator && (previous !== next || !indicator._railEdges)) moveIndicator(animate);
 
-        if (global.NewtabWidgets) {
-            NewtabWidgets.setRailState({ open: state.open, tab: state.tab });
-        }
         refreshLists();
         if (animate) {
             if (focusedPanel && focusedPanel.inert) $('.side-rail-tabs button[aria-selected="true"]').focus({ preventScroll: true });
@@ -1686,19 +1679,11 @@
         if (global.NewtabAppearance) global.NewtabAppearance.mountBackground($('#background-appearance'));
         bind();
 
-        var rs = NewtabWidgets.getRailState ? NewtabWidgets.getRailState() : defaultRailLike();
-        state.tab = rs.tab || 'personalize';
-        setTab(state.tab);
-        setOpen(!!rs.open);
-        // Never leave arrange on just because rail was open on components
-        if (!NewtabWidgets.isArranging || !NewtabWidgets.isArranging()) {
-            /* idle */
-        }
+        // Open/selected panel belong to this page only, never a saved layout.
+        // Ignore legacy rail state without rewriting users' stored preferences.
+        setTab('personalize');
+        setOpen(false);
         refreshLists();
-    }
-
-    function defaultRailLike() {
-        return { open: false, tab: 'personalize' };
     }
 
     global.NewtabSideRail = {

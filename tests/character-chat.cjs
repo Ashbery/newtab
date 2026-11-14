@@ -201,14 +201,14 @@ async function checkPersona(browser) {
     assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), edited);
     await boot(page);
     await edit(); assert.equal(await prompt.inputValue(), edited, 'saved prompt survives reload');
-    assert.equal(await page.locator('.character-chat-message.is-user').count(), 2, 'settings do not clear conversation history');
+    assert.equal(await page.locator('.character-chat-message.is-user').count(), 0, 'reload clears the conversation while retaining the saved persona');
     await page.getByRole('button', { name: '恢復預設', exact: true }).click();
     assert.equal(await prompt.inputValue(), defaults.defaultPrompt);
     assert.equal(await page.evaluate(() => localStorage.getItem('nt_character_persona_v1')), edited, 'reset changes draft until explicitly saved');
     await page.getByRole('button', { name: '取消', exact: true }).click();
     await edit(); assert.equal(await prompt.inputValue(), edited);
     await page.getByRole('button', { name: '恢復預設', exact: true }).click(); await save();
-    assert.equal(await page.locator('.character-chat-message.is-user').count(), 2, 'default reset affects only the prompt');
+    assert.equal(await page.locator('.character-chat-message.is-user').count(), 0, 'default reset affects only the prompt');
     await send(page, '預設角色測試'); await complete(page);
     assert.equal(await page.evaluate(() => chatTest.calls.at(-1).characterPrompt), defaults.defaultPrompt);
 
@@ -525,7 +525,7 @@ async function checkSideRailKeyboard(browser) {
             assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), false);
             assert.equal(await page.evaluate(() => document.activeElement.classList.contains('companion-trigger')), true, 'close returns focus to character');
             await boot(page);
-            assert.equal(await page.locator('.character-chat-message.is-user').count(), expectedBase + 2, 'history survives reload in current tab');
+            assert.equal(await page.locator('.character-chat-message.is-user').count(), 0, 'reload starts a fresh conversation');
             await openSettings(page);
             await page.getByRole('button', { name: '登出', exact: true }).click();
             assert.equal(await page.evaluate(() => chatTest.disconnectCalls), 1);

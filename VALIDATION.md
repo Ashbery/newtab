@@ -1,3 +1,17 @@
+# Release 2026.11.15.4
+
+## Fresh page state; saved preferences retained
+
+Chat messages now live only in the current document. The old sessionStorage history key is removed on module startup and is never read or written again. Closing/reopening the chat within a page retains that conversation; reloads and new tabs start empty. Saved persona, account credentials, widgets, layout profiles and appearance remain unchanged. The side rail no longer reads or writes its open/selected-tab state through the saved layout; every new document starts closed on Personalization, including layouts with legacy `rail.open: true`.
+
+`pagehide` fences pending reply/auth/import callbacks, aborts an active reply, stops login polling and clears chat messages, drafts, settings view and animation layers. This also resets a document entering the back/forward cache. Completed conversations retain at most twenty exchanges, with a 64,000-character target and the newest pair kept intact. An in-flight exchange may temporarily exceed those thresholds. Pruning covers both state and message DOM and adjusts retry indices; this is bounded application state, not a measurement of browser RAM or garbage-collection timing.
+
+Isolated Brave checks passed:
+
+- **5 chat lifecycle groups:** real reload, legacy cleanup before opening, actual opener-tab sessionStorage cloning, independent live tabs, retained persona/preferences, no history writes, synthetic persisted pagehide/pageshow cancellation and stale callbacks, 24 exchanges with pruning/retry, long replies and stopped login polling. Cached-page event handling is tested synthetically; no physical browser back/forward-cache admission claim is made.
+- **4 rail state groups:** ignored legacy open state, no storage writes on open/tab changes, reload/new tabs, profile switching and cross-tab preference synchronization without reopening or switching panels.
+- Existing **9 chat functional groups**, **2 chat motion configurations** and **5 rail motion groups** passed. An independent read-only review found no blocking issue. Tests use isolated profiles and fixture replies; no real model request or personal browser settings were changed.
+
 # Release 2026.11.15.3
 
 ## Chat progress and message labels

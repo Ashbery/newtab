@@ -1,7 +1,9 @@
 /* Character chat UI. Only the transport can provide assistant responses. */
 (function (global) {
     'use strict';
-    var STORAGE_KEY = 'nt_character_chat_session_v1';
+    // Old versions restored conversations from sessionStorage, including reloads
+    // and tabs duplicated by the browser. Conversations now belong to this document.
+    try { sessionStorage.removeItem('nt_character_chat_session_v1'); } catch (_) {}
     var PERSONA_KEY = 'nt_character_persona_v1';
     var persona = global.NewtabCharacterPersona;
     var MAX_MESSAGES = 40;
@@ -203,21 +205,24 @@
     function reaction(value) {
         document.dispatchEvent(new CustomEvent('newtab:chat-state', { detail: { widgetId: state.widgetId, state: value } }));
     }
-    function save() {
-        var messages = state.messages.filter(function (m) { return m.content; }).slice(-MAX_MESSAGES);
-        while (messages.length > 2 && JSON.stringify(messages).length > MAX_HISTORY_CHARS) messages.shift();
-        try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); }
-        catch (_) { ui.privacy.textContent = '瀏覽器無法暫存，重新整理後會清除這段對話。'; announce(ui.privacy.textContent); }
+    function trimHistory() {
+        var chars = state.messages.reduce(function (total, message) { return total + message.content.length; }, 0);
+        var removed = 0;
+        // Drop whole exchanges, retaining the newest pair even if it alone
+        // exceeds the character budget. Bound both live state and rendered DOM.
+        while (state.messages.length - removed > 2 && (state.messages.length - removed > MAX_MESSAGES || chars > MAX_HISTORY_CHARS)) {
+            chars -= state.messages[removed].content.length + state.messages[removed + 1].content.length;
+            removed += 2;
+        }
+        if (!removed) return;
+        state.messages.splice(0, removed);
+        if (state.retryAt >= 0) state.retryAt = Math.max(-1, state.retryAt - removed);
+        for (var i = 0; i < removed; i++) {
+            var row = ui.messages.firstElementChild;
+            if (row) { cancelMotion(row); row.remove(); }
+        }
     }
-    function load() {
-        try {
-            var raw = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
-            if (Array.isArray(raw)) state.messages = raw.filter(function (m) {
-                return m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string';
-            }).slice(-MAX_MESSAGES).map(function (m) {
-                return { role: m.role, content: m.content.slice(0, 16000), status: m.status === 'complete' ? 'complete' : 'stopped' };
-            });
-        } catch (_) { state.messages = []; }
+    function loadPersona() {
         try {
             var prompt = localStorage.getItem(PERSONA_KEY);
             if (prompt && prompt.trim() && prompt.length <= persona.maxLength) {
@@ -545,7 +550,7 @@
                 state.busy = false; state.controller = null;
                 renderReply(view.content, reply.content);
                 replyPhase(view, reply.status);
-                view.row.classList.remove('is-pending'); reaction('idle'); controls(); save(); scrollLatest(false);
+                view.row.classList.remove('is-pending'); reaction('idle'); trimHistory(); controls(); scrollLatest(false);
             }
         }
     }
@@ -557,7 +562,7 @@
         var message = { role: 'user', content: text.slice(0, 8000), status: 'complete' };
         state.messages.push(message);
         ui.input.value = ''; resizeComposer(true);
-        ui.empty.hidden = true; addMessage(message, true); scrollLatest(true); save(); requestReply(state.messages.length - 1);
+        ui.empty.hidden = true; addMessage(message, true); scrollLatest(true); requestReply(state.messages.length - 1);
     }
     function stop() { if (state.controller) { state.controller.abort(); announce('正在停止回覆…'); } }
     function retry() {
@@ -582,6 +587,29 @@
         if (ghost) panelMotion(ghost, from, true)
             .then(function (completed) { if (completed) { ghost.remove(); ghosts.delete(ghost); } });
     }
+    function resetPageSession() {
+        // Fence callbacks before aborting. Also runs when this document enters
+        // the back/forward cache, where its JS state would otherwise survive.
+        state.request++; state.connectionGeneration++; state.personaGeneration++;
+        var controller = state.controller;
+        state.controller = null; state.busy = false; state.checking = false;
+        if (controller) controller.abort();
+        stopLoginPolling(); state.loginUntil = 0;
+        state.messages = []; state.retryAt = -1; state.followLatest = true; state.composing = false;
+        state.personaEditing = false; state.personaImporting = false; state.opener = null;
+        state.connected = false; state.canChat = false;
+        if (!state.dialog) return;
+        state.dialog.close(); state.dialog.classList.remove('is-settings');
+        cancelAllMotion(); releaseLayer(state.dialog);
+        ui.personaToggle.setAttribute('aria-expanded', 'false');
+        ui.prompt.value = state.characterPrompt; ui.promptFile.value = ''; ui.promptNotice.textContent = '';
+        updatePromptControls();
+        ui.input.value = ''; ui.input.style.removeProperty('height'); ui.input.style.removeProperty('overflow-y');
+        ui.messages.replaceChildren(); ui.empty.hidden = false; ui.lastBusy = undefined;
+        controls(); announce('', true); reaction('idle');
+        state.widgetId = null;
+    }
+    global.addEventListener('pagehide', resetPageSession);
     function place() {
         if (!state.dialog) return;
         var width = Math.min(420, innerWidth - 32);
@@ -600,7 +628,7 @@
     }
     function create() {
         if (state.dialog) return;
-        load();
+        loadPersona();
         var dialog = element('dialog', 'character-chat-dialog'); state.dialog = dialog;
         dialog.setAttribute('aria-labelledby', 'character-chat-title'); dialog.setAttribute('role', 'dialog');
         var header = element('header', 'character-chat-header');
@@ -648,7 +676,7 @@
         var promptCancel = button('取消', 'character-chat-prompt-cancel', function () { closePersona(true); });
         ui.promptSave = button('儲存設定', 'character-chat-prompt-save', savePersona);
         promptActions.append(ui.promptReset, promptCancel, ui.promptSave);
-        ui.privacy = element('p', 'character-chat-privacy', '對話只暫存於目前分頁；角色設定保存在此瀏覽器。');
+        ui.privacy = element('p', 'character-chat-privacy', '對話只保留於本次頁面，重新整理或開新分頁即清空；角色設定仍會保留。');
         ui.settings.append(ui.settingsTitle, account, element('h4', 'character-chat-persona-title', '角色設定'), settingsIntro, promptLabel, ui.prompt, promptTools, ui.promptNotice, promptActions, ui.privacy); ui.stage.append(ui.settings, ui.conversation);
         var body = element('div', 'character-chat-body');
         ui.messages = element('div', 'character-chat-messages'); ui.messages.setAttribute('role', 'log'); ui.messages.setAttribute('aria-label', '對話內容'); ui.messages.setAttribute('aria-live', 'off'); ui.messages.tabIndex = 0;
