@@ -1307,7 +1307,7 @@
         // New cards use semantic spans of the home grid. The old catalogue
         // size fractions scale with the entire monitor and would produce
         // 850–950px cards on a 5120px display. Canvas width is not card size.
-        var spans = { clock: [6, 2], search: [6, 1], notes: [3, 2], weather: [3, 2],
+        var spans = { clock: [6, 2], search: [6, 1], notes: [3, 2], weather: [4, 4],
             todo: [3, 2], countdown: [3, 2], bookmarks: [4, 1] };
         var span = spans[type] || [3, 2];
         return { width: Math.min(grid.columns, grid.narrow ? 4 : span[0]) * grid.pitchX - grid.gap,
@@ -1477,6 +1477,19 @@
                 }), type, grid, false);
                 if (homeFits(candidate, others)) return candidate;
             }
+        }
+        // A full forecast needs more room than the original compact weather
+        // card. If no visible slot fits it, append on the same scrolling grid
+        // without moving or resizing the user's existing widgets.
+        if (type === 'weather' && !grid.narrow) {
+            var occupiedBottom = others.reduce(function (bottom, other) {
+                return Math.max(bottom, other.top + other.height + 6);
+            }, grid.height);
+            var nextRow = Math.max(maxRows, Math.ceil((occupiedBottom - grid.top) / grid.pitchY));
+            var overflow = homeSnap(Object.assign({}, rect, {
+                left: grid.left, top: grid.top + nextRow * grid.pitchY
+            }), type, grid, false);
+            if (homeFits(overflow, others)) return overflow;
         }
         return null;
     }

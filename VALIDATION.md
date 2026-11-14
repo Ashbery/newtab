@@ -198,3 +198,17 @@ Native looping remains unchanged. A new frame-presentation diagnostic compared a
 The original affected file is still needed to distinguish decoder seeking, held/duplicated tail frames, container padding and nonmatching first/last content. This release does not claim to resolve that unconfirmed source-specific issue. Timing samples use compositor callbacks, not a physical-display recording; mute tests check player state rather than audio waveform continuity.
 
 No award certification, every possible saved layout or continuous availability of third-party services is claimed. The Weather geometry matrix uses controlled fixtures; network and failure handling are covered separately.
+
+## Weather forecast dashboard — 2026.11.14.10
+
+The weather widget now offers Celsius/Fahrenheit, temperature/rain/wind charts with pointer and keyboard inspection, and selectable seven-day forecasts. New widgets use four by four home-screen cells; existing saved geometry is unchanged. Compact cards expose an inline forecast expansion and internal scrolling. All sizing follows the widget container, including wide monitors, and the existing long-press resize/Done/Cancel workflow remains in use.
+
+Validation performed against this implementation:
+
+- Weather data adapters: 19 unit tests, including real interval semantics, nulls versus zero, partial-day ranges, timezone correction without refetch, DST and old cache compatibility.
+- Weather lifecycle: 23 browser cases for location recovery, network/manual city selection, request cancellation, stale responses, old small widgets and the MET three-hour/Expires cache protections.
+- Dashboard: 12 isolated Brave cases covering 160×160, 320×360, 640×400, 900×440; 5120-wide edge placement; negative temperatures and touch; selected-day/metric values; keyboard access; unit persistence; chart-versus-drag gestures; real handle resizing and reload; midnight caches; irregular forecast cadence; and custom transparency/text appearance.
+- Location picker: 9 browser cases including timezone validation. Layout sizing/alignment: 34 unit cases. Startup gating: 9 browser cases; atomic shell cache: 10 browser cases. General UI: four desktop/mobile and reduced/normal-motion runs.
+- Separate isolated Brave checks requested public Tokyo weather: the primary source timed out and MET returned 88–89 forecast samples across seven days, with no browser errors. The visual fixture now seeds both cache stores and forbids further provider requests when the saved forecast exists. This establishes the fallback path on this connection, not uninterrupted availability of either provider.
+
+Independent reviews and rendered inspection caught and corrected inherited density rules hiding full-size details, touch-width overflow at 160px, stale timezone/date handling and uneven time-axis labels. Forecast ranges and source attribution remain visible; sparse MET intervals retain their original duration. No changes to the installed Brave extension, personal browser profile or chat helper were required.

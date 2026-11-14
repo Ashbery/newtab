@@ -7,7 +7,7 @@
     var COMPONENTS = [
         { type: 'clock', label: '時鐘', desc: '時間與日期', icon: 'fa-clock' },
         { type: 'search', label: '搜尋', desc: 'Google 搜尋', icon: 'fa-magnifying-glass' },
-        { type: 'weather', label: '天氣', desc: '即時溫度與狀況', icon: 'fa-cloud-sun' },
+        { type: 'weather', label: '天氣', desc: '逐時曲線、降雨與多日預報', icon: 'fa-cloud-sun' },
         { type: 'notes', label: '備註', desc: '快捷便利貼', icon: 'fa-sticky-note' },
         { type: 'countdown', label: '倒數日', desc: '重要日子倒數', icon: 'fa-hourglass-half' },
         { type: 'todo', label: '待辦', desc: '簡易清單', icon: 'fa-list-check' },

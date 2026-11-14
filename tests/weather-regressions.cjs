@@ -431,6 +431,7 @@ async function test(name, run) {
             const sandbox = { setTimeout, clearTimeout, AbortController, Date, fetch: () => new Promise(resolve => requests.push(resolve)),
                 localStorage: { getItem: key => stored[key] || null, setItem: (key, value) => { stored[key] = value; } } };
             sandbox.window = sandbox;
+            sandbox.NewtabWeatherData = require('../js/weather-data.js');
             const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../js/widget-host.js'), 'utf8')
                 .replace('global.NewtabWidgets = {', 'global.weatherProviderTest = { fetch: fetchMetWeather, write: writeWeatherCache }; global.NewtabWidgets = {');
             require('node:vm').runInNewContext(source, sandbox);
@@ -581,7 +582,9 @@ async function test(name, run) {
                 const widget = layout.widgets.find(w => w.type === 'weather');
                 widget.w = 160 / innerWidth;
                 widget.h = 160 / innerHeight;
-                if (widget.options.homeDesktop) Object.assign(widget.options.homeDesktop, { width: 160, height: 160, spanX: null, spanY: null });
+                widget.x = 24 / innerWidth; widget.y = 40 / innerHeight;
+                widget.options.homeDesktop = NewtabLayout.homePlacement({ left: 24, top: 40, width: 160, height: 160 }, 'weather', NewtabLayout.homeGrid(innerWidth, innerHeight));
+                layout.widgets = [widget]; layout.companionMigrated = true;
                 return layout;
             });
             // The outgoing page saves live state on pagehide; seed the saved

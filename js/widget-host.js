@@ -576,50 +576,19 @@
         };
     }
 
-    function weatherNumber(value, places) {
-        var scale = places ? 10 : 1;
-        return typeof value === 'number' && isFinite(value) ? Math.round(value * scale) / scale : null;
-    }
-
     function parseOpenMeteo(json) {
-        var cur = json && json.current || {};
-        if (!json || json.error || weatherNumber(cur.temperature_2m) === null) throw new Error('invalid weather data');
-        var daily = json.daily || {};
-        return { temp: weatherNumber(cur.temperature_2m), code: weatherNumber(cur.weather_code),
-            feels: weatherNumber(cur.apparent_temperature), humidity: weatherNumber(cur.relative_humidity_2m),
-            wind: weatherNumber(cur.wind_speed_10m, 1), high: weatherNumber(daily.temperature_2m_max && daily.temperature_2m_max[0]),
-            low: weatherNumber(daily.temperature_2m_min && daily.temperature_2m_min[0]), provider: 'open-meteo', fetchedAt: Date.now() };
+        return global.NewtabWeatherData.parseOpenMeteo(json);
     }
 
-    function metWeatherCode(symbol) {
-        var name = typeof symbol === 'string' ? symbol.replace(/_(day|night|polartwilight)$/, '') : '';
-        var exact = { clearsky: 0, fair: 1, partlycloudy: 2, cloudy: 3, fog: 45,
-            lightrain: 61, rain: 63, heavyrain: 65, lightrainshowers: 80, rainshowers: 81, heavyrainshowers: 82,
-            lightsnow: 71, snow: 73, heavysnow: 75, lightsnowshowers: 85, snowshowers: 86, heavysnowshowers: 86,
-            lightsleet: 68, sleet: 69, heavysleet: 69, lightsleetshowers: 83, sleetshowers: 84, heavysleetshowers: 84 };
-        if (/^(light|heavy)?(rain|snow|sleet)(showers)?andthunder$/.test(name)) return 95;
-        return Object.prototype.hasOwnProperty.call(exact, name) ? exact[name] : null;
-    }
-
-    function parseMetWeather(json, response) {
-        var series = json && json.properties && json.properties.timeseries;
-        if (!Array.isArray(series) || !series.length) throw new Error('invalid weather data');
-        var now = Date.now();
-        var sample = series.filter(function (item) { return item && isFinite(Date.parse(item.time)); })
-            .sort(function (a, b) { return Math.abs(Date.parse(a.time) - now) - Math.abs(Date.parse(b.time) - now); })[0];
-        var details = sample && sample.data && sample.data.instant && sample.data.instant.details;
-        if (!details || weatherNumber(details.air_temperature) === null || Math.abs(Date.parse(sample.time) - now) > 6 * 60 * 60 * 1000) {
-            throw new Error('invalid weather data');
-        }
-        var next = sample.data.next_1_hours;
+    function parseMetWeather(json, response, timeZone) {
         var expires = response.headers && response.headers.get ? Date.parse(response.headers.get('Expires')) : NaN;
-        return { temp: weatherNumber(details.air_temperature), humidity: weatherNumber(details.relative_humidity),
-            wind: weatherNumber(details.wind_speed, 1), code: metWeatherCode(next && next.summary && next.summary.symbol_code),
-            feels: null, high: null, low: null, provider: 'met-no', fetchedAt: now,
-            forecastAt: Date.parse(sample.time), refreshAfter: Math.max(now + WEATHER_MET_TTL_MS, isFinite(expires) ? expires : 0) };
+        return global.NewtabWeatherData.parseMet(json, {
+            timeZone: timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+            expires: expires
+        });
     }
 
-    function fetchMetWeather(lat, lon, cb) {
+    function fetchMetWeather(lat, lon, cb, timeZone) {
         var cached = readMetCache(lat, lon);
         if (cached && !cached.stale) { cb(null, cached.data); return function () {}; }
         var key = metCacheKey(lat, lon);
@@ -631,7 +600,7 @@
             // Simple browser CORS request: Origin identifies the site. Custom
             // headers would introduce an unsupported preflight request.
             pending.cancel = fetchWeatherProvider('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' +
-                metCoordinate(lat) + '&lon=' + metCoordinate(lon), parseMetWeather, function (err, data) {
+                metCoordinate(lat) + '&lon=' + metCoordinate(lon), function (json, response) { return parseMetWeather(json, response, timeZone); }, function (err, data) {
                 delete weatherMetRequests[key];
                 pending.callbacks.slice().forEach(function (callback) { callback(err, data); });
             });
@@ -646,18 +615,20 @@
     }
 
     /** Return one cancellation handle for both bounded provider attempts. */
-    function fetchWeatherNetwork(lat, lon, cb) {
+    function fetchWeatherNetwork(lat, lon, cb, timeZone) {
         var cancelled = false;
         var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(lat) +
             '&longitude=' + encodeURIComponent(lon) +
-            '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m' +
-            '&daily=temperature_2m_max,temperature_2m_min&wind_speed_unit=ms&timezone=auto&forecast_days=1';
+            '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day' +
+            '&hourly=temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,is_day' +
+            '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max' +
+            '&wind_speed_unit=ms&precipitation_unit=mm&temperature_unit=celsius&timezone=auto&timeformat=unixtime&forecast_days=7';
         var cancelCurrent = fetchWeatherProvider(url, parseOpenMeteo, function (err, data) {
             if (cancelled) return;
             if (!err) { cb(null, data); return; }
             cancelCurrent = fetchMetWeather(lat, lon, function (backupError, backupData) {
                 if (!cancelled) cb(backupError && (err.message === 'timeout' ? err : backupError), backupData);
-            });
+            }, timeZone);
         });
         return function () { cancelled = true; if (cancelCurrent) cancelCurrent(); };
     }
@@ -670,12 +641,12 @@
         var hasSaved = validWeatherCoordinates(saved.lat, saved.lon) && saved.locationSource !== 'fallback';
         if (options.location && validWeatherCoordinates(options.location.lat, options.location.lon) &&
             ['manual', 'network'].indexOf(options.location.locationSource) >= 0) {
-            done(options.location);
+            done(Object.assign({}, options.location, { timeZone: options.location.timeZone || null }));
             return function () {};
         }
         if (options.useDefault || (hasSaved && !options.relocate)) {
-            done(options.useDefault ? { lat: TAIPEI.lat, lon: TAIPEI.lon, city: TAIPEI.city, locationSource: 'default', locationNotice: '' } : {
-                lat: saved.lat, lon: saved.lon, city: saved.city || '目前位置',
+            done(options.useDefault ? { lat: TAIPEI.lat, lon: TAIPEI.lon, city: TAIPEI.city, locationSource: 'default', locationNotice: '', timeZone: 'Asia/Taipei' } : {
+                lat: saved.lat, lon: saved.lon, city: saved.city || '目前位置', timeZone: saved.timeZone,
                 locationSource: saved.locationSource || 'saved', locationNotice: saved.locationSource === 'network' ? '網路估算位置' : ''
             });
             return function () {};
@@ -690,7 +661,7 @@
         }
         function fallback(reason) {
             // Keep real/manual choices, but never invent a successful location.
-            finish(hasSaved ? { lat: saved.lat, lon: saved.lon, city: saved.city || '先前位置',
+            finish(hasSaved ? { lat: saved.lat, lon: saved.lon, city: saved.city || '先前位置', timeZone: saved.timeZone,
                 locationSource: saved.locationSource || 'saved',
                 locationNotice: reason + ' 目前保留原位置。' } : null, reason);
         }
@@ -706,7 +677,8 @@
                     fallback('無法取得有效位置，請重試或選擇城市。');
                     return;
                 }
-                finish({ lat: pos.coords.latitude, lon: pos.coords.longitude, city: '目前位置', locationSource: 'device', locationNotice: '' });
+                finish({ lat: pos.coords.latitude, lon: pos.coords.longitude, city: '目前位置', locationSource: 'device', locationNotice: '',
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
             }, function (err) {
                 fallback(err && err.code === 1 ? '未允許定位，請允許 Brave 的位置權限或選擇城市。' :
                     err && err.code === 3 ? '定位逾時，請重試或選擇城市。' : '無法取得裝置位置，請重試或選擇城市。');
@@ -802,48 +774,39 @@
 
     function paintWeatherReady(body, w, location, data, opts) {
         opts = opts || {};
+        w = findWidget(w.id) || w;
+        // Correct a previously cached forecast's local dates without bypassing
+        // the provider's refresh boundary or changing any forecast instants.
+        data = global.NewtabWeatherData.rezoneMet(data, location.timeZone);
         var focusClass = weatherFocusClass(body);
-        var cls = 'widget-body weather-body widget-surface';
-        if (opts.stale) cls += ' is-stale';
-        if (opts.failed) cls += ' is-offline';
-        body.className = cls;
+        var active = body.contains(document.activeElement) ? document.activeElement : null;
+        var focusSelector = active && active.matches('.weather-metric,.weather-day,.weather-unit,.weather-chart,.weather-details') ?
+            (active.classList.contains('weather-day') ? '.weather-day[data-date="' + active.dataset.date + '"]' :
+            active.classList.contains('weather-metric') ? '.weather-metric[data-metric="' + active.dataset.metric + '"]' :
+            active.classList.contains('weather-unit') ? '.weather-unit[data-unit="' + active.dataset.unit + '"]' :
+            active.classList.contains('weather-chart') ? '.weather-chart' : '.weather-details') : '';
+        body.className = 'widget-body weather-body widget-surface has-forecast' + (opts.stale ? ' is-stale' : '') + (opts.failed ? ' is-offline' : '');
         body.setAttribute('aria-busy', opts.loading ? 'true' : 'false');
-        var temp = data.temp != null ? data.temp + '°' : '--°';
-        var hi = data.high != null ? '↑' + data.high + '°' : '';
-        var lo = data.low != null ? '↓' + data.low + '°' : '';
-        var feels = data.feels != null ? '體感 ' + data.feels + '°' : '';
-        var hum = data.humidity != null ? '濕度 ' + data.humidity + '%' : '';
-        var wind = data.wind != null ? '風 ' + data.wind + 'm/s' : '';
-        body.innerHTML = weatherHeading() +
-            '<div class="weather-main">' +
-            '<span class="weather-temp"></span>' +
-            '<span class="weather-glyph"></span></div>' +
-            '<div class="weather-status" role="status" aria-live="polite"></div>' +
-            '<div class="weather-meta">' +
-            '<span class="weather-hi"></span><span class="weather-lo"></span>' +
-            '<span class="weather-feels"></span><span class="weather-hum"></span><span class="weather-wind"></span>' +
-            '</div>';
+        body.innerHTML = weatherHeading() + '<div class="weather-status" role="status" aria-live="polite"></div>';
         body.querySelector('.weather-city').textContent = location.city || '目前位置';
-        body.querySelector('.weather-temp').textContent = temp;
-        var glyph = body.querySelector('.weather-glyph');
-        glyph.innerHTML = wmoGlyph(data.code);
-        glyph.setAttribute('role', 'img');
-        glyph.setAttribute('aria-label', wmoLabel(data.code));
         var status = opts.loading ? opts.message || '正在更新…' : opts.failed ? '更新失敗，顯示先前資料' :
             location.locationNotice || wmoLabel(data.code);
         if (location.locationSource === 'network' && status.indexOf('網路估算') < 0) status += '（網路估算）';
         body.querySelector('.weather-status').textContent = status;
         body.querySelector('.weather-status').title = status;
         body.querySelector('.weather-status').setAttribute('aria-label', wmoLabel(data.code) + '，' + status);
-        body.querySelector('.weather-hi').textContent = hi;
-        body.querySelector('.weather-lo').textContent = lo;
-        body.querySelector('.weather-feels').textContent = feels;
-        body.querySelector('.weather-hum').textContent = hum;
-        body.querySelector('.weather-wind').textContent = wind;
+        global.NewtabWeatherDashboard.render(body, data, { glyph: wmoGlyph, label: wmoLabel,
+            unit: w.options && w.options.weatherUnit,
+            onUnit: function (unit) {
+                var current = findWidget(w.id);
+                if (current) { current.options = Object.assign({}, current.options || {}, { weatherUnit: unit }); persist(); }
+            }
+        });
         body.querySelector('.weather-retry').textContent = opts.failed ? '重試' : '更新';
         body.querySelector('.weather-retry').setAttribute('aria-label', opts.failed ? '重試天氣更新' : '更新天氣');
         weatherSource(body, data);
         weatherActions(body, w, focusClass);
+        if (focusSelector) { var target = body.querySelector(focusSelector); if (target) target.focus({ preventScroll: true }); }
     }
 
     function paintWeatherPending(body, w, location, message, failed) {
@@ -928,7 +891,7 @@
                 writeWeatherCache(lat, lon, data);
                 body._weatherShown = data;
                 paintWeatherReady(body, w, location, data);
-            });
+            }, location.timeZone);
         }, options);
     }
 
@@ -2024,6 +1987,8 @@
     }
 
     function armLongPress(el, e) {
+        // Forecast controls stay interactive even while arranging the canvas.
+        if (e.target.closest && e.target.closest('.weather-chart, .weather-metric, .weather-day, .weather-unit, .weather-details')) return;
         if (e.button != null && e.button !== 0) return;
         if (document.body.classList.contains('is-catalog-placing')) return;
         if (isChromeTarget(e.target)) return;

@@ -19,13 +19,17 @@
             result.latitude < -90 || result.latitude > 90 || result.longitude < -180 || result.longitude > 180) return null;
         var city = cleanName(result.name);
         if (!city) return null;
-        return { lat: result.latitude, lon: result.longitude, city: city,
+        var location = { lat: result.latitude, lon: result.longitude, city: city,
             locationSource: source === 'network' ? 'network' : 'manual', locationNotice: source === 'network' ? '網路估算位置' : '' };
+        if (typeof result.timezone === 'string') {
+            try { location.timeZone = new Intl.DateTimeFormat('en', { timeZone: result.timezone }).resolvedOptions().timeZone; } catch (_) { /* Unusable timezone is omitted. */ }
+        }
+        return location;
     }
     function networkResult(data) {
         if (!data || typeof data.latitude !== 'string' || !data.latitude.trim() || typeof data.longitude !== 'string' || !data.longitude.trim()) return null;
         // Retain only city information; never copy or store the returned IP.
-        var result = { latitude: Number(data.latitude), longitude: Number(data.longitude), name: cleanName(data.city), admin1: cleanName(data.region), country: cleanName(data.country || data.country_code) };
+        var result = { latitude: Number(data.latitude), longitude: Number(data.longitude), name: cleanName(data.city), timezone: data.timezone, admin1: cleanName(data.region), country: cleanName(data.country || data.country_code) };
         return locationFrom(result, 'network') ? result : null;
     }
     function ownerExists(session) {

@@ -66,3 +66,12 @@ UI UX Pro Max 以 personal productivity／productivity dashboard 查詢時回傳
 現有 HTML、CSS、JavaScript 保持靜態執行，不因參考 React 範例而加入框架依賴。生成角色素材的來源與處理見 [assets/character/README.md](assets/character/README.md)。
 
 原始分享來源：[UiSavior 的 X 貼文](https://x.com/UiSavior/status/2107836628232257750)。
+
+## 天氣面板（2026.11.14.10）
+
+依使用者提供的 Google 天氣截圖安排城市、目前天氣、三種逐時曲線及七日預報。圖示延續銀藍緞帶雲與貓掌太陽，字體、透明度和文字配色沿用組件外觀設定。
+
+- [BeUI Tabs](https://beui.dev/components/motion/tabs)：採用單一滑動選中指示線、方向鍵切換與減少動態效果；原生 JavaScript 實作 320ms 指示線過渡。
+- [EvilCharts](https://evilcharts.com/)：參考互動圖表的數值探查方式；使用本地 SVG 曲線、時間游標及可鍵盤操作的數值提示，未加入 React 圖表套件。
+- UI UX Pro Max 的時間序列查詢：採用少量資料以 SVG 呈現、直接數值標示和鍵盤探查。未採用需要歷史基準與信賴區間的金融預測圖建議。
+- [Open-Meteo 官方文件](https://open-meteo.com/en/docs)與 [MET JSON 文件](https://docs.api.met.no/doc/ForecastJSON.html)：確認單位、時區與降雨區間語意。缺值保留缺值；備援來源不提供機率時改顯示區間雨量。

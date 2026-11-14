@@ -147,9 +147,10 @@ test('new cards use fixed semantic spans on ultrawide monitors while saved custo
     const model=L.homePlacement(custom,'notes',L.homeGrid(1440,900));
     for(const [width,height] of [[1920,1080],[2560,1440],[2560,1080],[3440,1440],[3840,1600],[3840,1080],[5120,1440],[2752,1152],[2560,1067],[3413,960]]) {
         const grid=L.homeGrid(width,height);
-        for(const type of ['notes','weather','todo','countdown']) {
+        for(const type of ['notes','todo','countdown']) {
             assert.deepEqual({...L.homeNewFootprint(type,{},grid)},{width:280,height:200});
         }
+        assert.deepEqual({...L.homeNewFootprint('weather',{},grid)},{width:376,height:408});
         assert.deepEqual({...L.homeNewFootprint('app',{},grid)},{width:68,height:80});
         const saved=L.homePlacementRect(model,'notes',grid);
         assert.equal(saved.width,457);assert.equal(saved.height,263);
@@ -157,7 +158,44 @@ test('new cards use fixed semantic spans on ultrawide monitors while saved custo
     assert.deepEqual({...L.homePlacementRect(model,'notes',L.homeGrid(1440,900))},custom);
     for(const width of [320,390]) {
         assert.deepEqual({...L.homeNewFootprint('notes',{},L.homeGrid(width,844))},{width:width-48,height:200});
+        assert.deepEqual({...L.homeNewFootprint('weather',{},L.homeGrid(width,844))},{width:width-48,height:408});
     }
+});
+
+test('a new full weather forecast gets a free grid slot without changing saved widgets',()=>{
+    for(const [width,height] of [[1440,900],[1920,1080],[3440,1440],[5120,1440],[390,844],[320,640]]) {
+        window.innerWidth=width;window.innerHeight=height;
+        const grid=L.homeGrid(width,height);
+        const widgets=L.defaultLayout().widgets.concat({id:'companion-1',type:'companion',options:{homeSeed:'companion'}});
+        const occupied=widgets.map(w=>({...L.homeDefaultRect(w,grid),id:w.id}));
+        const previous=JSON.stringify(occupied);
+        const rect={left:0,top:0,...L.homeNewFootprint('weather',{},grid)};
+        const placed=L.homeNextFree(rect,'weather',occupied,grid);
+        assert(placed,'weather must be addable at '+width);
+        assert(L.homeFits(placed,occupied),'weather must not cover existing widgets');
+        assert.equal(placed.width,rect.width);assert.equal(placed.height,408);
+        assert(placed.left>=16&&placed.left+placed.width<=width-16);
+        assert.deepEqual({...L.homeSnap(placed,'weather',grid,false)},{...placed});
+        assert.equal(JSON.stringify(occupied),previous,'placement cannot mutate existing cards');
+        if(width===1440) assert(placed.top>=height,'crowded default desktop extends the existing canvas');
+    }
+});
+
+test('weather overflow follows occupied canvas rows and preserves existing custom dimensions',()=>{
+    const grid=L.homeGrid(1440,900);
+    const occupied=[{id:'filled',left:0,top:0,width:1440,height:1400}];
+    const fresh={left:0,top:0,...L.homeNewFootprint('weather',{},grid)};
+    const placed=L.homeNextFree(fresh,'weather',occupied,grid);
+    assert(placed.top>=1406);
+    assert.equal((placed.top-grid.top)/grid.pitchY,Math.round((placed.top-grid.top)/grid.pitchY));
+    assert.equal(L.homeNextFree(fresh,'notes',occupied,grid),null,'other widget placement policy is unchanged');
+    const custom={left:350,top:302,width:457,height:263};
+    const saved=L.homePlacement(custom,'weather',grid);
+    for(const [width,height] of [[1440,900],[1920,1080],[3440,1440],[5120,1440]]) {
+        const restored=L.homePlacementRect(saved,'weather',L.homeGrid(width,height));
+        assert.equal(restored.width,457);assert.equal(restored.height,263);
+    }
+    assert.deepEqual({...L.homePlacementRect(saved,'weather',grid)},custom);
 });
 test('only the exact previous default receives a responsive seed; custom geometry and content survive',()=>{
     const previous={v:4,rail:{open:false},widgets:[

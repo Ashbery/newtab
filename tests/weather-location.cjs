@@ -178,3 +178,15 @@ test('mobile and short-window results remain within the dialog and keyboard focu
         await page.keyboard.press('Escape'); assert.equal(await page.locator('.weather-location-dialog').count(), 0);
     }
 });
+
+test('city timezone is retained only when valid and unrelated fields are excluded', async t => {
+    for (const timezone of ['Asia/Tokyo', 'not/a-timezone']) {
+        const { page, input, submit, results, respond } = await fixture(t);
+        await input.fill('東京'); await submit.click();
+        await respond(0, { results: [city('東京', { timezone, secret: 'do-not-store' })] });
+        await results.first().click();
+        const selected = await page.evaluate(() => weatherSelections[0]);
+        assert.equal(selected.timeZone, timezone === 'Asia/Tokyo' ? 'Asia/Tokyo' : undefined);
+        assert.equal(selected.secret, undefined);
+    }
+});
