@@ -71,10 +71,57 @@
     }
 
     function persist() {
+        if (global.NewtabLayoutProfiles && NewtabLayoutProfiles.isApplying()) return true;
         if (state.editor) { state.editor.dirty = true; emitChange(); return true; }
         var ok = L.saveLayout(state.layout);
         emitChange();
         return ok;
+    }
+
+    function profileBusy() {
+        if (state.arranging || state.drag || state.resize || state.longPress || state.blankLP || document.body.classList.contains('is-catalog-placing')) return true;
+        var focused = document.activeElement;
+        if (focused && (focused.isContentEditable || focused.matches && focused.matches('textarea, input:not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="submit"])'))) return true;
+        if (document.querySelector('dialog[open], .folder-overlay.is-open, .bookmark-modal.is-open:not([inert]), .custom-app-modal.is-open:not([inert]), .icon-crop-modal.is-open:not([inert]), .search-expand-layer.is-open, .ctx-menu:not([hidden]):not([inert])')) return true;
+        return ['about-page-container', 'video-upload-container'].some(function (id) {
+            var layer = document.getElementById(id);
+            return layer && getComputedStyle(layer).display !== 'none';
+        });
+    }
+
+    function disposeWidgetBody(el) {
+        var body = el.querySelector('.widget-body');
+        if (body && body._weatherRun) body._weatherRun.cancel();
+        if (body && body._dispose) body._dispose();
+        if (typeof el._companionCleanup === 'function') el._companionCleanup();
+    }
+
+    function applyProfileLayout(layout) {
+        clearLongPress(); clearBlankLP();
+        var previous = {};
+        state.layout.widgets.forEach(function (w) { previous[w.id] = w; });
+        state.layout = layout;
+        var bodyOptions = {
+            notes: ['content'], todo: ['items'], countdown: ['title', 'targetDate'], bookmarks: ['links'],
+            weather: ['lat', 'lon', 'city', 'timeZone', 'locationSource', 'weatherUnit']
+        };
+        // Geometry-only changes keep the mounted renderer and pending requests.
+        // Only changed contents replace their body, cancelling its callbacks.
+        $$('.widget[data-id]').forEach(function (el) {
+            var id = el.getAttribute('data-id'), next = findWidget(id), old = previous[id];
+            if (!next || !old || next.type !== old.type) return;
+            var fields = bodyOptions[next.type];
+            if (!fields || fields.every(function (key) { return JSON.stringify(old.options && old.options[key]) === JSON.stringify(next.options && next.options[key]); })) return;
+            var body = el.querySelector('.widget-body');
+            disposeWidgetBody(el);
+            var builders = { notes: buildNotesBody, todo: buildTodoBody, countdown: buildCountdownBody, bookmarks: buildBookmarksBody, weather: buildWeatherBody };
+            if (body) el.replaceChild(builders[next.type](next), body);
+        });
+        state.initialViewport = L.viewport();
+        state.renderedRects = Object.create(null);
+        state.baselineRects = null;
+        var canvas = $('#widget-canvas'); if (canvas) canvas.scrollTop = 0;
+        applyPositions(); syncClockHour12Bridge(); emitChange();
     }
 
     function findWidget(id) {
@@ -1001,6 +1048,7 @@
         ta.maxLength = NOTES_MAX;
         ta.value = (w.options && w.options.content) || '';
         var saveTimer = null;
+        body._dispose = function () { clearTimeout(saveTimer); saveTimer = null; };
         ta.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
         ta.addEventListener('input', function () {
             var widget = findWidget(w.id);
@@ -1529,7 +1577,7 @@
             var id = el.getAttribute('data-id');
             if (!present[id]) {
                 if (el.getAttribute('data-type') !== 'clock' && el.getAttribute('data-type') !== 'search') {
-                    if (typeof el._companionCleanup === 'function') el._companionCleanup();
+                    disposeWidgetBody(el);
                     el.remove();
                     return;
                 }
@@ -2726,6 +2774,7 @@
     function resetLayout() {
         state.layout = L.defaultLayout();
         migrateCompanionWidget(false);
+        if (global.NewtabLayoutProfiles && NewtabLayoutProfiles.getState().enabled) state.layout = NewtabLayoutProfiles.mergeShared(state.layout);
         if (state.editor) { state.editor.rects = {}; state.editor.selected = null; state.editor.geometryDirty = true; }
         applyPositions();
         if (state.editor) { state.editor.rects = L.clone(state.renderedRects); state.layout.widgets.forEach(function (w) { commitEditorRect(w.id, state.editor.rects[w.id]); }); }
@@ -2740,7 +2789,7 @@
             if (partial.tab) state.layout.rail.tab = partial.tab;
         }
         state.layout.rail = L.normalizeRail(state.layout.rail);
-        if (!state.editor) L.saveLayout(state.layout);
+        if (!state.editor && !(global.NewtabLayoutProfiles && NewtabLayoutProfiles.isApplying())) L.saveLayout(state.layout);
         emitChange();
     }
 
@@ -3152,6 +3201,7 @@
         state.layout = L.loadLayout();
         state.initialViewport = L.viewport();
         migrateCompanionWidget();
+        if (global.NewtabLayoutProfiles) NewtabLayoutProfiles.attach({ getLayout: function () { return L.clone(state.layout); }, isBusy: profileBusy, apply: applyProfileLayout });
         bindEvents();
         applyPositions();
         syncClockHour12Bridge();

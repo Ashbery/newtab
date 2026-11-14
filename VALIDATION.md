@@ -1,3 +1,30 @@
+# Release 2026.11.15.2
+
+## Screen arrangements with shared contents; lower interaction cost
+
+Added opt-in layout profiles and a personalization control for naming, manual selection and automatic display identification. Per-profile geometry and visible widgets are separate; notes, todos and other shared widget options are merged only when the originating field actually changes. Original layout data is retained. Switching waits for active input, arrangement, dragging or open settings to finish. Reset and disable preserve shared content; unchanged companions/widgets keep their DOM and rendering state. Chat keeps its existing per-tab conversation while profiles switch, without introducing cross-tab history storage.
+
+Independent review identified and corrected real lifecycle defects: refreshing another tab's note originally rebuilt unrelated companion/weather bodies; profile reset could overwrite shared options; revealing a widget in a draft could later replace newer shared content; and partial initial storage failure could make a retry reuse obsolete seed data. Automatic pending changes and in-flight permission results also require ownership/cancellation when the user stops automatic mode or revokes permission.
+
+The native Window Management API and iframe delegation were checked using the actual extension files in an isolated Brave profile, with current site files served at the production origin. The API was available, the permission prompt state was respected, the explicitly granted embedding/site permission pair returned ScreenDetails, and the automatic enable action succeeded without application errors. Existing geolocation/media/local-helper delegations remain. The local wrapper's `newtab.html` gained only `window-management`; its original file is backed up in the task's ignored evidence folder. The installed extension needs one reload to adopt that file.
+
+Display changes and same-resolution arrangements are exercised with controlled ScreenDetails events in real Brave pages. A separate headless experiment exposed two virtual displays, but moving its browser window did not update the native currentScreen object; that experiment is recorded as unsupported evidence, not a physical-monitor pass. No permanent hardware ID is available; ambiguous same-model reconnects stay manual. No personal browser profile or graphics setting was changed.
+
+### Measured motion refinement
+
+Final verification passed:
+
+- **19/19 profile cases:** 12 storage/merge/failure cases and 7 real Brave interaction cases, including independent geometry, shared notes/todos, stale writers, Done/Cancel during screen changes, reset, late geolocation, hidden-widget reuse, modal deferral, partial storage failure and owner-specific cancellation. Existing home-grid/layout-resize checks also passed **33/33**.
+- **10/10 screen UI groups:** equal-resolution and equal-name display fixtures, concurrent tabs, already-granted startup, revocation, ambiguous reconnection/rebinding, manual fallback, 320/390/1440/3440 widths, reversible disclosure, reduced motion, stopping queued auto changes and late authorization after a stop in another tab. Independent reproductions confirmed all **3** cancellation failure paths were fixed.
+- **Motion:** shared lifecycle **9/9**, side rail **5/5** with final 380/32 response and composition-hint cleanup, and chat motion **2/2**.
+- **Existing behavior:** appearance controls passed at three sizes; home editor passed desktop/phone, keyboard, touch, folder/catalog placement and save/cancel/resize cases; full-width canvas passed eight fresh/legacy viewport configurations plus pointer-hold and legacy migration checks; startup passed **9/9**, including 16:9, 21:9 and 32:9 saved geometry.
+
+The same 3440×1440 isolated Brave fixture with the default background and active Live2D was traced before and after, with no video recording during measurement. During a 4.2-second side-panel switching sequence, style recalculation fell from **1062.8 ms to 155.8 ms**, layout from **77.1 ms to 18.7 ms**, and main-thread task time from **2.705 s to 1.647 s**. Direct transforms, a fixed-size scaled tab pill and temporary composition hints remove repeated inherited-style and width-layout work. The final pane/opening-drawer response uses 380/32, selected by normal-speed visual review against two alternatives.
+
+Approximately 199.5 requestAnimationFrame callbacks/second and a 5.1 ms p95 callback interval were observed in that fixture. These are **not physical-display frame-rate measurements**, do not establish the user's personal Brave GPU setting, and exclude the user's local video background. The isolated GPU reported hardware compositing/rasterization enabled. Initial chat settings layout still takes approximately 20 ms; the final trace contained no callback interval above 33 ms or Long Animation Frame above 50 ms. The website cannot force browser graphics acceleration on.
+
+Reproducible tests and evidence: `tests/layout-profiles.cjs`, `tests/screen-layouts.cjs`, `.impeccable/review/screen-motion-20261115/`, `screen-layouts/`, `motion-performance-final-20261115/`, and `rail-response-20261115/`. Recordings show normal-speed interaction and are not FPS benchmarks.
+
 # Release 2026.11.15.1
 
 ## Continuous, interruptible interface response

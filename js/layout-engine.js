@@ -559,7 +559,7 @@
         return layout;
     }
 
-    function loadLayout() {
+    function loadLegacyLayout() {
         try {
             var raw = global.localStorage.getItem(STORAGE_KEY);
             if (!raw) return defaultLayout();
@@ -574,7 +574,7 @@
         }
     }
 
-    function saveLayout(layout) {
+    function saveLegacyLayout(layout) {
         var normalized = normalizeLayout(
             layout,
             global.innerWidth || 1200,
@@ -605,6 +605,18 @@
             console.warn('[NewtabLayout] save failed', e);
             return false;
         }
+    }
+
+    function loadLayout() {
+        var profiles = global.NewtabLayoutProfiles;
+        if (!profiles) return loadLegacyLayout();
+        profiles.setLegacySaver(saveLegacyLayout);
+        return profiles.load(loadLegacyLayout);
+    }
+
+    function saveLayout(layout) {
+        var profiles = global.NewtabLayoutProfiles;
+        return profiles ? profiles.save(normalizeLayout(layout), saveLegacyLayout) : saveLegacyLayout(layout);
     }
 
     function viewport() {
@@ -1198,6 +1210,8 @@
         else if (type === 'folder') defaultOpts = { name: '資料夾', grid: 2, children: [] };
         else if (type === 'companion') defaultOpts = { animationMode: 'auto' };
         else defaultOpts = opts.options || {};
+        var reusable = global.NewtabLayoutProfiles && global.NewtabLayoutProfiles.reusable(type, opts, base);
+        if (reusable) { id = reusable.id; defaultOpts = Object.assign({}, defaultOpts, reusable.options || {}); }
         if (type === 'app') {
             defaultOpts.size = (opts.options && opts.options.size) || 'm';
             defaultOpts.appId = opts.appId;

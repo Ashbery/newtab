@@ -12,6 +12,7 @@
             global.NewtabWidgets.init();
             if (global.NewtabContextMenu) global.NewtabContextMenu.init();
             if (global.NewtabSideRail) global.NewtabSideRail.init();
+            if (global.NewtabScreenLayouts) global.NewtabScreenLayouts.init();
             if (global.NewtabStartup) global.NewtabStartup.ready();
             if (global.NewtabSiteCache) global.NewtabSiteCache.start();
         } catch (error) {

@@ -13,9 +13,19 @@
     var ui = {};
     var motionPreference = global.matchMedia('(prefers-reduced-motion: reduce)');
     var motions = new Map(), springs = new Map(), ghosts = new Set(), viewRevision = 0, viewBlend = 0;
+    var layerHints = new WeakMap();
 
     function reducedMotion() { return motionPreference.matches || !!(global.NewtabMotion && global.NewtabMotion.reduced()); }
     function cancelMotion(el) { var animation = motions.get(el); if (animation) { motions.delete(el); animation.cancel(); } }
+    function promoteLayer(el) {
+        if (reducedMotion()) return;
+        if (!layerHints.has(el)) layerHints.set(el, el.style.willChange);
+        el.style.willChange = 'transform, opacity';
+    }
+    function releaseLayer(el) {
+        if (!layerHints.has(el)) return;
+        el.style.willChange = layerHints.get(el); layerHints.delete(el);
+    }
     function springMotion(owner, key, target, from, update, settings) {
         var group = springs.get(owner);
         if (!group) { group = new Map(); springs.set(owner, group); }
@@ -41,17 +51,20 @@
     }
     function panelMotion(el, from, exiting) {
         var to = { opacity: exiting ? 0 : 1, x: 0, y: exiting ? 8 : 0, scale: exiting ? .985 : 1 };
+        promoteLayer(el);
         if (global.NewtabMotion && global.NewtabMotion.spring) {
             // Both directions keep one owner, even while native dialog.close()
             // releases focus and its inert visual handoff finishes outside it.
             return springMotion(state.dialog, 'chat-panel', to, from, function (pose) { paintPose(el, pose); },
                 { stiffness: exiting ? 560 : 380, damping: exiting ? 42 : 36 }).then(function (complete) {
+                    if (complete) releaseLayer(el);
                     if (complete && el === state.dialog) { el.style.removeProperty('opacity'); el.style.removeProperty('transform'); }
                     return complete;
                 });
         }
         return animate(el, [{ opacity: from.opacity, transform: 'translate(' + from.x + 'px,' + from.y + 'px) scale(' + from.scale + ')' },
-            { opacity: to.opacity, transform: 'translateY(' + to.y + 'px) scale(' + to.scale + ')' }], exiting ? 'control' : 'panel');
+            { opacity: to.opacity, transform: 'translateY(' + to.y + 'px) scale(' + to.scale + ')' }], exiting ? 'control' : 'panel')
+            .then(function (complete) { if (complete) releaseLayer(el); return complete; });
     }
     function animate(el, frames, token) {
         // Reversing a transition starts at its rendered state, never its old
@@ -83,6 +96,7 @@
             var visible = el === ui.settings ? state.personaEditing : !state.personaEditing;
             el.hidden = !visible; el.inert = !visible; el.setAttribute('aria-hidden', String(!visible));
             el.style.removeProperty('opacity'); el.style.removeProperty('transform');
+            releaseLayer(el);
         });
     }
     function cancelAllMotion(except, keepPanel) {
@@ -139,6 +153,7 @@
             var from = el.hidden ? { opacity: 0, transform: 'translateX(' + (side * 16) + 'px)' } : { opacity: style.opacity, transform: style.transform };
             var to = { opacity: visible ? 1 : 0, transform: 'translateX(' + (visible ? 0 : side * 16) + 'px)' };
             el.hidden = false; el.inert = !visible; el.setAttribute('aria-hidden', String(!visible));
+            promoteLayer(el);
             // The semantic view and pointer action change immediately; only
             // the inert outgoing pixels remain while the transition settles.
             cancelMotion(el);
@@ -154,7 +169,7 @@
                 el.style.opacity = to.opacity; el.style.transform = to.transform; complete = animate(el, [from, to], 'panel');
             }
             complete.then(function (completed) {
-                if (completed && revision === viewRevision && !visible) el.hidden = true;
+                if (completed && revision === viewRevision) { releaseLayer(el); if (!visible) el.hidden = true; }
             });
         });
         if (!settings) resizeComposer(false);
@@ -561,6 +576,7 @@
         if (state.busy) stop();
         state.connectionGeneration++; state.checking = false; stopLoginPolling();
         state.dialog.close();
+        releaseLayer(state.dialog);
         if (state.personaEditing) closePersona(false);
         if (ghost) panelMotion(ghost, from, true)
             .then(function (completed) { if (completed) { ghost.remove(); ghosts.delete(ghost); } });

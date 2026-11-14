@@ -120,9 +120,12 @@
         var away = { opacity: 0, x: options.x || 0, y: options.y === undefined ? 12 : options.y, scale: options.scale === undefined ? .975 : options.scale };
         var original = poseStyles.get(element);
         if (!original) {
-            original = { opacity: element.style.opacity, translate: element.style.translate, scale: element.style.scale, presence: element.style.getPropertyValue('--motion-presence') };
+            original = { opacity: element.style.opacity, translate: element.style.translate, scale: element.style.scale,
+                willChange: element.style.willChange, presence: element.style.getPropertyValue('--motion-presence'),
+                backdrop: element.matches('.appearance-dialog, .weather-location-dialog') };
             poseStyles.set(element, original);
         }
+        if (!reduced()) element.style.willChange = 'transform, opacity';
         var duration = options.duration || (exiting ? 180 : 360);
         var stiffness = options.stiffness || (exiting ? 850 : 380);
         // Legacy callers' timings select a physical response, not a hard cutoff.
@@ -132,7 +135,7 @@
             maxDuration: exiting ? 220 : 780,
             update: function (pose) {
                 element.style.opacity = Math.max(0, Math.min(1, pose.opacity));
-                element.style.setProperty('--motion-presence', Math.max(0, Math.min(1, pose.opacity)));
+                if (original.backdrop) element.style.setProperty('--motion-presence', Math.max(0, Math.min(1, pose.opacity)));
                 element.style.translate = pose.x.toFixed(3) + 'px ' + pose.y.toFixed(3) + 'px';
                 element.style.scale = pose.scale.toFixed(5);
             }
@@ -142,6 +145,7 @@
         var original = poseStyles.get(element);
         if (!original) return;
         element.style.opacity = original.opacity; element.style.translate = original.translate; element.style.scale = original.scale;
+        element.style.willChange = original.willChange;
         if (original.presence) element.style.setProperty('--motion-presence', original.presence); else element.style.removeProperty('--motion-presence');
         poseStyles.delete(element);
     }

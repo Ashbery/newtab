@@ -26,7 +26,6 @@ body.side-rail-open #side-rail {
     transition: transform var(--motion-panel, 320ms) var(--motion-ease, cubic-bezier(.22,1,.36,1)), visibility 0s;
 }
 #side-rail[data-motion-ready], body.side-rail-open #side-rail[data-motion-ready] {
-    transform: translateX(calc((100% + 24px) * var(--rail-hidden, 1)));
     transition: none;
 }
 #side-rail-dim { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
@@ -65,6 +64,7 @@ body.side-rail-open #side-rail {
     box-shadow: 0 1px 3px #304a5b14, 0 0 0 1px #304a5b08;
     pointer-events: none;
     z-index: -1;
+    transform-origin: 0 50%;
 }
 #side-rail .side-rail-tabs button {
     min-height: 44px;
@@ -90,7 +90,7 @@ body.side-rail-open #side-rail {
     scrollbar-width: thin;
     scrollbar-color: #9cacb9 transparent;
     background: #f8fbfd;
-    transform: translate3d(var(--rail-panel-x, 0%), 0, 0);
+    transform: none;
     animation: none;
     transition: none;
 }

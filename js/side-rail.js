@@ -496,16 +496,22 @@
         if (selected) panel.style.zIndex = String(++panelSequence);
         if (!selected && hidden) return;
         panel.hidden = false;
+        if (panel._railWillChange === undefined) panel._railWillChange = panel.style.willChange;
+        if (animate && !reduceMotion()) panel.style.willChange = 'transform';
         var target = { x: selected ? 0 : -direction };
         return spring(panel, 'rail-panel', target, {
             from: hidden ? { x: direction } : (panel._railPose || { x: 0 }),
-            stiffness: 420, damping: 36, precision: .001, maxDuration: 1000,
+            stiffness: 380, damping: 32, precision: .001, maxDuration: 1000,
             update: function (pose) {
                 panel._railPose = pose;
-                panel.style.setProperty('--rail-panel-x', (pose.x * 100).toFixed(4) + '%');
+                // A directly composited pose does not invalidate inherited
+                // custom properties throughout the entire settings subtree.
+                panel.style.transform = 'translate3d(' + (pose.x * 100).toFixed(4) + '%,0,0)';
             }
         }, !animate || reduceMotion()).then(function (complete) {
             if (!complete || token !== panel._railToken) return;
+            panel.style.willChange = panel._railWillChange || ''; delete panel._railWillChange;
+            panel.style.removeProperty('transform');
             if (!selected) {
                 panel.hidden = true;
                 panel.classList.remove('is-leaving');
@@ -523,17 +529,27 @@
         var edges = old || { left: left, right: right };
         edges.target = left;
         indicator._railEdges = edges;
-        function paint() {
-            indicator.style.transform = 'translate3d(' + edges.left.toFixed(3) + 'px,0,0)';
-            indicator.style.width = Math.max(1, edges.right - edges.left).toFixed(3) + 'px';
+        var width = Math.max(1, right - left);
+        if (!edges.baseWidth || Math.abs(edges.baseWidth - width) > .1) {
+            edges.baseWidth = width; indicator.style.width = width + 'px';
         }
-        ['left', 'right'].forEach(function (edge) {
+        var token = (indicator._railToken || 0) + 1; indicator._railToken = token;
+        if (indicator._railWillChange === undefined) indicator._railWillChange = indicator.style.willChange;
+        if (animate && old && !reduceMotion()) indicator.style.willChange = 'transform';
+        function paint() {
+            indicator.style.transform = 'translate3d(' + edges.left.toFixed(3) + 'px,0,0) scaleX(' +
+                (Math.max(1, edges.right - edges.left) / edges.baseWidth).toFixed(5) + ')';
+        }
+        Promise.all(['left', 'right'].map(function (edge) {
             var leading = direction > 0 ? edge === 'right' : edge === 'left';
-            spring(indicator, 'rail-pill-' + edge, { x: edge === 'left' ? left : right }, {
+            return spring(indicator, 'rail-pill-' + edge, { x: edge === 'left' ? left : right }, {
                 from: { x: edges[edge] }, stiffness: leading ? 620 : 390,
                 damping: leading ? 39 : 31, precision: .04, maxDuration: 1000,
                 update: function (pose) { edges[edge] = pose.x; paint(); }
             }, !animate || !old || reduceMotion());
+        })).then(function (complete) {
+            if (token !== indicator._railToken || !complete.every(Boolean)) return;
+            indicator.style.willChange = indicator._railWillChange || ''; delete indicator._railWillChange;
         });
     }
 
@@ -544,15 +560,22 @@
         rail._railToken = token;
         rail.dataset.motionReady = 'true';
         rail.style.visibility = 'visible';
+        if (rail._railWillChange === undefined) rail._railWillChange = rail.style.willChange;
+        if (animate && !reduceMotion()) rail.style.willChange = 'transform';
         spring(rail, 'rail-drawer', { reveal: open ? 1 : 0 }, {
             from: rail._railPose || { reveal: 0 }, stiffness: open ? 380 : 460,
-            damping: open ? 34 : 38, precision: .001, maxDuration: 1000,
+            damping: open ? 32 : 38, precision: .001, maxDuration: 1000,
             update: function (pose) {
                 rail._railPose = pose;
-                rail.style.setProperty('--rail-hidden', (1 - pose.reveal).toFixed(5));
+                var hidden = 1 - pose.reveal;
+                rail.style.transform = 'translate3d(calc(' + (hidden * 100).toFixed(5) + '% + ' +
+                    (hidden * 24).toFixed(4) + 'px),0,0)';
             }
         }, !animate || reduceMotion()).then(function (complete) {
-            if (complete && token === rail._railToken && !state.open) rail.style.visibility = 'hidden';
+            if (!complete || token !== rail._railToken) return;
+            rail.style.willChange = rail._railWillChange || ''; delete rail._railWillChange;
+            rail.style.removeProperty('transform');
+            if (!state.open) rail.style.visibility = 'hidden';
         });
     }
 

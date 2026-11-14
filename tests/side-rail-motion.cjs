@@ -79,6 +79,8 @@ async function onePanel(page, name) {
                 }
             });
             await onePanel(page, 'personalize'); await page.waitForTimeout(950);
+            assert(await page.locator('.side-rail-panel,.rail-tab-indicator').evaluateAll(elements =>
+                elements.every(el => !el.style.willChange)), 'reversed panels and indicator release temporary compositor hints');
             const selected = await page.locator('.side-rail-tabs [aria-selected=true]').boundingBox();
             const finalPill = await page.locator('.rail-tab-indicator').boundingBox();
             assert(Math.abs(selected.x - finalPill.x) < 1 && Math.abs(selected.width - finalPill.width) < 1);
@@ -104,6 +106,7 @@ async function onePanel(page, name) {
             await page.waitForTimeout(1000); await page.keyboard.press('Escape');
             await page.waitForFunction(() => getComputedStyle(document.querySelector('#side-rail')).visibility === 'hidden');
             assert(await page.locator('#side-rail').evaluate(el => el.inert));
+            assert.equal(await page.locator('#side-rail').evaluate(el => el.style.willChange), '', 'closed drawer releases its compositor hint');
             await page.locator('#side-rail-tab').evaluate(el => el.blur()); await page.mouse.move(200, 50); await page.waitForTimeout(700);
             assert.equal(await page.locator('#side-rail-tab').evaluate(el => getComputedStyle(el).opacity), '0');
             await page.mouse.move(1437, 80); await page.waitForTimeout(300);
@@ -143,6 +146,8 @@ async function onePanel(page, name) {
             await page.waitForFunction(() => getComputedStyle(document.querySelector('#side-rail')).visibility === 'hidden');
             await page.evaluate(() => { NewtabSideRail.open(); NewtabSideRail.setTab('personalize'); }); await onePanel(page, 'personalize');
             const snap = await pose(page); assert(Math.abs(panel(snap, 'personalize').x - snap.drawerX - 1) < 1);
+            assert(await page.locator('#side-rail,.side-rail-panel,.rail-tab-indicator').evaluateAll(elements =>
+                elements.every(el => !el.style.willChange)), 'dynamic reduced motion releases every temporary compositor hint');
             await context.close();
         });
         await test('custom app and crop keep stacked focus and discard interrupted close cleanup', async () => {

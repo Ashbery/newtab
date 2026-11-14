@@ -76,6 +76,16 @@ The owner found the first motion pass too rigid. The principal problem was disco
 
 DesignBookmark's actual Toggle switch, Tab pill and Spring dropdown examples informed the physical response. Cult UI's actual Direction-Aware Tabs and Popover sources informed directional continuity and restrained settling. This implementation keeps interactions interruptible instead of blocking input until an animation finishes. Review uses normal-speed recordings, intermediate frames, rapid reversals and functional tests; the target is a dependable finished product, not an award claim.
 
+### Display-specific placement and lighter motion — 2026.11.15.2
+
+The user selected separate arrangements with shared content. Screen profiles own widget geometry, sizes, visibility, pinning and home-grid placement. Widget content and appearance remain shared by widget identity. A screen change must not create a second conversation, reset a note, restart an unaffected Live2D renderer or overwrite another tab's newer content. The original common arrangement is retained; disabling the feature restores that geometry with current shared content, and keeps saved screen profiles.
+
+The personalization drawer offers a quiet native switch, a layout selector/name and an explicit automatic-identification action. New/unknown displays copy the current arrangement as a starting point. Window Management permission is requested only by that action; startup may resume a permission already granted. Screen identity uses local descriptors rather than viewport dimensions alone. Duplicate display names use desktop positions; ambiguous reconnections retain the selected layout until explicitly rebound. The browser does not supply a permanent hardware identifier.
+
+Changing screens during a drag, input, settings dialog or arrangement draft queues the change until the operation finishes. Pending automatic changes belong to the automatic detector; stopping it or losing permission cancels only its requests. A late permission result cannot re-enable a choice stopped from another tab. Per-field content records and per-widget profile geometry prevent a stale full-page snapshot from overwriting unrelated changes. Content refreshes preserve unaffected widget DOM and renderers.
+
+The movement refinement targets measured rendering work as well as feel. Drawer/pages now set transform directly instead of updating inherited CSS variables across the entire settings subtree. The selected pill scales a fixed face rather than changing width on every frame. Compositor preparation is temporary and cleaned up after settling, reversal or reduced-motion changes. The selected page spring is 380/32: approximately 4 px of settling on a 342 px pane, less pronounced than the rejected 380/30 response. Hardware acceleration remains a browser/driver decision, not a pretend website setting.
+
 ## Functional refinement after owner review
 Tapping Add creates an immediately usable widget and brings it into view on phones. Arrangement is explicit in Tools or entered through a deliberate long press. Right-click and Shift+F10 open the selected widget's menu; touch users can select it during editing and use the shared toolbar's Settings action. Individual three-dot buttons have been removed at the owner's request.
 
