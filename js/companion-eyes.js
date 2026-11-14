@@ -101,7 +101,13 @@
                 var blink = closedImage ? Math.max(0, Math.min(1, Number(value) || 0)) : 0;
                 if (blink === previous) return canvas;
                 previous = blink;
-                if (blink <= .0001) { painter.putImageData(original, 0, 0); return canvas; }
+                if (blink <= .0001) {
+                    // Restore artwork, not readback bytes: privacy browsers
+                    // may perturb getImageData pixels outside the eye patches.
+                    painter.clearRect(0, 0, width, height);
+                    painter.drawImage(image, 0, 0, width, height);
+                    return canvas;
+                }
                 for (var index = 0; index < patches.length; index++) {
                     var p = patches[index], geo = p.geometry, pixels = p.image.data;
                     for (var k = 0, offset = 0; k < geo.length; k += 7, offset += 4) {

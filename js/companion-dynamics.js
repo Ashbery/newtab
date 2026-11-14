@@ -26,6 +26,7 @@
     }
 
     function create(options) {
+        var fixedHead = !!(options && options.fixedHead);
         var randomState = seedNumber((options || {}).seed);
         function random() {
             randomState ^= randomState << 13; randomState ^= randomState >>> 17; randomState ^= randomState << 5;
@@ -92,6 +93,10 @@
             current.breath = clamp(breath, -.005, .005);
             current.hairLeft = clamp(leftHair, -.008, .008); current.hairRight = clamp(rightHair, -.008, .008);
             current.earLeft = clamp(leftEar, -.025, .025); current.earRight = clamp(rightEar, -.025, .025);
+            if (fixedHead) {
+                current.headX = current.headY = current.headRoll = current.bodyRoll = 0;
+                current.hairLeft = current.hairRight = current.earLeft = current.earRight = 0;
+            }
             current.blink = clamp(blink, 0, 1);
             current.gazeX = clamp(gx * .004, -.004, .004); current.gazeY = clamp(gy * .003, -.003, .003);
             current.greet = clamp(greet + reply * .08, 0, 1);

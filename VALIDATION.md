@@ -1,4 +1,12 @@
-# Release 2026.11.14.13
+# Release 2026.11.14.14
+
+Validation date: 2026-11-14 (Asia/Taipei).
+
+The owner rejected head movement on the flattened portrait. All head translation/rotation, torso roll, and hair/ear deformation are disabled. Both renderers add a mesh row exactly at normalizedY0.46 and restrict subtle breathing below it; eye-aperture blinking remains. This is a still-headed portrait, not an authored Live2D model. Existing display-synced cadence, pause/preferences and in-page chat remain.
+
+Actual Brave pixel regression passed2/2:99 WebGL and91 Canvas frames each inspect149,247head/face pixels outside the declared eyelid windows, with zero changed pixels during pointer/greeting/chat/breath interactions. Eye and torso motion and keyboard/pointer chat remain functional. A blink reset now redraws original artwork instead of restoring privacy-perturbed canvas readback bytes. Full companion browser integration passed11/11; dynamics units passed8/8.
+
+# Release 2026.11.14.13 (historical results)
 
 Validation date: 2026-11-14 (Asia/Taipei).
 

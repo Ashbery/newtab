@@ -8,6 +8,18 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../js/companion-dynamic
 const create = sandbox.window.NewtabCompanionDynamics.create;
 const limits = { headX: .014, headY: .008, headRoll: .028, bodyRoll: .006, breath: .005, hairLeft: .008, hairRight: .008, earLeft: .025, earRight: .025, gazeX: .004, gazeY: .003, blink: 1, greet: 1 };
 const copy = pose => ({ ...pose });
+test('fixed-head portrait ignores articulated pose while keeping blink and breathing', () => {
+    const rig = create({ seed: 'still-head', fixedHead: true });
+    const fixed = ['headX', 'headY', 'headRoll', 'bodyRoll', 'hairLeft', 'hairRight', 'earLeft', 'earRight'];
+    let blinkSeen = false, breathSeen = false;
+    for (let frame = 0; frame < 1200; frame++) {
+        const pose = rig.advance(1000 / 120, { x: Math.sin(frame / 30), y: Math.cos(frame / 21), hover: true,
+            greeting: 1 + Math.floor(frame / 120), chatState: frame % 240 < 120 ? 'thinking' : 'replying' });
+        for (const key of fixed) assert.equal(pose[key], 0, key + ' stays fixed');
+        blinkSeen ||= pose.blink > .9; breathSeen ||= Math.abs(pose.breath) > .002;
+    }
+    assert.ok(blinkSeen && breathSeen);
+});
 function run(rig, milliseconds, input = {}, fps = 120) {
     const count = Math.round(milliseconds / 1000 * fps), delta = milliseconds / count;
     let pose;

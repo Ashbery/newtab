@@ -1,4 +1,4 @@
-/* Local portrait rig: continuous pose, articulated regional weights and drawn eyelids. */
+/* Flat portrait: a fixed head, drawn eyelids and restrained breathing below the neck. */
 (function () {
     'use strict';
     var instances = new Map();
@@ -50,22 +50,13 @@
         if (!gl) return null;
         var vertex = [
             'attribute vec2 a_uv; varying vec2 v_uv;',
-            'uniform float u_motion; uniform vec4 u_head; uniform vec4 u_secondary; uniform vec2 u_body;',
+            'uniform float u_motion; uniform float u_breath;',
             'void main(){ v_uv=a_uv; vec2 p=a_uv;',
-            'float head=1.0-smoothstep(0.39,0.48,p.y);',
-            'vec2 torso=p-vec2(0.5,0.91); p+=vec2(-torso.y,torso.x)*u_body.x*u_motion;',
-            'p.y-=u_body.y*(0.30+0.70*head)*u_motion;',
-            'p.x+=(a_uv.x-0.5)*u_body.y*0.55*smoothstep(0.42,0.7,a_uv.y)*u_motion;',
-            'vec2 neck=p-vec2(0.53,0.44); p+=(vec2(-neck.y,neck.x)*u_head.z+u_head.xy)*head*u_motion;',
-            'float lockY=smoothstep(0.32,0.56,a_uv.y)*(1.0-smoothstep(0.76,0.94,a_uv.y));',
-            'float leftLock=(1.0-smoothstep(0.08,0.17,abs(a_uv.x-(0.29-0.16*a_uv.y))))*lockY;',
-            'float rightLock=(1.0-smoothstep(0.07,0.16,abs(a_uv.x-(0.70+0.16*a_uv.y))))*lockY;',
-            'p.x+=(leftLock*u_secondary.x+rightLock*u_secondary.y)*u_motion;',
-            'p.y+=(leftLock*u_secondary.x-rightLock*u_secondary.y)*0.25*u_motion;',
-            'float leftEar=(1.0-smoothstep(0.65,1.0,length((a_uv-vec2(0.28,0.13))/vec2(0.12,0.12))))*(1.0-smoothstep(0.18,0.24,a_uv.y));',
-            'float rightEar=(1.0-smoothstep(0.6,1.0,length((a_uv-vec2(0.66,0.08))/vec2(0.12,0.13))))*(1.0-smoothstep(0.12,0.20,a_uv.y));',
-            'vec2 dl=a_uv-vec2(0.32,0.22),dr=a_uv-vec2(0.65,0.17);',
-            'p+=(vec2(-dl.y,dl.x)*u_secondary.z*leftEar+vec2(-dr.y,dr.x)*u_secondary.w*rightEar)*u_motion;',
+            // No invented head/neck rig for the flattened artwork. A mesh row
+            // at this exact boundary prevents interpolation moving the face.
+            'float chest=smoothstep(0.46,0.64,p.y)*(1.0-smoothstep(0.92,1.0,p.y));',
+            'p.x+=(a_uv.x-0.5)*u_breath*0.55*chest*u_motion;',
+            'p.y-=u_breath*0.28*chest*u_motion;',
             'gl_Position=vec4(p.x*2.0-1.0,1.0-p.y*2.0,0.0,1.0); }'
         ].join('\n');
         var fragment = [
@@ -91,9 +82,12 @@
             program = gl.createProgram(); gl.attachShader(program, v); gl.attachShader(program, f); gl.linkProgram(program);
             if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Character renderer unavailable');
             gl.useProgram(program);
-            var vertices = [], cols = 32, rows = 44;
+            var vertices = [], cols = 32, rowPositions = [];
+            for (var ry = 0; ry <= 44; ry++) rowPositions.push(ry / 44);
+            rowPositions.push(.46); rowPositions.sort(function (a, b) { return a - b; });
+            var rows = rowPositions.length - 1;
             for (var row = 0; row < rows; row++) for (var col = 0; col < cols; col++) {
-                var x = col / cols, y = row / rows, x2 = (col + 1) / cols, y2 = (row + 1) / rows;
+                var x = col / cols, y = rowPositions[row], x2 = (col + 1) / cols, y2 = rowPositions[row + 1];
                 vertices.push(x,y, x2,y, x,y2, x,y2, x2,y, x2,y2);
             }
             buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -121,16 +115,14 @@
                 gl.uniform1i(gl.getUniformLocation(program, index ? 'u_closed' : 'u_art'), index);
             });
             var uniforms = {};
-            ['motion','head','secondary','body','blink'].forEach(function (name) { uniforms[name] = gl.getUniformLocation(program, 'u_' + name); });
+            ['motion','breath','blink'].forEach(function (name) { uniforms[name] = gl.getUniformLocation(program, 'u_' + name); });
             return {
                 kind: 'webgl',
                 draw: function (state) {
                     gl.viewport(0, 0, canvas.width, canvas.height);
                     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
                     gl.uniform1f(uniforms.motion, state.motion);
-                    gl.uniform4f(uniforms.head, state.headX, state.headY, state.headRoll, 0);
-                    gl.uniform4f(uniforms.secondary, state.hairLeft, state.hairRight, state.earLeft, state.earRight);
-                    gl.uniform2f(uniforms.body, state.bodyRoll, state.breath);
+                    gl.uniform1f(uniforms.breath, state.breath);
                     gl.uniform1f(uniforms.blink, blinkImage ? state.blink : 0);
                     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2);
                 },
@@ -148,15 +140,13 @@
         if (!ctx) return null;
         var eyeRig = window.NewtabCompanionEyes.createCanvas(image, blinkImage, 544, 725);
         var source = eyeRig.paint(0);
-        var cols = 8, rows = 12, nodes = [], warped = [], cells = [];
+        var cols = 8, rowPositions = [], nodes = [], warped = [], cells = [];
+        for (var ry = 0; ry <= 12; ry++) rowPositions.push(ry / 12);
+        rowPositions.push(.46); rowPositions.sort(function (a, b) { return a - b; });
+        var rows = rowPositions.length - 1;
         for (var row = 0; row <= rows; row++) for (var col = 0; col <= cols; col++) {
-            var nx = col / cols, ny = row / rows;
-            var lockY = smooth(.32, .56, ny) * (1 - smooth(.76, .94, ny));
-            nodes.push({ x: nx, y: ny, head: 1 - smooth(.39, .48, ny), chest: smooth(.42, .7, ny),
-                hairL: (1 - smooth(.08, .17, Math.abs(nx - (.29 - .16 * ny)))) * lockY,
-                hairR: (1 - smooth(.07, .16, Math.abs(nx - (.70 + .16 * ny)))) * lockY,
-                earL: (1 - smooth(.65, 1, Math.hypot((nx - .28) / .12, (ny - .13) / .12))) * (1 - smooth(.18, .24, ny)),
-                earR: (1 - smooth(.6, 1, Math.hypot((nx - .66) / .12, (ny - .08) / .13))) * (1 - smooth(.12, .20, ny)) });
+            var nx = col / cols, ny = rowPositions[row];
+            nodes.push({ x: nx, y: ny, chest: smooth(.46, .64, ny) * (1 - smooth(.92, 1, ny)) });
             warped.push({ x: 0, y: 0 });
         }
         for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) {
@@ -166,16 +156,8 @@
         function smooth(a, b, v) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
         function deform(uv, s, point) {
             var x = uv.x, y = uv.y, m = s.motion;
-            x -= (uv.y - .91) * s.bodyRoll * m; y += (uv.x - .5) * s.bodyRoll * m;
-            y -= s.breath * (.30 + .70 * uv.head) * m;
+            y -= s.breath * .28 * uv.chest * m;
             x += (uv.x - .5) * s.breath * .55 * uv.chest * m;
-            var dx = x - .53, dy = y - .44;
-            x += (-dy * s.headRoll + s.headX) * uv.head * m;
-            y += (dx * s.headRoll + s.headY) * uv.head * m;
-            x += (uv.hairL * s.hairLeft + uv.hairR * s.hairRight) * m;
-            y += (uv.hairL * s.hairLeft - uv.hairR * s.hairRight) * .25 * m;
-            x -= ((uv.y - .22) * s.earLeft * uv.earL + (uv.y - .17) * s.earRight * uv.earR) * m;
-            y += ((uv.x - .32) * s.earLeft * uv.earL + (uv.x - .65) * s.earRight * uv.earR) * m;
             point.x = x * canvas.width; point.y = y * canvas.height;
         }
         function tracePoint(point, previous, next, orientation, first) {
@@ -246,7 +228,7 @@
         var disposed = false, visible = true, frame = 0, rig = null, greeting = 0, hovered = false, messageTimer = 0;
         var pacer = createFramePacer();
         var target = { x: 0, y: 0 }, motionInput = { x: 0, y: 0, hover: false, greeting: 0, chatState: 'idle' };
-        var dynamics = window.NewtabCompanionDynamics && window.NewtabCompanionDynamics.create({ seed: widget.id });
+        var dynamics = window.NewtabCompanionDynamics && window.NewtabCompanionDynamics.create({ seed: widget.id, fixedHead: true });
         var state = { motion: 0, frames: 0, drawMs: 0, time: 0, headX: 0, headY: 0, headRoll: 0, bodyRoll: 0, breath: 0,
             hairLeft: 0, hairRight: 0, earLeft: 0, earRight: 0, blink: 0, gazeX: 0, gazeY: 0, greet: 0 };
         if (dynamics) Object.assign(state, dynamics.advance(0, motionInput));

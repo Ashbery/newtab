@@ -241,7 +241,7 @@ test('native and whole-refresh RAF pacing remains even without speeding up the p
             assert.ok(Math.abs(result.seconds - 3) < .001, 'Animation speed follows elapsed time at every display refresh rate');
             assert.ok(result.firstPointer < .1, 'A pointer step enters smoothly instead of jumping to its destination');
             assert.ok(result.pointer > .97 && result.pointer < 1, 'Gaze approaches the target within half a second');
-            assert.ok(result.head > 0 && result.head / .012 < result.pointer, 'The heavier head follows behind the gaze');
+            assert.equal(result.head, 0, 'The flat portrait keeps its head fixed even when the pointer target changes');
             if (hz === 144) {
                 await page.evaluate(() => NewtabWidgets.enterArrange());
                 await page.waitForFunction(() => NewtabCompanion.getState('companion-1').motion === 'paused', null, { polling: 50 });
