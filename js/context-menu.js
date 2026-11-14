@@ -80,6 +80,7 @@
             t.closest('.icon-crop-modal') ||
             t.closest('.custom-app-modal') ||
             t.closest('.appearance-dialog') ||
+            t.closest('.weather-location-dialog') ||
             t.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]')
         );
     }

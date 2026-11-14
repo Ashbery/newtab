@@ -12,7 +12,14 @@
     var HANDLE_DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
     var WEATHER_CACHE_KEY = 'nt_weather_cache';
     var WEATHER_TTL_MS = 30 * 60 * 1000;
+    var WEATHER_MET_CACHE_KEY = 'nt_weather_met_cache_v1';
+    var WEATHER_MET_TTL_MS = 3 * 60 * 60 * 1000;
+    var WEATHER_MET_CACHE_MAX = 50;
+    var weatherMetMemory = Object.create(null);
+    var weatherMetRequests = Object.create(null);
     var WEATHER_FETCH_MS = 8000;
+    var WEATHER_LOCATION_MS = 12000;
+    var WEATHER_PERMISSION_WAIT_MS = 30000;
     var APPEARANCE_BG_MAX = 180000;
     var TAIPEI = { lat: 25.033, lon: 121.565, city: '台北' };
     var NOTES_MAX = 5000;
@@ -94,6 +101,7 @@
         if (!t || !t.closest) return false;
         return !!(
             t.closest('.appearance-dialog') ||
+            t.closest('.weather-location-dialog') ||
             t.closest('.character-chat-dialog') ||
             t.closest('.home-header') ||
             t.closest('.home-footer') ||
@@ -410,6 +418,9 @@
             shapes = '<g transform="translate(12 -4) scale(.8)">' + sun + '</g>' + cloud + ribbon;
         } else if (c === 45 || c === 48) {
             shapes = cloud + ribbon + '<path d="M16 49h32m-26 6h22" stroke="#94adbc"/>';
+        } else if (c === 68 || c === 69 || c === 83 || c === 84) {
+            shapes = cloud + ribbon + '<path d="m21 48-2 5m11-5-2 5" stroke="#79b6cf" stroke-width="3"/>' +
+                '<path d="M42 47v10m-4-7 8 4m0-4-8 4" stroke="#86b3cb"/>';
         } else if ((c >= 71 && c <= 77) || c === 85 || c === 86) {
             shapes = cloud + ribbon + '<path d="M23 47v10m-4-7 8 4m0-4-8 4m22-7v10m-4-7 8 4m0-4-8 4" stroke="#86b3cb"/>';
         } else if (c >= 95) {
@@ -430,6 +441,7 @@
         if (c === 3) return '陰';
         if (c === 45 || c === 48) return '霧';
         if (c >= 51 && c <= 67) return '雨';
+        if (c === 68 || c === 69 || c === 83 || c === 84) return '雨夾雪';
         if ((c >= 71 && c <= 77) || c === 85 || c === 86) return '雪';
         if (c >= 80 && c <= 82) return '陣雨';
         if (c >= 95) return '雷雨';
@@ -445,39 +457,96 @@
         return data && typeof data.temp === 'number' && isFinite(data.temp);
     }
 
+    function metCoordinate(value) { return String(Math.trunc(value * 10000) / 10000); }
+    function metCacheKey(lat, lon) { return metCoordinate(lat) + ',' + metCoordinate(lon); }
+
+    function validMetEntry(entry) {
+        var data = entry && entry.data;
+        return validWeatherData(data) && data.provider === 'met-no' &&
+            typeof data.fetchedAt === 'number' && isFinite(data.fetchedAt) && data.fetchedAt <= Date.now() + 60000 &&
+            typeof data.refreshAfter === 'number' && isFinite(data.refreshAfter) &&
+            data.refreshAfter >= data.fetchedAt + WEATHER_MET_TTL_MS &&
+            (data.refreshAfter > Date.now() || Date.now() - data.fetchedAt <= 7 * 24 * 60 * 60 * 1000);
+    }
+
+    // Keep every unexpired location, including A → B → A selections. A fresh
+    // entry must never be evicted merely to make room for another location.
+    function readMetEntries() {
+        try {
+            var stored = JSON.parse(localStorage.getItem(WEATHER_MET_CACHE_KEY) || '{}');
+            Object.keys(stored).slice(0, WEATHER_MET_CACHE_MAX).forEach(function (key) {
+                var entry = stored[key];
+                if (validMetEntry(entry) && (!weatherMetMemory[key] ||
+                    entry.data.fetchedAt > weatherMetMemory[key].data.fetchedAt)) weatherMetMemory[key] = entry;
+            });
+        } catch (e) { /* The memory cache still honors refresh limits. */ }
+        Object.keys(weatherMetMemory).forEach(function (key) {
+            if (!validMetEntry(weatherMetMemory[key])) delete weatherMetMemory[key];
+        });
+        return weatherMetMemory;
+    }
+
+    function metHasCacheRoom(key) {
+        var entries = readMetEntries();
+        if (entries[key]) return true;
+        var reserved = Object.keys(weatherMetRequests).filter(function (name) { return name !== key && !entries[name]; }).length;
+        if (Object.keys(entries).length + reserved < WEATHER_MET_CACHE_MAX) return true;
+        var expired = Object.keys(entries).filter(function (name) { return entries[name].data.refreshAfter <= Date.now(); })
+            .sort(function (a, b) { return entries[a].data.fetchedAt - entries[b].data.fetchedAt; });
+        while (Object.keys(entries).length + reserved >= WEATHER_MET_CACHE_MAX) {
+            if (!expired.length) return false;
+            delete entries[expired.shift()];
+        }
+        return true;
+    }
+
+    function readMetCache(lat, lon) {
+        var entry = readMetEntries()[metCacheKey(lat, lon)];
+        return entry ? { data: entry.data, stale: Date.now() >= entry.data.refreshAfter } : null;
+    }
+
     /** Cache entries never turn missing temperatures into a successful reading. */
     function readWeatherCache(lat, lon) {
+        var met = readMetCache(lat, lon);
+        if (met && !met.stale) return met;
         try {
             var raw = global.localStorage && localStorage.getItem(WEATHER_CACHE_KEY);
-            if (!raw) return null;
+            if (!raw) return met;
             var c = JSON.parse(raw);
             if (!c || !validWeatherData(c.data) || !validWeatherCoordinates(c.lat, c.lon) ||
                 typeof c.ts !== 'number' || !isFinite(c.ts) || c.ts > Date.now() + 60000 ||
-                Date.now() - c.ts > 7 * 24 * 60 * 60 * 1000) return null;
-            if (Math.abs(c.lat - lat) > 0.001 || Math.abs(c.lon - lon) > 0.001) return null;
+                Date.now() - c.ts > 7 * 24 * 60 * 60 * 1000) return met;
+            if (Math.abs(c.lat - lat) > 0.001 || Math.abs(c.lon - lon) > 0.001) return met;
+            // MET uses exact four-decimal request keys, not nearby-place matching.
+            if (c.data.provider === 'met-no') return met;
             var stale = Date.now() - c.ts > WEATHER_TTL_MS;
+            if (met && met.data.fetchedAt > c.ts) return met;
+            c.data.provider = 'open-meteo';
+            c.data.fetchedAt = c.ts;
             return { data: c.data, stale: stale };
         } catch (e) {
-            return null;
+            return met;
         }
     }
 
     function writeWeatherCache(lat, lon, data) {
+        if (data.provider === 'met-no') {
+            var key = metCacheKey(lat, lon);
+            if (metHasCacheRoom(key)) {
+                weatherMetMemory[key] = { data: data };
+                try { localStorage.setItem(WEATHER_MET_CACHE_KEY, JSON.stringify(weatherMetMemory)); } catch (e) { /* memory cache remains */ }
+            }
+        }
         try {
             if (global.localStorage) {
                 localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({
-                    lat: lat, lon: lon, ts: Date.now(), data: data
+                    lat: lat, lon: lon, ts: data.fetchedAt || Date.now(), data: data
                 }));
             }
         } catch (e) { /* ignore */ }
     }
 
-    /** Return a cancellation function; only the current mounted caller may cache. */
-    function fetchWeatherNetwork(lat, lon, cb) {
-        var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(lat) +
-            '&longitude=' + encodeURIComponent(lon) +
-            '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m' +
-            '&daily=temperature_2m_max,temperature_2m_min&wind_speed_unit=ms&timezone=auto&forecast_days=1';
+    function fetchWeatherProvider(url, parse, cb) {
         var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
         var settled = false;
         function finish(err, data) {
@@ -493,26 +562,10 @@
         var opts = ctrl ? { signal: ctrl.signal } : {};
         Promise.resolve().then(function () { return fetch(url, opts); }).then(function (res) {
             if (!res.ok) throw new Error('http ' + res.status);
-            return res.json();
-        }).then(function (json) {
+            return res.json().then(function (json) { return { json: json, response: res }; });
+        }).then(function (result) {
             if (settled) return;
-            var cur = json && json.current || {};
-            if (!json || json.error || typeof cur.temperature_2m !== 'number' || !isFinite(cur.temperature_2m)) {
-                throw new Error('invalid weather data');
-            }
-            var daily = json.daily || {};
-            var data = {
-                temp: Math.round(cur.temperature_2m),
-                code: typeof cur.weather_code === 'number' && isFinite(cur.weather_code) ? cur.weather_code : null,
-                feels: typeof cur.apparent_temperature === 'number' && isFinite(cur.apparent_temperature) ? Math.round(cur.apparent_temperature) : null,
-                humidity: typeof cur.relative_humidity_2m === 'number' && isFinite(cur.relative_humidity_2m) ? Math.round(cur.relative_humidity_2m) : null,
-                wind: typeof cur.wind_speed_10m === 'number' && isFinite(cur.wind_speed_10m) ? Math.round(cur.wind_speed_10m * 10) / 10 : null,
-                high: daily.temperature_2m_max && typeof daily.temperature_2m_max[0] === 'number' && isFinite(daily.temperature_2m_max[0])
-                    ? Math.round(daily.temperature_2m_max[0]) : null,
-                low: daily.temperature_2m_min && typeof daily.temperature_2m_min[0] === 'number' && isFinite(daily.temperature_2m_min[0])
-                    ? Math.round(daily.temperature_2m_min[0]) : null
-            };
-            finish(null, data);
+            finish(null, parse(result.json, result.response));
         }).catch(function (err) {
             finish(err || new Error('fetch failed'));
         });
@@ -523,44 +576,142 @@
         };
     }
 
+    function weatherNumber(value, places) {
+        var scale = places ? 10 : 1;
+        return typeof value === 'number' && isFinite(value) ? Math.round(value * scale) / scale : null;
+    }
+
+    function parseOpenMeteo(json) {
+        var cur = json && json.current || {};
+        if (!json || json.error || weatherNumber(cur.temperature_2m) === null) throw new Error('invalid weather data');
+        var daily = json.daily || {};
+        return { temp: weatherNumber(cur.temperature_2m), code: weatherNumber(cur.weather_code),
+            feels: weatherNumber(cur.apparent_temperature), humidity: weatherNumber(cur.relative_humidity_2m),
+            wind: weatherNumber(cur.wind_speed_10m, 1), high: weatherNumber(daily.temperature_2m_max && daily.temperature_2m_max[0]),
+            low: weatherNumber(daily.temperature_2m_min && daily.temperature_2m_min[0]), provider: 'open-meteo', fetchedAt: Date.now() };
+    }
+
+    function metWeatherCode(symbol) {
+        var name = typeof symbol === 'string' ? symbol.replace(/_(day|night|polartwilight)$/, '') : '';
+        var exact = { clearsky: 0, fair: 1, partlycloudy: 2, cloudy: 3, fog: 45,
+            lightrain: 61, rain: 63, heavyrain: 65, lightrainshowers: 80, rainshowers: 81, heavyrainshowers: 82,
+            lightsnow: 71, snow: 73, heavysnow: 75, lightsnowshowers: 85, snowshowers: 86, heavysnowshowers: 86,
+            lightsleet: 68, sleet: 69, heavysleet: 69, lightsleetshowers: 83, sleetshowers: 84, heavysleetshowers: 84 };
+        if (/^(light|heavy)?(rain|snow|sleet)(showers)?andthunder$/.test(name)) return 95;
+        return Object.prototype.hasOwnProperty.call(exact, name) ? exact[name] : null;
+    }
+
+    function parseMetWeather(json, response) {
+        var series = json && json.properties && json.properties.timeseries;
+        if (!Array.isArray(series) || !series.length) throw new Error('invalid weather data');
+        var now = Date.now();
+        var sample = series.filter(function (item) { return item && isFinite(Date.parse(item.time)); })
+            .sort(function (a, b) { return Math.abs(Date.parse(a.time) - now) - Math.abs(Date.parse(b.time) - now); })[0];
+        var details = sample && sample.data && sample.data.instant && sample.data.instant.details;
+        if (!details || weatherNumber(details.air_temperature) === null || Math.abs(Date.parse(sample.time) - now) > 6 * 60 * 60 * 1000) {
+            throw new Error('invalid weather data');
+        }
+        var next = sample.data.next_1_hours;
+        var expires = response.headers && response.headers.get ? Date.parse(response.headers.get('Expires')) : NaN;
+        return { temp: weatherNumber(details.air_temperature), humidity: weatherNumber(details.relative_humidity),
+            wind: weatherNumber(details.wind_speed, 1), code: metWeatherCode(next && next.summary && next.summary.symbol_code),
+            feels: null, high: null, low: null, provider: 'met-no', fetchedAt: now,
+            forecastAt: Date.parse(sample.time), refreshAfter: Math.max(now + WEATHER_MET_TTL_MS, isFinite(expires) ? expires : 0) };
+    }
+
+    function fetchMetWeather(lat, lon, cb) {
+        var cached = readMetCache(lat, lon);
+        if (cached && !cached.stale) { cb(null, cached.data); return function () {}; }
+        var key = metCacheKey(lat, lon);
+        var pending = weatherMetRequests[key];
+        if (!pending) {
+            if (!metHasCacheRoom(key)) { cb(new Error('weather cache limit')); return function () {}; }
+            pending = { callbacks: [], cancel: null };
+            weatherMetRequests[key] = pending;
+            // Simple browser CORS request: Origin identifies the site. Custom
+            // headers would introduce an unsupported preflight request.
+            pending.cancel = fetchWeatherProvider('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' +
+                metCoordinate(lat) + '&lon=' + metCoordinate(lon), parseMetWeather, function (err, data) {
+                delete weatherMetRequests[key];
+                pending.callbacks.slice().forEach(function (callback) { callback(err, data); });
+            });
+        }
+        pending.callbacks.push(cb);
+        return function () {
+            pending.callbacks = pending.callbacks.filter(function (callback) { return callback !== cb; });
+            if (!pending.callbacks.length && weatherMetRequests[key] === pending) {
+                delete weatherMetRequests[key]; pending.cancel();
+            }
+        };
+    }
+
+    /** Return one cancellation handle for both bounded provider attempts. */
+    function fetchWeatherNetwork(lat, lon, cb) {
+        var cancelled = false;
+        var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(lat) +
+            '&longitude=' + encodeURIComponent(lon) +
+            '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m' +
+            '&daily=temperature_2m_max,temperature_2m_min&wind_speed_unit=ms&timezone=auto&forecast_days=1';
+        var cancelCurrent = fetchWeatherProvider(url, parseOpenMeteo, function (err, data) {
+            if (cancelled) return;
+            if (!err) { cb(null, data); return; }
+            cancelCurrent = fetchMetWeather(lat, lon, function (backupError, backupData) {
+                if (!cancelled) cb(backupError && (err.message === 'timeout' ? err : backupError), backupData);
+            });
+        });
+        return function () { cancelled = true; if (cancelCurrent) cancelCurrent(); };
+    }
+
     function resolveWeatherLocation(w, done, options) {
         options = options || {};
         var saved = w.options || {};
-        var hasSaved = validWeatherCoordinates(saved.lat, saved.lon);
+        // A previous failed lookup stored Taipei as a fallback. It is not a
+        // user's location choice and must not prevent a fresh device lookup.
+        var hasSaved = validWeatherCoordinates(saved.lat, saved.lon) && saved.locationSource !== 'fallback';
+        if (options.location && validWeatherCoordinates(options.location.lat, options.location.lon) &&
+            ['manual', 'network'].indexOf(options.location.locationSource) >= 0) {
+            done(options.location);
+            return function () {};
+        }
         if (options.useDefault || (hasSaved && !options.relocate)) {
             done(options.useDefault ? { lat: TAIPEI.lat, lon: TAIPEI.lon, city: TAIPEI.city, locationSource: 'default', locationNotice: '' } : {
                 lat: saved.lat, lon: saved.lon, city: saved.city || '目前位置',
-                locationSource: saved.locationSource || 'saved', locationNotice: saved.locationNotice || ''
+                locationSource: saved.locationSource || 'saved', locationNotice: saved.locationSource === 'network' ? '網路估算位置' : ''
             });
             return function () {};
         }
         var finished = false;
         var timer;
-        function finish(location) {
+        function finish(location, reason) {
             if (finished) return;
             finished = true;
             clearTimeout(timer);
-            done(location);
+            done(location, reason);
         }
         function fallback(reason) {
-            finish({ lat: hasSaved ? saved.lat : TAIPEI.lat, lon: hasSaved ? saved.lon : TAIPEI.lon,
-                city: hasSaved ? saved.city || '先前位置' : TAIPEI.city,
-                locationSource: hasSaved ? saved.locationSource || 'saved' : 'fallback',
-                locationNotice: reason + (hasSaved ? '，保留原位置' : '，顯示台北') });
+            // Keep real/manual choices, but never invent a successful location.
+            finish(hasSaved ? { lat: saved.lat, lon: saved.lon, city: saved.city || '先前位置',
+                locationSource: saved.locationSource || 'saved',
+                locationNotice: reason + ' 目前保留原位置。' } : null, reason);
         }
-        timer = setTimeout(function () { fallback('定位逾時'); }, WEATHER_FETCH_MS);
-        if (!navigator.geolocation) fallback('瀏覽器不支援定位');
+        // The network request timeout must not also cut short the browser's
+        // permission prompt. A separate watchdog still bounds a missing callback.
+        timer = setTimeout(function () { fallback('定位逾時，請確認位置權限或選擇城市。'); }, WEATHER_PERMISSION_WAIT_MS);
+        var policy = document.permissionsPolicy || document.featurePolicy;
+        if (policy && policy.allowsFeature && !policy.allowsFeature('geolocation')) fallback('此頁面未取得定位權限，請選擇城市。');
+        else if (!navigator.geolocation) fallback('瀏覽器不支援定位，請選擇城市。');
         else try {
             navigator.geolocation.getCurrentPosition(function (pos) {
                 if (!pos || !pos.coords || !validWeatherCoordinates(pos.coords.latitude, pos.coords.longitude)) {
-                    fallback('無法取得位置');
+                    fallback('無法取得有效位置，請重試或選擇城市。');
                     return;
                 }
                 finish({ lat: pos.coords.latitude, lon: pos.coords.longitude, city: '目前位置', locationSource: 'device', locationNotice: '' });
             }, function (err) {
-                fallback(err && err.code === 1 ? '未允許定位' : err && err.code === 3 ? '定位逾時' : '無法取得位置');
-            }, { timeout: WEATHER_FETCH_MS, maximumAge: 600000 });
-        } catch (e) { fallback('無法取得位置'); }
+                fallback(err && err.code === 1 ? '未允許定位，請允許 Brave 的位置權限或選擇城市。' :
+                    err && err.code === 3 ? '定位逾時，請重試或選擇城市。' : '無法取得裝置位置，請重試或選擇城市。');
+            }, { timeout: WEATHER_LOCATION_MS, maximumAge: options.relocate ? 0 : 600000, enableHighAccuracy: false });
+        } catch (e) { fallback('無法取得裝置位置，請重試或選擇城市。'); }
         return function () { finished = true; clearTimeout(timer); };
     }
 
@@ -568,6 +719,7 @@
         var locate = body.querySelector('.weather-locate');
         var retry = body.querySelector('.weather-retry');
         var fallback = body.querySelector('.weather-default');
+        var city = body.querySelector('.weather-city-button');
         function bind(button, options) {
             if (!button) return;
             button.addEventListener('click', function (e) {
@@ -579,6 +731,22 @@
         bind(locate, { relocate: true, force: true });
         bind(retry, { force: true });
         bind(fallback, { useDefault: true, force: true });
+        if (city) city.addEventListener('click', function (event) {
+            event.preventDefault(); event.stopPropagation();
+            if (!global.NewtabWeatherLocation) return;
+            var current = findWidget(w.id);
+            if (!current) return;
+            global.NewtabWeatherLocation.open({ opener: city,
+                focusTarget: function () { return body.isConnected ? body.querySelector('.weather-city-button') : null; },
+                city: current.options && ['manual', 'network', 'default'].indexOf(current.options.locationSource) >= 0 ? current.options.city : '',
+                isCurrent: function () { return body.isConnected && !!findWidget(w.id); },
+                onSelect: function (location) {
+                    var selected = findWidget(w.id);
+                    if (!body.isConnected || !selected) return;
+                    loadWeatherInto(body, selected, { location: location, force: true });
+                }
+            });
+        });
         if (focusClass) {
             var next = body.querySelector('.' + focusClass);
             if (!next && focusClass === 'weather-default') next = retry;
@@ -589,15 +757,47 @@
     function weatherFocusClass(body) {
         var active = document.activeElement;
         if (!body.contains(active)) return '';
-        return ['weather-retry', 'weather-locate', 'weather-default'].filter(function (name) {
+        return ['weather-retry', 'weather-locate', 'weather-default', 'weather-city-button'].filter(function (name) {
             return active.classList.contains(name);
         })[0] || '';
     }
 
     function weatherHeading() {
-        return '<div class="weather-heading"><span class="weather-city"></span>' +
+        return '<div class="weather-heading"><button type="button" class="weather-city-button" aria-label="選擇天氣城市" title="選擇天氣城市"><span class="weather-city"></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>' +
             '<div class="weather-actions"><button type="button" class="weather-locate" title="重新定位" aria-label="重新定位">定位</button>' +
             '<button type="button" class="weather-retry" title="更新天氣" aria-label="更新天氣">更新</button></div></div>';
+    }
+
+    function weatherSource(body, data) {
+        var source = document.createElement('div');
+        source.className = 'weather-source';
+        var provider = document.createElement('a');
+        var isMet = data.provider === 'met-no';
+        provider.textContent = isMet ? 'MET Norway' : 'Open-Meteo';
+        provider.href = isMet ? 'https://www.met.no/en' : 'https://open-meteo.com/';
+        provider.target = '_blank'; provider.rel = 'noopener noreferrer';
+        source.appendChild(provider);
+        source.appendChild(document.createTextNode(' · '));
+        var license = document.createElement('a');
+        license.textContent = 'CC BY 4.0'; license.href = 'https://creativecommons.org/licenses/by/4.0/';
+        license.target = '_blank'; license.rel = 'noopener noreferrer'; source.appendChild(license);
+        if (typeof data.fetchedAt === 'number' && isFinite(data.fetchedAt)) {
+            var time = document.createElement('time');
+            time.className = 'weather-fetched';
+            time.dateTime = new Date(data.fetchedAt).toISOString();
+            time.textContent = '取得於 ' + new Date(data.fetchedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+            time.title = new Date(data.fetchedAt).toLocaleString('zh-TW') + (isMet ? '；預報數值已四捨五入，更新間隔至少 3 小時。' : '；數值已四捨五入。');
+            if (isMet && typeof data.forecastAt === 'number' && isFinite(data.forecastAt)) {
+                time.title += ' 預報有效時間：' + new Date(data.forecastAt).toLocaleString('zh-TW');
+            }
+            source.appendChild(time);
+        }
+        if (isMet) {
+            var note = document.createElement('span');
+            note.className = 'weather-source-note'; note.textContent = '預報 · 數值已四捨五入';
+            source.appendChild(note);
+        }
+        body.appendChild(source);
     }
 
     function paintWeatherReady(body, w, location, data, opts) {
@@ -631,6 +831,7 @@
         glyph.setAttribute('aria-label', wmoLabel(data.code));
         var status = opts.loading ? opts.message || '正在更新…' : opts.failed ? '更新失敗，顯示先前資料' :
             location.locationNotice || wmoLabel(data.code);
+        if (location.locationSource === 'network' && status.indexOf('網路估算') < 0) status += '（網路估算）';
         body.querySelector('.weather-status').textContent = status;
         body.querySelector('.weather-status').title = status;
         body.querySelector('.weather-status').setAttribute('aria-label', wmoLabel(data.code) + '，' + status);
@@ -641,6 +842,7 @@
         body.querySelector('.weather-wind').textContent = wind;
         body.querySelector('.weather-retry').textContent = opts.failed ? '重試' : '更新';
         body.querySelector('.weather-retry').setAttribute('aria-label', opts.failed ? '重試天氣更新' : '更新天氣');
+        weatherSource(body, data);
         weatherActions(body, w, focusClass);
     }
 
@@ -651,8 +853,8 @@
         body.innerHTML = weatherHeading() + '<div class="weather-status" role="status" aria-live="polite"></div>' +
             (!failed ? '<div class="weather-skel sk-lg" aria-hidden="true"></div>' : '') +
             (!location ? '<button type="button" class="weather-default">先看台北天氣</button>' : '');
-        body.querySelector('.weather-city').textContent = location ? location.city : '天氣';
-        body.querySelector('.weather-status').textContent = message;
+        body.querySelector('.weather-city').textContent = location ? location.city : '選擇城市';
+        body.querySelector('.weather-status').textContent = message + (location && location.locationSource === 'network' ? '（網路估算）' : '');
         body.querySelector('.weather-retry').textContent = failed ? '重試' : '更新';
         body.querySelector('.weather-retry').setAttribute('aria-label', failed ? '重試天氣更新' : '更新天氣');
         weatherActions(body, w, focusClass);
@@ -672,14 +874,24 @@
         function active() { return !run.cancelled && body.isConnected && !!findWidget(w.id); }
         var shown = body._weatherShown || null;
         var saved = w.options || {};
-        var locating = options.relocate || !validWeatherCoordinates(saved.lat, saved.lon);
+        var locating = !options.location && !options.useDefault && (options.relocate || saved.locationSource === 'fallback' || !validWeatherCoordinates(saved.lat, saved.lon));
         if (shown && body._weatherLocation) {
             paintWeatherReady(body, w, body._weatherLocation, shown, { stale: true, loading: true, message: locating ? '正在定位…' : '正在更新…' });
         } else paintWeatherPending(body, w, null, locating ? '正在定位…' : '正在取得天氣…', false);
-        run.cancelLocation = resolveWeatherLocation(w, function (location) {
+        run.cancelLocation = resolveWeatherLocation(w, function (location, locationError) {
             if (!active()) return;
+            if (!location) {
+                run.pending = false;
+                body._weatherShown = null; body._weatherLocation = null;
+                paintWeatherPending(body, w, null, locationError || '無法取得位置，請選擇城市。', true);
+                return;
+            }
             var current = findWidget(w.id);
-            current.options = Object.assign({}, current.options || {}, location);
+            current.options = Object.assign({}, current.options || {}, location, {
+                // Permission/provider errors are transient UI state, not a
+                // permanent property of a user's chosen city.
+                locationNotice: location.locationSource === 'network' ? '網路估算位置' : ''
+            });
             // Resolve onto current state: another widget operation can clone the
             // layout while location/network requests are still in flight.
             w = current;
@@ -693,7 +905,7 @@
             if (cached && cached.data) {
                 shown = cached.data;
                 body._weatherShown = shown;
-                if (!cached.stale && !options.force) {
+                if (!cached.stale && (!options.force || cached.data.provider === 'met-no')) {
                     run.pending = false;
                     paintWeatherReady(body, w, location, shown);
                     return;
@@ -732,7 +944,7 @@
                 var w = el && findWidget(el.getAttribute('data-id'));
                 if (!w) return;
                 var opts = w.options || {};
-                if (!validWeatherCoordinates(opts.lat, opts.lon)) return;
+                if (!validWeatherCoordinates(opts.lat, opts.lon) || opts.locationSource === 'fallback') return;
                 var cached = readWeatherCache(opts.lat, opts.lon);
                 if (force || !cached || cached.stale) loadWeatherInto(body, w, { force: true });
             });

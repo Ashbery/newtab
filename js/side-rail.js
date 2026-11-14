@@ -1416,7 +1416,7 @@
         }
 
         document.addEventListener('keydown', function (e) {
-            if ($('.appearance-dialog[open]')) return;
+            if ($('.appearance-dialog[open], .weather-location-dialog[open]')) return;
             var crop = $('.icon-crop-modal.is-open:not([inert])');
             var appModal = $('.custom-app-modal.is-open:not([inert])');
             var dialog = crop || appModal;

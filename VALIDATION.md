@@ -1,4 +1,25 @@
-# Release 2026.11.14.6
+# Release 2026.11.14.7
+
+Validation date: 2026-11-14 (Asia/Taipei).
+
+- Split location-permission waiting from weather-network timeouts. Explicit relocation requests a fresh device fix. Failed legacy Taipei fallbacks no longer prevent a new lookup; a failure preserves a genuinely selected city but does not silently invent a successful location.
+- Added an accessible city picker with Open-Meteo geocoding and an explicitly requested GeoJS city estimate. Estimated results require confirmation, remain labelled, and never retain the returned IP address. Abort/generation guards prevent old requests, removed widgets and closed dialogs from changing current state. Keyboard and focus recovery survive weather repainting.
+- Added MET Norway Locationforecast fallback after an unsuccessful Open-Meteo attempt. The widget identifies its active provider and license, shows acquisition time, and leaves unavailable optional metrics empty. Four-decimal coordinates and a bounded per-location cache respect at least three hours and later response expiry; refresh and A → B → A selections cannot bypass a fresh MET entry.
+- Preserved the actual installed Brave extension, native blank address bar, private profile, authentication helper, saved layouts and unrelated appearance controls. Website asset versions carry this update without reinstalling the extension.
+
+| Verification | Observed result |
+| --- | --- |
+| Search and resize | 27/27 tests passed. |
+| Existing UI | All four desktop/mobile × normal/reduced-motion scenarios passed. |
+| Weather recovery and providers | 23/23 scenarios passed, including legacy fallback recovery, fresh relocation, permission/provider errors, manual selection versus pending GPS, old replies, mobile recovery, Open-Meteo failure to MET fallback, malformed and late provider results, three-hour/Expires boundaries, force/reload/city roundtrips, blocked storage, capacity reservations and sleet conditions. |
+| City picker | 8/8 browser suites passed, including explicit network opt-in and confirmation, validation, IP exclusion, IME/keyboard, abort and late replies, close/reopen/removal, error recovery, focus replacement and responsive layouts. |
+| Actual Brave wrapper and live services | In an isolated profile, the actual installed extension loaded this source under the GitHub Pages origin. A real Kaohsiung city search succeeded; Open-Meteo forecast timed out, MET returned a valid temperature, and Update reused the fresh MET entry. No weather response was mocked in this check. The original profile and its permissions were not changed. |
+| Independent review | Separate reviewer reproduced and verified fixes for concurrent cache capacity, then checked provider parsing, cancellation, expiry and displayed valid forecast time. No remaining actionable findings in that scope. |
+| Visual review | The 320px picker, network-estimate confirmation and long permission-error guidance were inspected. The actual 1920×1080 weather result showed its city, temperature, recovery controls and provider attribution without clipping. At 160×160, the cached real result retained a visible temperature, no horizontal overflow, and scroll-accessible provider links. Reopening the same isolated Brave profile made zero weather API requests. |
+
+The owner's native location permission state and physical device location remain unverified. The repair provides recovery paths when that browser/system service is unavailable. External API reachability can change. Isolated browser profiles, screenshots and detailed test evidence remain ignored under `.impeccable/review/`.
+
+# Release 2026.11.14.6 (historical results)
 
 Validation date:2026-11-14 (Asia/Taipei).
 

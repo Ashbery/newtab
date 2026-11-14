@@ -18,7 +18,7 @@
 - 右鍵「自訂組件外觀」調整每個組件的底色、透明度、模糊、圓角、邊框、陰影與文字明暗。一般組件底色預設 70% 透明，時鐘完全透明；圖示下方文字沒有底色。
 - 搜尋列的外觀設定另提供「搜尋送出按鈕」：獨立調整背景色、背景透明度百分比、圖示顏色與圓角，即時預覽並儲存。「恢復按鈕預設」只重設按鈕；整體「恢復預設」同時還原搜尋列與按鈕。手機展開搜尋也沿用相同設定。
 - 專注模式收起捷徑與角色，按 Escape 或從工具選單返回。
-- 天氣提供定位、更新與失敗重試；書籤可直接管理名稱、網址與刪除。
+- 天氣提供裝置定位、城市搜尋、網路城市估算、更新與失敗重試；書籤可直接管理名稱、網址與刪除。
 
 ## 預覽與使用
 
@@ -57,6 +57,7 @@ node tests/background-seam.cjs
 node tests/background-compatibility.cjs
 node tests/extension-compatibility.cjs
 node tests/weather-regressions.cjs
+node tests/weather-location.cjs
 node tests/widget-functionality.cjs
 node tests/appearance-controls.cjs
 node tests/search-appearance.cjs
@@ -92,6 +93,16 @@ Brave 可能在原生新分頁底部附加白色頁尾，顯示擴充名稱與�
 預設 Nacho 設定以公開角色資料與官方介紹為參考，採用悠緩親近、偶爾俏皮的繁體中文語氣，融入繪畫、遊戲與鳳梨披薩等興趣。來源、讀取限制與原創演繹範圍見 [角色設定說明](CHARACTER_PERSONA.md)。舊版原始預設會自動採用新版，自訂過的提示詞保留。
 
 本機服務已啟動後，Brave 可能詢問是否允許網站連接本機。新分頁外框的 iframe 需保留 `geolocation; autoplay` 並加入 `loopback-network; local-network-access` 委派，更新外框後重新載入擴充一次。這不更動既有背景、永久啟用設定及空白網址列行為。
+
+## 天氣位置
+
+「定位」會請求瀏覽器取得裝置位置；重新定位不使用舊的裝置定位快取。定位與天氣連線分別計時，不再讓天氣服務的8秒逾時提早中止位置權限提示。定位失敗會顯示原因，保留先前有效或手動選過的位置；沒有位置時，不會自動把台北當成定位成功。舊版因失敗而存下的台北備援位置也不再阻止重試。主動點選「先看台北天氣」仍會儲存這個選擇。
+
+點天氣組件左上的城市名稱，可輸入至少兩個字元並按「搜尋城市」，再選取城市／行政區／國家相符的結果。也可主動按「以網路估算城市」：由 GeoJS 依網路IP估算，確認結果後才套用。這是約略位置，VPN或網路業者可能造成偏差；不會在定位被拒絕時自動啟用，也不會儲存服務回傳的IP。城市與天氣座標保留在本機設定，更新天氣時提供給天氣服務；網路估算的位置會持續標示。選定城市、取消搜尋或移除組件後，過期回覆不會蓋掉新設定。
+
+天氣先使用 Open-Meteo；連線或資料失敗時改用 [MET Norway 的 Locationforecast](https://api.met.no/weatherapi/locationforecast/2.0/documentation)。組件標示實際來源、資料時間與授權；備援預報不會假造缺少的體感溫度或每日高低溫。MET 座標只送到小數4位，依地點快取至少3小時並遵守服務的 `Expires`，「更新」與切換城市也不會繞過這段快取。資料依 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 使用，來源與[服務規範](https://docs.api.met.no/doc/TermsOfService.html)均保留連結。
+
+地名資料：[Open-Meteo](https://open-meteo.com/en/docs/geocoding-api)；網路城市估算：[GeoJS](https://www.geojs.io/docs/v1/endpoints/geo/)。原生裝置定位仍受瀏覽器與系統權限、定位服務可用性影響，網頁不會擅自更改這些權限。此更新不需要重新安裝新分頁擴充。
 
 ## 素材
 
