@@ -58,7 +58,8 @@
 .character-chat-reply-state { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: 10px; font-weight: 400; color: #577487; }
 .character-chat-reply-state-icon, .character-chat-reply-state-icon svg { display: block; width: 14px; height: 14px; }
 .character-chat-reply-state-icon svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.chat-state-ring { stroke-dasharray: 17 15; transform-origin: 8px 8px; animation: chat-state-turn 1.8s linear infinite; }
+.chat-state-ring { stroke-dasharray: 17 15; transform-origin: 8px 8px; }
+.character-chat-message:is([data-phase="thinking"], [data-phase="streaming"]) .chat-state-ring { animation: chat-state-turn 1.8s linear infinite; }
 .chat-state-check { display: none; }
 .character-chat-message[data-phase="complete"] .chat-state-ring { display: none; }
 .character-chat-message[data-phase="complete"] .chat-state-check { display: block; }
@@ -136,5 +137,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
     .character-chat-dialog *, .character-chat-dialog *::before, .character-chat-dialog *::after { animation: none !important; transition: none !important; }
+    /* Keep only the small, functional busy indicator moving; no panel or message motion. */
+    .character-chat-dialog .character-chat-message:is([data-phase="thinking"], [data-phase="streaming"]) .chat-state-ring { animation: chat-state-turn 2.8s linear infinite !important; }
     .character-chat-dialog button:active:not(:disabled) svg { scale: 1; }
 }

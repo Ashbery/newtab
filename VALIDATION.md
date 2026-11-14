@@ -1,3 +1,11 @@
+# Release 2026.11.15.3
+
+## Chat progress and message labels
+
+The small reply ring now runs only during thinking and streaming. Reduced-motion mode retains a slower 2.8-second functional indicator while decorative chat motion remains disabled; the normal ring stays at 1.8 seconds. This fixes the reproduced freeze caused by the global reduced-motion animation resets. The user's actual system preference was not inspected. Completed, stopped and failed replies remove the animation entirely. User bubbles now show their content without a visible author header, while preserving the accessible author label and Nacho's avatar/name.
+
+Isolated Brave validation passed both 1440×900 and 390×844 chat-motion groups. Checks compare rendered transforms and actual icon pixels in both motion modes, switch the motion preference during streaming, verify completion/stop/error cleanup, and retain the existing composer, settings, immediate-abort and rapid-reopen coverage. All nine existing chat functional groups also passed, including 320×640, history, persona, retry, safe formatting and keyboard interactions. Independent read-only review found no blocking issue. All model responses were fixtures; no account, personal browser profile, extension or local helper was changed.
+
 # Release 2026.11.15.2
 
 ## Screen arrangements with shared contents; lower interaction cost

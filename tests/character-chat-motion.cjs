@@ -12,6 +12,28 @@ async function settled(page) {
         !document.querySelector('[data-chat-motion]') &&
         document.getAnimations().filter(a => a.effect?.target?.closest?.('.character-chat-dialog') && a.effect.getTiming().iterations !== Infinity).every(a => a.playState === 'finished'));
 }
+async function assertProgressMoving(page, phase) {
+    const row = page.locator('.character-chat-message.is-assistant').last();
+    assert.equal(await row.getAttribute('data-phase'), phase);
+    const ring = row.locator('.chat-state-ring');
+    const icon = row.locator('.character-chat-reply-state-icon');
+    await settled(page);
+    const before = await ring.evaluate(el => getComputedStyle(el).transform);
+    const imageBefore = await icon.screenshot();
+    await page.waitForTimeout(220);
+    const after = await ring.evaluate(el => getComputedStyle(el).transform);
+    const imageAfter = await icon.screenshot();
+    assert.notEqual(before, after, `${phase}: the rendered progress ring keeps turning`);
+    assert(!imageBefore.equals(imageAfter), `${phase}: visible icon pixels change, not just its animation clock`);
+}
+async function assertProgressSettled(page, phase) {
+    const row = page.locator('.character-chat-message.is-assistant').last();
+    await page.waitForFunction(expected => document.querySelector('.character-chat-message.is-assistant:last-child')?.dataset.phase === expected, phase);
+    await settled(page);
+    assert.equal(await row.locator('.chat-state-ring').evaluate(el => el.getAnimations().length), 0, `${phase}: no orphaned spinner`);
+    assert.equal(await row.locator('.chat-state-ring').isVisible(), false);
+    assert.equal(await row.locator('.chat-state-check').isVisible(), phase === 'complete');
+}
 async function setup(browser, viewport) {
     const context = await browser.newContext({ viewport, reducedMotion: 'no-preference', hasTouch: viewport.width < 600,
         isMobile: viewport.width < 600, serviceWorkers: 'block',
@@ -34,6 +56,7 @@ async function setup(browser, viewport) {
                 return new Promise((resolve, reject) => {
                     chatMotion.delta = onDelta;
                     chatMotion.finish = () => resolve({});
+                    chatMotion.fail = () => reject(new Error('測試連線中斷'));
                     signal.addEventListener('abort', () => { chatMotion.aborted++; reject(new DOMException('Stopped', 'AbortError')); }, { once: true });
                 });
             }
@@ -72,6 +95,9 @@ async function setup(browser, viewport) {
             assert.equal(await page.evaluate(() => chatMotion.calls), 1, 'send action is immediate, before animation ends');
             assert.equal(await page.getByRole('button', { name: '停止回覆', exact: true }).isVisible(), true);
             assert.match(await page.locator('.character-chat-message.is-assistant:not([aria-hidden]) .character-chat-reply-state').innerText(), /正在思考/);
+            assert.equal(await page.locator('.character-chat-message.is-user .character-chat-speaker').count(), 0, 'user bubbles show content without a name header');
+            assert.equal(await page.getByRole('article', { name: '你的訊息' }).count(), 1, 'the message author remains accessible');
+            await assertProgressMoving(page, 'thinking');
             await page.evaluate(() => {
                 chatMotion.delta('當然可以。');
                 chatMotion.row = document.querySelector('.character-chat-message.is-assistant');
@@ -84,6 +110,7 @@ async function setup(browser, viewport) {
             assert.equal(await page.evaluate(() => chatMotion.animations.filter(x => typeof x.target === 'string' && x.target.includes('character-chat-message')).length),
                 await page.evaluate(() => chatMotion.entrances), 'stream chunks never replay message entrances');
             await settled(page);
+            await assertProgressMoving(page, 'streaming');
             assert((await input.boundingBox()).height <= 45, 'submitted composer settles back to a single row');
             await page.screenshot({ path: `${output}/streaming-${viewport.width}.png` });
             await page.getByRole('button', { name: '對話設定', exact: true }).click();
@@ -96,6 +123,7 @@ async function setup(browser, viewport) {
             await page.evaluate(() => chatMotion.finish());
             await page.waitForFunction(() => document.querySelector('.character-chat-message.is-assistant')?.dataset.phase === 'complete');
             await settled(page);
+            await assertProgressSettled(page, 'complete');
             await page.screenshot({ path: `${output}/complete-${viewport.width}.png` });
             await input.fill('測試立即停止與快速重開');
             await page.getByRole('button', { name: '傳送', exact: true }).click();
@@ -161,7 +189,27 @@ async function setup(browser, viewport) {
             assert.equal(await page.locator('.character-chat-view-ghost,.character-chat-exit-ghost').count(), 0, 'dynamic reduced motion removes outgoing layers');
             await page.getByRole('button', { name: '對話設定', exact: true }).click();
             assert.equal(await page.evaluate(() => document.getAnimations().filter(a => a.effect?.target?.closest?.('.character-chat-dialog')).length), 0);
-            await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+            await page.keyboard.press('Escape');
+            for (const terminal of ['complete', 'stopped', 'failed']) {
+                await input.fill('進度提示測試');
+                await page.getByRole('button', { name: '傳送', exact: true }).click();
+                await assertProgressMoving(page, 'thinking');
+                await page.evaluate(() => chatMotion.delta('我在這裡。'));
+                await assertProgressMoving(page, 'streaming');
+                assert.equal(await page.evaluate(() => document.getAnimations().filter(a => a.effect?.target?.closest?.('.character-chat-dialog') &&
+                    !a.effect.target.matches('.chat-state-ring')).length), 0, 'reduced motion keeps all decorative chat motion off');
+                if (terminal === 'complete') {
+                    await page.emulateMedia({ reducedMotion: 'no-preference' });
+                    await assertProgressMoving(page, 'streaming');
+                    await page.emulateMedia({ reducedMotion: 'reduce' });
+                    await assertProgressMoving(page, 'streaming');
+                    await page.evaluate(() => chatMotion.finish());
+                } else if (terminal === 'stopped') await page.getByRole('button', { name: '停止回覆', exact: true }).click();
+                else await page.evaluate(() => chatMotion.fail());
+                await assertProgressSettled(page, terminal);
+            }
+            assert.equal(await page.locator('.character-chat-message.is-user .character-chat-speaker').count(), 0);
+            await page.keyboard.press('Escape');
             assert.equal(await page.evaluate(() => NewtabCharacterChat.isOpen()), false);
             assert.equal(await page.locator('.character-chat-exit-ghost').count(), 0, 'reduced motion closes without a visual clone');
             assert.deepEqual(errors, []);
@@ -185,7 +233,7 @@ async function setup(browser, viewport) {
             const video = page.video();
             await context.close();
             if (video) await video.saveAs(`${output}/continuous-${viewport.width}.webm`);
-            console.log(`PASS chat motion ${viewport.width}: adaptive composer, immediate send/stop, stable stream DOM, settings transition, rapid reopen, live reduced motion, cleanup`);
+            console.log(`PASS chat motion ${viewport.width}: visible thinking/streaming progress in both motion modes, no user headers, completion/stop/error cleanup, adaptive composer, stable stream DOM, view continuity`);
         }
     } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

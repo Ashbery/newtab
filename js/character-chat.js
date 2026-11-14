@@ -342,22 +342,23 @@
     function addMessage(message, entrance) {
         var row = element('article', 'character-chat-message is-' + message.role);
         row.setAttribute('aria-label', message.role === 'user' ? '你的訊息' : 'Nacho 回覆');
-        var name = element('div', 'character-chat-speaker');
-        if (message.role === 'assistant') name.appendChild(avatar('character-chat-avatar character-chat-reply-avatar'));
-        name.appendChild(element('span', null, message.role === 'user' ? '你' : 'Nacho'));
         var progress, progressLabel;
         if (message.role === 'assistant') {
+            var name = element('div', 'character-chat-speaker');
+            name.appendChild(avatar('character-chat-avatar character-chat-reply-avatar'));
+            name.appendChild(element('span', null, 'Nacho'));
             progress = element('span', 'character-chat-reply-state'); progress.setAttribute('aria-hidden', 'true');
             var icon = element('span', 'character-chat-reply-state-icon');
             icon.innerHTML = '<svg viewBox="0 0 16 16"><circle class="chat-state-ring" cx="8" cy="8" r="5"/><path class="chat-state-check" d="m4 8 2.5 2.5L12 5"/></svg>';
             progressLabel = element('span'); progress.append(icon, progressLabel); name.appendChild(progress);
+            row.appendChild(name);
         }
         var content = element('div', 'character-chat-text', message.content);
         if (message.role === 'assistant') renderReply(content, message.content);
         var note = element('span', 'character-chat-message-note');
         if (message.status === 'stopped') note.textContent = '已停止';
         if (message.status === 'failed') note.textContent = '回覆未完成';
-        row.append(name, content, note); ui.messages.appendChild(row);
+        row.append(content, note); ui.messages.appendChild(row);
         var view = { row: row, content: content, note: note, progress: progress, progressLabel: progressLabel };
         replyPhase(view, message.status === 'streaming' ? 'thinking' : message.status);
         if (entrance === true) animate(row, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], 'control');
