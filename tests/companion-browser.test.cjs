@@ -8,8 +8,16 @@ const browserOptions = process.env.NEWTAB_BROWSER_PATH ? { executablePath: proce
 before(async () => { browser = await chromium.launch({ headless: true, ...browserOptions }); });
 after(async () => { if (browser) await browser.close(); });
 
+// This suite verifies the original portrait rigs, which remain the fallback
+// when a proper Live2D model is missing. Cubism has its own browser suite.
+async function imageRigContext(owner, options) {
+    const context = await owner.newContext(options);
+    await context.route('**/assets/character/live2d/nacho.model3.json*', route => route.fulfill({ status: 404, body: 'image-rig fixture' }));
+    return context;
+}
+
 async function open(width = 1440, height = 900, extra = {}) {
-    const context = await browser.newContext({ viewport: { width, height }, reducedMotion: extra.reducedMotion || 'no-preference' });
+    const context = await imageRigContext(browser, { viewport: { width, height }, reducedMotion: extra.reducedMotion || 'no-preference' });
     if (extra.noWebGL) await context.addInitScript(() => {
         const original = HTMLCanvasElement.prototype.getContext;
         HTMLCanvasElement.prototype.getContext = function (type, ...rest) { return type === 'webgl' ? null : original.call(this, type, ...rest); };
@@ -130,7 +138,7 @@ test('character opens the in-page chat from pointer and keyboard, then cleans up
 test('a browser with WebGL disabled still animates illustrated pixels and blinks in Canvas2D', async () => {
     const fallbackBrowser = await chromium.launch({ headless: true, ...browserOptions, args: ['--disable-webgl'] });
     try {
-        const context = await fallbackBrowser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
+        const context = await imageRigContext(fallbackBrowser, { viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
         const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
         await page.goto(url);
         await page.waitForFunction(() => NewtabCompanion.getState('companion-1')?.motion === 'running');
@@ -169,7 +177,7 @@ test('loss of an active graphics context switches to animated fallback without a
 });
 
 test('embedded new-tab frame animates while visible and pauses when its frame is hidden', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
+    const context = await imageRigContext(browser, { viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
     try {
         const wrapper = new URL('__companion_frame_test__', url).href;
         await context.route(wrapper, route => route.fulfill({ contentType: 'text/html', body: '<style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe id="frame" src="' + url + '"></iframe>' }));
@@ -192,7 +200,7 @@ test('embedded new-tab frame animates while visible and pauses when its frame is
 
 test('native and whole-refresh RAF pacing remains even without speeding up the physical pose', async () => {
     for (const fallback of [false, true]) for (const hz of [60, 120, 144, 200, 240]) {
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
+        const context = await imageRigContext(browser, { viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
         try {
             await context.addInitScript(({ fallback }) => {
                 if (fallback) {
@@ -258,7 +266,7 @@ test('native and whole-refresh RAF pacing remains even without speeding up the p
 });
 
 test('software refresh pacing after a 200 Hz pause immediately resumes at 60 Hz', async () => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
+    const context = await imageRigContext(browser, { viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
     try {
         await context.addInitScript(() => {
             const getContext = HTMLCanvasElement.prototype.getContext;
@@ -314,6 +322,7 @@ test('real rendering follows native refresh or a stable software divisor', async
         const measuredBrowser = await chromium.launch({ headless: true, ...browserOptions, args: fallback ? ['--disable-webgl'] : [] });
         try {
             const page = await measuredBrowser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, reducedMotion: 'no-preference' });
+            await page.route('**/assets/character/live2d/nacho.model3.json*', route => route.fulfill({ status: 404, body: 'image-rig fixture' }));
             await page.goto(url);
             await page.waitForFunction(() => NewtabCompanion.getState('companion-1')?.motion === 'running');
             // Warm up image upload and the first visible render before sampling.
@@ -362,7 +371,7 @@ test('real rendering follows native refresh or a stable software divisor', async
 
 test('a missing animation helper preserves a visible portrait and the chat button', async () => {
     for (const module of ['companion-dynamics', 'companion-eyes']) {
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const context = await imageRigContext(browser, { viewport: { width: 1440, height: 900 } });
         try {
             await context.route('**/js/' + module + '.js*', route => route.abort());
             const page = await context.newPage(), errors = [];

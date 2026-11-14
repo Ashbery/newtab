@@ -1,0 +1,33 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "nacho.moc3",
+    "Textures": [
+      "nacho-atlas.webp"
+    ],
+    "Physics": "nacho.physics3.json",
+    "DisplayInfo": "nacho.cdi3.json"
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": [
+        "ParamEyeLOpen",
+        "ParamEyeROpen"
+      ]
+    },
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": [
+        "ParamMouthOpenY"
+      ]
+    }
+  ],
+  "Ashbery": {
+    "PreserveCanvas": true,
+    "Profile": "fixed-head-nacho",
+    "Revision": "r5"
+  }
+}

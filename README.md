@@ -6,7 +6,7 @@
 
 - 本機 Manrope Light 纖細數字時鐘，完整時分秒一行、日期獨立排列；Google 搜尋、建議、網址直達。
 - `/` 或 Ctrl/Cmd+K 開始搜尋；支援中文輸入法、方向鍵、Enter、Escape。建議服務無法使用時仍可搜尋。
-- 可新增、移動、縮放與移除的角色組件，保留圓形銀藍場景與柔化下緣。現有平面立繪固定頭部，保留連續眨眼與頸部以下的輕微呼吸。硬體加速動畫跟隨螢幕每次刷新；相容模式以整數刷新間隔維持 60 FPS 以上的目標，實際依裝置效能而定。可選擇跟隨系統、開啟動畫或靜態角色。點角色開啟頁內 Nacho 對話。
+- 可新增、移動、縮放與移除的角色組件，保留圓形銀藍場景與柔化下緣。Nacho 已製作成 30 層 Live2D 模型，頭部固定，具有連續眨眼、回覆時的小幅嘴形、輕微呼吸與髮尾擺動。動畫跟隨螢幕刷新，物理以固定 60 Hz 計算並插值；實際幀率依裝置效能而定。可選擇跟隨系統、開啟動畫或靜態角色。點角色仍開啟頁內 Nacho 對話。
 - 九款角色風格應用插畫與一致的組件圖示；懸停浮起、目的地提示及按壓回饋。
 - 捷徑、資料夾、待辦、筆記、書籤、天氣與倒數組件；格位吸附、落點預覽、選取後調整大小。
 - 桌面與手機分別保留排列；進入編輯時維持當前位置，「完成」儲存，「取消」還原。
@@ -34,6 +34,8 @@ python -m http.server 4173 --bind 127.0.0.1
 [GitHub Pages](https://ashbery.github.io/newtab/) 顯示倉庫已發布的版本。部署需包含 index.html、css/、js/、assets/（包含 fonts/）、nachoneko-assets.js、newtab-sw.js 和圖標檔案。
 
 新分頁會在套用儲存的組件座標與外觀後顯示功能介面，不再先露出左上角的未排版搜尋列。主要人物、圖示與時鐘字型提早載入；其他網路字型不會擋住搜尋。舊素材腳本改為個別檔案參照，保留原始授權及素材。
+
+人物先顯示原立繪，Live2D 在背景載入；模型準備好後以相同大小、位置接手，不阻擋搜尋。模型與官方 Cubism SDK 都由本站提供，無法使用時自動回到原圖動畫。動畫關閉、系統減少動態效果、隱藏分頁及組件編輯狀態均保留。[模型與工程說明](assets/character/live2d/README.md)。
 
 已成功載入的自訂背景會在本機留下小型預覽，供下次開頁先顯示；原始圖片或影片完成解碼後接手。預覽不會改動影片位置、循環或原檔，背景透明度與模糊設定照常套用。清除／更換背景時會同步更新預覽；無法擷取的跨站媒體仍可正常播放。
 
@@ -74,6 +76,7 @@ node tests/widget-functionality.cjs
 node tests/appearance-controls.cjs
 node tests/search-appearance.cjs
 node --test tests/companion-browser.test.cjs
+node tests/companion-live2d.cjs
 node --test tests/context-menu-browser.test.cjs
 node tests/full-canvas.cjs
 node tests/character-chat.cjs

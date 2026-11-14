@@ -1,0 +1,28 @@
+{
+  "revision": "r5",
+  "sourceAtlasSha256": "d8bd8aeae63d5fbadae5ea2a2024b40c9722e5993629c5e17f83455ea580d38f",
+  "sourceAtlasBytes": 6872913,
+  "visibleAtlasDifferences": 0,
+  "files": {
+    "nacho-atlas.webp": {
+      "bytes": 1338712,
+      "sha256": "fc6af038105c643bcae980399bd07fc83705f3dc4808c147df67520ac45c3b34"
+    },
+    "nacho.moc3": {
+      "bytes": 997568,
+      "sha256": "9428f9b3bcffefbcb8640b67a92a6cb3b572f7adacb6f53670ae43dc59d5db82"
+    },
+    "nacho.physics3.json": {
+      "bytes": 12226,
+      "sha256": "13eef842ae3449632c0797bfd17636f69065926569d15a72e4564a5a5d7d707d"
+    },
+    "nacho.cdi3.json": {
+      "bytes": 4976,
+      "sha256": "b8cd1a04dbb421a5535ca452dd1a4ce695667b55a89c20233b3e60b70683a75b"
+    },
+    "nacho.model3.json": {
+      "bytes": 574,
+      "sha256": "035a42c6b2aa50e008c11abf04bb86f0fac6977c5d2e518b0e01bf3730525539"
+    }
+  }
+}

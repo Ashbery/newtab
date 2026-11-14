@@ -226,6 +226,7 @@
         var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
         var mode = animationMode(options), chatState = 'idle';
         var disposed = false, visible = true, frame = 0, rig = null, greeting = 0, hovered = false, messageTimer = 0;
+        var live2d = null, live2dPending = !!window.NewtabCompanionLive2D;
         var pacer = createFramePacer();
         var target = { x: 0, y: 0 }, motionInput = { x: 0, y: 0, hover: false, greeting: 0, chatState: 'idle' };
         var dynamics = window.NewtabCompanionDynamics && window.NewtabCompanionDynamics.create({ seed: widget.id, fixedHead: true });
@@ -244,7 +245,7 @@
             rig.draw(Object.assign({}, state, { motion: 0, blink: 0, greet: 0 }));
         }
         function sync() {
-            if (disposed) return;
+            if (disposed || live2dPending || live2d) return;
             if (shouldMove()) {
                 root.dataset.motion = 'running';
                 if (!frame) { pacer.reset(); frame = requestAnimationFrame(tick); }
@@ -270,6 +271,8 @@
         }
         function resize() {
             if (disposed) return;
+            if (live2d) { live2d.resize(); return; }
+            if (live2dPending) return;
             var rect = root.getBoundingClientRect();
             root.style.setProperty('--companion-height', rect.height + 'px');
             var rendered = canvas.getBoundingClientRect(), ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -282,7 +285,7 @@
             }
         }
         function start() {
-            if (disposed || rig || !ready.art || (!ready.blink && !ready.blinkFailed)) return;
+            if (disposed || live2dPending || live2d || rig || !ready.art || (!ready.blink && !ready.blinkFailed)) return;
             // The portrait and chat button remain usable if an optional
             // animation module failed to download on a first uncached visit.
             if (!dynamics || !window.NewtabCompanionEyes) { root.dataset.motion = 'static'; return; }
@@ -298,7 +301,7 @@
             rig = createCanvasRig(canvas, image, ready.blink ? blinkImage : null);
         }
         function loaded() { ready.art = true; start(); }
-        function artFailed() { root.dataset.motion = 'unavailable'; root.classList.add('art-unavailable'); }
+        function artFailed() { if (live2d && root.dataset.live2d === 'ready') return; root.dataset.motion = 'unavailable'; root.classList.add('art-unavailable'); }
         image.addEventListener('load', loaded); image.addEventListener('error', artFailed);
         if (image.complete && image.naturalWidth) loaded();
         blinkImage.onload = function () { ready.blink = true; start(); };
@@ -324,6 +327,7 @@
             if (value === 'speaking') value = 'replying';
             chatState = ['idle', 'thinking', 'replying', 'error'].indexOf(value) >= 0 ? value : 'idle';
             root.dataset.chatState = chatState;
+            if (live2d) live2d.setActivity({ state: chatState });
         }
         function chatChanged(event) { if (event.detail && event.detail.widgetId === widget.id) updateChatState(event.detail.state); }
         function openChat(event) {
@@ -357,7 +361,28 @@
             } else root.classList.remove('has-rig');
             sync();
         }
-        canvas.addEventListener('webglcontextlost', lost);
+        function live2dFailed() {
+            if (disposed) return;
+            if (live2d) live2d.destroy();
+            live2d = null; live2dPending = false;
+            root.dataset.live2d = 'unavailable';
+            // A canvas that owned WebGL2 cannot be reused for the image rig's
+            // WebGL1/Canvas2D context. Keep the portrait visible during fallback.
+            var fallback = document.createElement('canvas'); fallback.className = 'companion-canvas';
+            fallback.width = canvas.width; fallback.height = canvas.height; canvas.replaceWith(fallback); canvas = fallback;
+            canvas.addEventListener('webglcontextlost', lost);
+            start();
+        }
+        if (live2dPending) {
+            try {
+                live2d = window.NewtabCompanionLive2D.mount({
+                    root: root, canvas: canvas, animationMode: mode,
+                    onReady: function () { live2dPending = false; root.classList.remove('art-unavailable'); },
+                    onError: live2dFailed
+                });
+                live2d.setActivity({ state: chatState });
+            } catch (_) { live2dFailed(); }
+        } else canvas.addEventListener('webglcontextlost', lost);
         function destroy() {
             if (disposed) return; disposed = true;
             if (frame) cancelAnimationFrame(frame); clearTimeout(messageTimer);
@@ -368,13 +393,17 @@
             image.removeEventListener('load', loaded); image.removeEventListener('error', artFailed);
             blinkImage.onload = blinkImage.onerror = null;
             canvas.removeEventListener('webglcontextlost', lost);
+            if (live2d) live2d.destroy();
             if (rig) rig.destroy(); root.remove(); instances.delete(widget.id);
         }
         instances.set(widget.id, {
             destroy: destroy,
-            setAnimation: function (value) { mode = ['auto', 'on', 'off'].indexOf(value) >= 0 ? value : value === false ? 'off' : 'on'; sync(); },
+            setAnimation: function (value) { mode = ['auto', 'on', 'off'].indexOf(value) >= 0 ? value : value === false ? 'off' : 'on'; if (live2d) live2d.setMode(mode); else sync(); },
             setChatState: updateChatState,
-            state: function () { return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, mode: mode, enabled: mode !== 'off', reduced: reduced.matches, renderer: rig ? rig.kind : 'image', drawMs: state.drawMs, targetFps: rig ? pacer.target() : 0, animationTime: state.time, pointerX: state.gazeX / .004, pointerY: state.gazeY / .003, chatState: chatState,
+            state: function () {
+                if (live2d) return Object.assign({ enabled: mode !== 'off', chatState: chatState, targetFps: 60, pointerX: 0, pointerY: 0,
+                    pose: { headX: 0, headY: 0, headRoll: 0, bodyRoll: 0, gazeX: 0, gazeY: 0 } }, live2d.state());
+                return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, mode: mode, enabled: mode !== 'off', reduced: reduced.matches, renderer: rig ? rig.kind : 'image', drawMs: state.drawMs, targetFps: rig ? pacer.target() : 0, animationTime: state.time, pointerX: state.gazeX / .004, pointerY: state.gazeY / .003, chatState: chatState,
                 pose: { headX: state.headX, headY: state.headY, headRoll: state.headRoll, bodyRoll: state.bodyRoll, breath: state.breath, hairLeft: state.hairLeft, hairRight: state.hairRight, earLeft: state.earLeft, earRight: state.earRight, gazeX: state.gazeX, gazeY: state.gazeY, greet: state.greet } }; }
         });
         return destroy;

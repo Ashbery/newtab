@@ -57,6 +57,8 @@ async function open(fallback = false, reducedMotion = 'no-preference', embedded 
         reducedMotion, serviceWorkers: 'block' });
     const wrapper = new URL('__companion_motion_wrapper__', base).href;
     await context.route(/^https?:\/\//, route => {
+        // Measure the old image rigs independently of the separate Cubism suite.
+        if (new URL(route.request().url()).pathname.endsWith('/assets/character/live2d/nacho.model3.json')) return route.fulfill({ status: 404, body: 'image-rig fixture' });
         if (embedded && route.request().url() === wrapper) return route.fulfill({ contentType: 'text/html',
             body: '<style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe id="motion-frame" src="' + base + '"></iframe>' });
         return new URL(route.request().url()).origin === origin ? route.continue() : route.abort();

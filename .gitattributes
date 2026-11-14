@@ -31,3 +31,9 @@
 *.zip   binary
 *.streamDeckIconPack binary
 *.sdIconPack binary
+
+# Keep compiled models and the official Core's verified bytes unchanged.
+*.moc3 binary
+assets/vendor/cubism/live2dcubismcore.min.js -text
+# Bundled SDK debug-format strings contain intentional spaces before newlines.
+assets/vendor/cubism/companion-runtime.js whitespace=-blank-at-eol

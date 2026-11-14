@@ -100,7 +100,12 @@ for (const fallback of [false, true]) test(`${fallback ? 'Canvas2D' : 'WebGL'} h
     try {
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2,
             reducedMotion: 'no-preference', serviceWorkers: 'block' });
-        await context.route(/^https?:\/\//, route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+        await context.route(/^https?:\/\//, route => {
+            const request = new URL(route.request().url());
+            // This is the pixel regression for the original portrait fallback.
+            if (request.pathname.endsWith('/assets/character/live2d/nacho.model3.json')) return route.fulfill({ status: 404, body: 'image-rig fixture' });
+            return request.origin === origin ? route.continue() : route.abort();
+        });
         await context.addInitScript(installHeadProbe);
         const page = await context.newPage(), errors = [];
         page.on('pageerror', error => errors.push(error.message));

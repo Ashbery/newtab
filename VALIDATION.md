@@ -1,4 +1,27 @@
-# Release 2026.11.14.14
+# Release 2026.11.14.15
+
+Validation date: 2026-11-14 (Asia/Taipei). Model revision: **r5**.
+
+Nacho now uses a real, layered Cubism model while retaining the approved portrait and fixed head. The authoring pass produced 30 source layers/meshes, 25 deformers, 21 parameters and 6 hair-physics groups. Local underpainting, measured eye/lash masks, a moving lower aperture/lid, localized mouth features and a chest-only breath field replace the flattened primary animation. The prior portrait rig remains the automatic fallback.
+
+Review caught and corrected upward-shifted closed lashes, duplicated old eye outlines, a floating iris strip at half closure, a missing mouth-base alpha exemption and short hair motion suppressed by the SDK's zero-motion threshold. The finalized model disables generic eye-jelly physics, uses fixed 60 Hz physics with interpolation, and retains all head/body angle parameters at zero. The website does not play generic nod/shake motions.
+
+| Verification | Observed result |
+| --- | --- |
+| Actual model | Unmodified official Web Core loaded the final MOC, passed its consistency check and 273 parameter samples with finite geometry/opacity. 30 actual drawables; no placeholder MOC. MOC SHA-256: `9428f9b3bcffefbcb8640b67a92a6cb3b572f7adacb6f53670ae43dc59d5db82`. |
+| Eyes, mouth and seams | Actual Brave WebGL renders inspected on light/dark backgrounds: independent eyes, both-eye closure including .9 handoff, 15 mouth-form/open combinations, breath and individual hair extrema. Independent facial review passed; continuous opening/closing and secondary motion were checked separately. Original portrait and neutral model high-alpha bounds match exactly. |
+| Website integration | Final repository-model suite passed 12/12, including 1920×1080, 3440×1440 and 5120×1440 at DPR2, resize bounds, in-page chat input, animation preferences, reduced motion, arrange/drag/offscreen pauses, destroy/remount, missing assets, WebGL2/context failure and fallback. Personal Brave profile, extension files, login helper, backgrounds and layout data were not modified. |
+| Startup | With model loading deliberately held, search and the portrait were usable in 229 ms; after release the model was ready in 767 ms in the local fixture. Lazy manifest, Core, renderer, MOC, physics and atlas shared release `.15`. These local controlled timings are not an internet cold-start guarantee. |
+| Actual paints | Final runtime at the test machine's 200 Hz refresh: 601 paints in about 3 seconds, median interval 5.0 ms, p95 5.1 ms, maximum 5.3 ms. CPU submission p95 0.9 ms is recorded separately from paint cadence. All 6 hair outputs varied gently; eye-jelly output remained zero. Results are specific to this RTX5070Ti/Brave environment. |
+| Fixed head | All 6 head/body angles stayed zero. A separate browser-compositor comparison across 12 blink/reply/breath frames found zero changed pixels in the lower-face ROI outside the mouth. Ear/hair-root ROI had at most 32 of 57,600 pixels differ by only 1/255, with no visible contour displacement; this is not a claim of universal bit-identical head pixels. |
+| Existing fallback/features | Portrait fallback browser + still-head tests passed 13/13; its actual WebGL/Canvas motion suite passed. Search and responsive-resize unit checks passed 27/27. Independent read-only lifecycle/chat/cache review found no blocking regression. |
+| Editable delivery | Final CMO imported, rendered, saved to a portable project and reopened in PSD2Live3.6.7 with the same 30 layers/meshes, 25 deformers, 21 parameters and 6 physics groups. CMO SHA-256: `bbe1c1579cddea341b932b5d924ef712ae9feed25e2b158f76048be4af6b1196`. All 9 frozen source hashes matched. The self-contained source ZIP's 73 members and hashes were independently reread after creation. |
+
+The 4096² atlas was losslessly reduced from 6,872,913-byte PNG to 1,338,712-byte WebP. Every visible RGB pixel and all alpha values match; the editable source retains the original PNG. Exact runtime artifact hashes and model/tool attribution are in [assets/character/live2d](assets/character/live2d/README.md); official SDK licenses and rebuild details are in [assets/vendor/cubism](assets/vendor/cubism/README.md). Detailed captures and scripts remain in local ignored review storage.
+
+The retained exporter diagnostics concern low-alpha face bounds, invisible neutral closed-lash bounds, duplicate sided display names resolved by stable IDs, and atlas-reconstructed CMO source layers. The original PSD edit-link chain is not retained; a separate registered layered PSD and reproducible recipe are supplied. Official Cubism Editor GUI, native Java Core and VTube Studio/camera workflows were not tested. Mouth movement responds to text reply activity and is not audio lip synchronization. Missing uncached model files offline fall back to the portrait.
+
+# Release 2026.11.14.14 (historical results)
 
 Validation date: 2026-11-14 (Asia/Taipei).
 
