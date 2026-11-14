@@ -1,9 +1,64 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta name="newtab-release" content="2026.11.14.8">
+    <meta name="newtab-release" content="2026.11.14.9">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style id="startup-style">
+        html { background: #edf2f6; }
+        html.nt-booting body { visibility: hidden; }
+        #startup-backdrop { display: none; position: fixed; inset: 0; z-index: 2; pointer-events: none; visibility: visible; background: var(--startup-preview) center / cover no-repeat; opacity: var(--background-visibility, 1); filter: blur(var(--background-blur, 0px)); transform: scale(var(--background-scale, 1)); }
+        html[data-startup-preview] #startup-backdrop { display: block; }
+        #video-background, #image-background { visibility: visible; }
+        #startup-error { position: fixed; z-index: 2000; top: 40%; left: 50%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); box-sizing: border-box; padding: 24px; border: 1px solid #b9cedb; border-radius: 18px; background: #f6fafd; color: #304a5b; visibility: visible; text-align: center; font: 14px/1.7 system-ui, sans-serif; }
+        #startup-error[hidden] { display: none; }
+        #startup-retry { display: block; margin: 16px auto 0; min-height: 44px; padding: 8px 20px; border: 0; border-radius: 10px; background: #396b87; color: white; cursor: pointer; font: inherit; }
+        #startup-retry:focus-visible { outline: 2px solid #396b87; outline-offset: 4px; }
+    </style>
+    <script>
+        // This tiny pre-paint step never waits on fonts, media or the network.
+        (function () {
+            var root = document.documentElement, complete = false;
+            var key = 'nt_startup_background_v1';
+            root.classList.add('nt-booting');
+            function hidePreview() { root.removeAttribute('data-startup-preview'); root.style.removeProperty('--startup-preview'); }
+            function fail() {
+                if (complete) return;
+                var panel = document.getElementById('startup-error');
+                if (panel) panel.hidden = false;
+                else document.addEventListener('DOMContentLoaded', fail, { once: true });
+            }
+            var watchdog = setTimeout(fail, 12000);
+            try {
+                var appearance = {};
+                try { appearance = JSON.parse(localStorage.getItem('nt_appearance_v1') || '{}') || {}; } catch (_) {}
+                function percent(value) { return typeof value === 'number' && isFinite(value) ? Math.max(0, Math.min(100, value)) : 0; }
+                root.style.setProperty('--background-visibility', String(1 - percent(appearance.transparency) / 100));
+                root.style.setProperty('--background-blur', percent(appearance.blur) * .4 + 'px');
+                root.style.setProperty('--background-scale', String(1 + percent(appearance.blur) / 100 * .08));
+                var identity = localStorage.getItem('nt_background_v1');
+                var meta = JSON.parse(identity || '{}');
+                var preview = JSON.parse(localStorage.getItem(key) || 'null');
+                if (meta && ['file', 'url', 'extension'].indexOf(meta.source) >= 0 && preview && preview.version === 1 && preview.identity === identity &&
+                    typeof preview.image === 'string' && preview.image.length <= 180000 && /^data:image\/(webp|jpeg);base64,[A-Za-z0-9+/=]+$/.test(preview.image)) {
+                    root.style.setProperty('--startup-preview', 'url("' + preview.image + '")');
+                    root.setAttribute('data-startup-preview', '');
+                }
+            } catch (_) { /* Blocked or old storage falls back to the normal theme. */ }
+            window.NewtabStartup = {
+                ready: function () {
+                    complete = true; clearTimeout(watchdog);
+                    root.classList.remove('nt-booting'); root.classList.add('nt-ready');
+                    var panel = document.getElementById('startup-error'); if (panel) panel.hidden = true;
+                    if (window.performance && performance.mark) performance.mark('newtab-ready');
+                },
+                fail: fail,
+                backgroundReady: hidePreview,
+                clearBackground: function () { hidePreview(); try { localStorage.removeItem(key); } catch (_) {} }
+            };
+            document.addEventListener('click', function (event) { if (event.target.id === 'startup-retry') location.reload(); });
+        })();
+    </script>
     <title>Ashbery 新分頁 — 可自訂瀏覽器起始頁</title>
     <meta name="description" content="Ashbery 新分頁：可愛風格的瀏覽器自訂起始頁。內建時鐘與日期、Google 搜尋與建議、捷徑，並可上傳影片或圖片作為背景。純靜態頁面，可設為瀏覽器啟動頁。">
     <meta name="robots" content="index,follow">
@@ -34,10 +89,12 @@
       字體靈感：甘城なつき / Nachoneko（@amsrntk3 · YouTube Nachoneko_dayo）
       全站字體：Yomogi（手寫可愛）· Font Awesome 圖示除外
     -->
+    <link rel="preload" href="assets/character/nacho-companion.webp" as="image" fetchpriority="high">
+    <link rel="preload" href="assets/character/launcher-icons.svg" as="image" fetchpriority="high">
     <link rel="preload" href="assets/fonts/manrope-clock-light.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Yomogi&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Yomogi&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <style>
         /*
          * Nachoneko（甘城なつき）靈感配色與字體
@@ -1677,20 +1734,43 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/widgets.css">
-    <link rel="stylesheet" href="css/side-rail.css">
-    <link rel="stylesheet" href="css/theme.css">
-    <link rel="stylesheet" href="css/experience.css?v=2026.11.14.6">
-    <link rel="stylesheet" href="css/character-panels.css">
-    <link rel="stylesheet" href="css/companion.css">
-    <link rel="stylesheet" href="css/clock.css">
-    <link rel="stylesheet" href="css/home-editor.css">
-    <link rel="stylesheet" href="css/appearance.css?v=2026.11.14.8">
-    <link rel="stylesheet" href="css/weather-location.css?v=2026.11.14.7">
-    <link rel="stylesheet" href="css/character-chat.css?v=2026.11.14.4">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="css/widgets.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/side-rail.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/theme.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/experience.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/character-panels.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/companion.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/clock.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/home-editor.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/appearance.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/weather-location.css?v=2026.11.14.9">
+    <link rel="stylesheet" href="css/character-chat.css?v=2026.11.14.9">
+    <script defer src="nachoneko-assets.js?v=2026.11.14.9"></script>
+    <script defer src="js/app-registry.js?v=2026.11.14.9"></script>
+    <script defer src="js/layout-engine.js?v=2026.11.14.9"></script>
+    <script defer src="js/clock.js?v=2026.11.14.9"></script>
+    <script defer src="js/appearance.js?v=2026.11.14.9"></script>
+    <script defer src="js/chat-transport.js?v=2026.11.14.9"></script>
+    <script defer src="js/character-persona.js?v=2026.11.14.9"></script>
+    <script defer src="js/character-chat.js?v=2026.11.14.9"></script>
+    <script defer src="js/companion.js?v=2026.11.14.9"></script>
+    <script defer src="js/weather-location.js?v=2026.11.14.9"></script>
+    <script defer src="js/widget-host.js?v=2026.11.14.9"></script>
+    <script defer src="js/widget-catalog.js?v=2026.11.14.9"></script>
+    <script defer src="js/folder-ui.js?v=2026.11.14.9"></script>
+    <script defer src="js/context-menu.js?v=2026.11.14.9"></script>
+    <script defer src="js/side-rail.js?v=2026.11.14.9"></script>
+    <script defer src="js/search.js?v=2026.11.14.9"></script>
+    <script defer src="js/background.js?v=2026.11.14.9"></script>
+    <script defer src="js/experience.js?v=2026.11.14.9"></script>
+    <script defer src="js/motion.js?v=2026.11.14.9"></script>
+    <script defer src="js/site-cache.js?v=2026.11.14.9"></script>
+    <script defer src="js/bootstrap.js?v=2026.11.14.9"></script>
 </head>
 <body>
+    <div id="startup-backdrop" aria-hidden="true"></div>
+    <div id="startup-error" role="alert" hidden>新分頁載入未完成。請重新載入。<button id="startup-retry" type="button">重新載入</button></div>
     <video id="video-background" autoplay muted loop playsinline preload="metadata"></video>
     <div id="image-background" aria-hidden="true"></div>
     <div class="landscape-shade" aria-hidden="true"></div>
@@ -1755,7 +1835,7 @@
         </button>
     </div>
 
-    <!-- 應用選單：Nachoneko 圖標（由 nachoneko-assets.js data URI 注入） -->
+    <!-- 應用選單：Nachoneko 圖標（由 nachoneko-assets.js 套用快取素材） -->
     <div class="google-apps-folder" id="google-apps-folder">
         <div class="apps-grid-3x3">
             <a href="https://mail.google.com" class="google-app-item">
@@ -1937,75 +2017,5 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</pre>
         </div>
     </div>
 
-    <!-- Original licensed icon pack; character artwork also lives in assets/. -->
-    <script src="nachoneko-assets.js"></script>
-    <script src="js/app-registry.js"></script>
-    <script src="js/layout-engine.js"></script>
-    <script src="js/clock.js"></script>
-    <script src="js/appearance.js?v=2026.11.14.8"></script>
-    <script src="js/chat-transport.js?v=2026.11.14.4"></script>
-    <script src="js/character-persona.js?v=2026.11.14.5"></script>
-    <script src="js/character-chat.js?v=2026.11.14.5"></script>
-    <script src="js/companion.js?v=2026.11.14.4"></script>
-    <script src="js/weather-location.js?v=2026.11.14.7"></script>
-    <script src="js/widget-host.js?v=2026.11.14.7"></script>
-    <script src="js/widget-catalog.js"></script>
-    <script src="js/folder-ui.js"></script>
-    <script src="js/context-menu.js?v=2026.11.14.7"></script>
-    <script src="js/side-rail.js?v=2026.11.14.7"></script>
-    <script src="js/search.js"></script>
-    <script src="js/background.js"></script>
-    <script src="js/experience.js"></script>
-    <script src="js/motion.js"></script>
-    <script>
-        // Google應用圖標功能
-        const appsTrigger = document.getElementById('apps-trigger');
-        const appsFolder = document.getElementById('google-apps-folder');
-
-        function openAppsFolder() {
-            appsFolder.style.display = 'block';
-            appsTrigger.classList.add('active');
-            appsTrigger.setAttribute('aria-expanded', 'true');
-        }
-
-        function closeAppsFolder() {
-            appsFolder.style.display = 'none';
-            appsTrigger.classList.remove('active');
-            appsTrigger.setAttribute('aria-expanded', 'false');
-        }
-
-        appsTrigger.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (appsFolder.style.display === 'block') {
-                closeAppsFolder();
-            } else {
-                openAppsFolder();
-            }
-        });
-
-        // 點擊頁面其他區域關閉應用資料夾
-        document.addEventListener('click', function(event) {
-            if (!appsTrigger.contains(event.target) && !appsFolder.contains(event.target)) {
-                closeAppsFolder();
-            }
-        });
-
-        // 載入儲存的背景（IndexedDB 本機檔 + localStorage 網址）
-        window.addEventListener('DOMContentLoaded', function() {
-            // M3: free layout + apps + side rail
-            if (window.NewtabWidgets && typeof window.NewtabWidgets.init === 'function') {
-                window.NewtabWidgets.init();
-            }
-            if (window.NewtabContextMenu && typeof window.NewtabContextMenu.init === 'function') {
-                window.NewtabContextMenu.init();
-            }
-            if (window.NewtabSideRail && typeof window.NewtabSideRail.init === 'function') {
-                window.NewtabSideRail.init();
-            }
-
-            if (window.NewtabBackground) window.NewtabBackground.init();
-
-        });
-    </script>
 </body>
 </html>

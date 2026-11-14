@@ -31,7 +31,15 @@ python -m http.server 4173 --bind 127.0.0.1
 
 開啟 [本機預覽](http://127.0.0.1:4173/)。也可直接開啟 index.html，建議使用 HTTP 預覽以獲得一致的儲存行為。
 
-[GitHub Pages](https://ashbery.github.io/newtab/) 顯示倉庫已發布的版本。部署需包含 index.html、css/、js/、assets/（包含 fonts/）、nachoneko-assets.js 和圖標檔案。
+[GitHub Pages](https://ashbery.github.io/newtab/) 顯示倉庫已發布的版本。部署需包含 index.html、css/、js/、assets/（包含 fonts/）、nachoneko-assets.js、newtab-sw.js 和圖標檔案。
+
+新分頁會在套用儲存的組件座標與外觀後顯示功能介面，不再先露出左上角的未排版搜尋列。主要人物、圖示與時鐘字型提早載入；其他網路字型不會擋住搜尋。舊素材腳本改為個別檔案參照，保留原始授權及素材。
+
+已成功載入的自訂背景會在本機留下小型預覽，供下次開頁先顯示；原始圖片或影片完成解碼後接手。預覽不會改動影片位置、循環或原檔，背景透明度與模糊設定照常套用。清除／更換背景時會同步更新預覽；無法擷取的跨站媒體仍可正常播放。
+
+瀏覽器允許時，Service Worker 會在首次可用後準備本機頁面快取。之後的新分頁先讀完整快取，背景檢查更新；只有新版本的必要程式與樣式都備妥才切換，完成後由下一個新分頁套用，不會打斷目前操作。保留最近兩份完整版本，公共素材快取有容量上限。聊天、搜尋建議、天氣回覆及個人上傳媒體不在這個公共頁面快取中。快取遭瀏覽器封鎖時仍可照常載入網站，首次下載與本機解碼速度仍取決於環境。
+
+維護時，變更本機 CSS／JS 必須同步更新 index.html 中對應的 `?v=` 版本與 `newtab-release`；啟動模組依序以 `defer` 載入，請勿在其前方重新加入阻塞的外部字型或大型內嵌素材。
 
 滑鼠靠近畫面右緣會顯示「工具」，移開後收起；鍵盤聚焦時也會顯示，觸控裝置保留可點的入口。工具內集中組件、應用與個人化設定。
 
@@ -56,6 +64,9 @@ node tests/ui-regressions.cjs
 node tests/background-playback.cjs
 node tests/background-seam.cjs
 node tests/background-compatibility.cjs
+node tests/startup-background.cjs
+node tests/startup-cache.cjs
+node tests/startup-render.cjs
 node tests/extension-compatibility.cjs
 node tests/weather-regressions.cjs
 node tests/weather-location.cjs

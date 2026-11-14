@@ -21,6 +21,11 @@
     var selectedFile = null;
     var busy = false;
     var revision = 0;
+    var mediaRevision = 0;
+    var cancelReady = null;
+    var mediaFailed = false;
+    var PREVIEW_KEY = 'nt_startup_background_v1';
+    var PREVIEW_MAX = 180000;
     var dbPromise = null;
     var returnFocus = new WeakMap();
 
@@ -31,6 +36,93 @@
 
     function safeRead(key) {
         try { return localStorage.getItem(key); } catch (_) { return null; }
+    }
+
+    function finishStartup(failed) {
+        if (failed) {
+            try { localStorage.removeItem(PREVIEW_KEY); } catch (_) { /* storage can be unavailable */ }
+        }
+        var startup = global.NewtabStartup;
+        if (startup) {
+            if (failed && startup.clearBackground) startup.clearBackground();
+            else if (startup.backgroundReady) startup.backgroundReady();
+        }
+    }
+
+    function cachePreview(media, identity, token) {
+        if (!identity || token !== mediaRevision || safeRead('nt_background_v1') !== identity) return;
+        try {
+            var old = JSON.parse(safeRead(PREVIEW_KEY));
+            if (old && old.version === 1 && old.identity === identity && typeof old.image === 'string' &&
+                old.image.length <= PREVIEW_MAX && /^data:image\/(webp|jpeg);base64,/.test(old.image)) return;
+        } catch (_) { /* replace malformed preview metadata only */ }
+        try {
+            var width = media.videoWidth || media.naturalWidth;
+            var height = media.videoHeight || media.naturalHeight;
+            if (!width || !height) return;
+            var canvas = document.createElement('canvas');
+            var scale = Math.min(1, 960 / Math.max(width, height));
+            var preview;
+            for (var attempt = 0; attempt < 3; attempt++) {
+                canvas.width = Math.max(1, Math.round(width * scale));
+                canvas.height = Math.max(1, Math.round(height * scale));
+                var context = canvas.getContext('2d');
+                if (!context) return;
+                context.drawImage(media, 0, 0, canvas.width, canvas.height);
+                preview = canvas.toDataURL('image/webp', .62);
+                if (!/^data:image\/webp;base64,/.test(preview)) preview = canvas.toDataURL('image/jpeg', .62);
+                if (preview.length <= PREVIEW_MAX) break;
+                scale *= .65;
+            }
+            if (preview && preview.length <= PREVIEW_MAX && /^data:image\/(webp|jpeg);base64,/.test(preview) &&
+                token === mediaRevision && safeRead('nt_background_v1') === identity) {
+                localStorage.setItem(PREVIEW_KEY, JSON.stringify({ version: 1, identity: identity, image: preview }));
+            }
+        } catch (_) { /* Cross-origin canvas, decoding, or quota failures never prevent the original background. */ }
+    }
+
+    function watchReady(src, type, identity) {
+        if (cancelReady) cancelReady();
+        var token = ++mediaRevision;
+        var media = type === 'image' ? new Image() : video;
+        var settled = false;
+        var timer;
+        function cleanup() {
+            clearTimeout(timer);
+            media.removeEventListener(type === 'image' ? 'load' : 'loadeddata', loaded);
+            media.removeEventListener('error', failed);
+        }
+        function current() { return !settled && token === mediaRevision; }
+        function complete(ok) {
+            if (!current()) return;
+            settled = true; cleanup();
+            if (!ok) {
+                mediaFailed = true;
+                if (type === 'video') video.pause();
+                video.style.display = image.style.display = 'none';
+                document.body.classList.remove('has-custom-background');
+                finishStartup(true);
+                syncControls();
+                return;
+            }
+            // Do not seek or reload the live video to obtain a preview. Its
+            // decoded first frame is enough, and native looping stays untouched.
+            cachePreview(media, identity, token);
+            requestAnimationFrame(function () {
+                if (token === mediaRevision) finishStartup(false);
+            });
+        }
+        function loaded() {
+            if (!current()) return;
+            if (type === 'image' && media.decode) media.decode().then(function () { complete(true); }, failed);
+            else if (type === 'image' || (video.readyState >= 2 && video.currentSrc === src)) complete(true);
+        }
+        function failed() { complete(false); }
+        media.addEventListener(type === 'image' ? 'load' : 'loadeddata', loaded);
+        media.addEventListener('error', failed);
+        timer = setTimeout(failed, 12000);
+        cancelReady = function () { settled = true; cleanup(); };
+        if (type === 'image') media.src = src;
     }
 
     function openDatabase() {
@@ -132,7 +224,7 @@
     }
 
     function syncControls() {
-        var playable = currentType === 'video' && !video.error;
+        var playable = currentType === 'video' && !video.error && !mediaFailed;
         var mediaStatus = document.getElementById('rail-media-status');
         if (mediaStatus) {
             mediaStatus.hidden = playable;
@@ -162,11 +254,13 @@
         });
     }
 
-    function applyMedia(src, type, name) {
+    function applyMedia(src, type, name, identity) {
         document.body.classList.add('has-custom-background');
         var previous = activeObjectUrl;
         activeObjectUrl = src.indexOf('blob:') === 0 ? src : null;
         currentType = type;
+        mediaFailed = false;
+        watchReady(src, type, identity);
         video.pause();
         // Remove the original <source> as well, or load() restarts it behind an image.
         video.querySelectorAll('source').forEach(function (source) { source.remove(); });
@@ -220,7 +314,10 @@
                 else await clearStoredMedia();
                 localStorage.setItem('nt_background_v1', JSON.stringify(meta));
             } catch (_) { saved = false; }
-            applyMedia(source, type, name);
+            // A newly selected file may have the same name/metadata as its
+            // predecessor. Its preview must still come from the new pixels.
+            try { localStorage.removeItem(PREVIEW_KEY); } catch (_) { /* current media still applies */ }
+            applyMedia(source, type, name, saved ? safeRead('nt_background_v1') : null);
             source = null; // The active background now owns its object URL.
             if (saved) {
                 busy = false;
@@ -272,6 +369,9 @@
     function restoreTheme() {
         if (busy) return;
         revision++;
+        mediaRevision++;
+        if (cancelReady) cancelReady();
+        finishStartup(true);
         var saved = true;
         // An explicit default record supersedes legacy preferences without
         // deleting the user's cached original media.
@@ -296,6 +396,10 @@
 
     async function restore() {
         var started = revision;
+        var applied = false;
+        var deadline = setTimeout(function () {
+            if (started === revision && !applied) finishStartup(true);
+        }, 12000);
         try {
             var meta;
             try { meta = JSON.parse(safeRead('nt_background_v1')); } catch (_) { /* legacy settings */ }
@@ -337,7 +441,8 @@
                     }
                     var source = URL.createObjectURL(blob);
                     var type = record.blob ? record.type : (blob.type.indexOf('image/') === 0 ? 'image' : meta.type);
-                    applyMedia(source, type, record.name || meta.name || '自訂背景');
+                    applyMedia(source, type, record.name || meta.name || '自訂背景', safeRead('nt_background_v1'));
+                    applied = true;
                     return;
                 }
             }
@@ -348,10 +453,15 @@
                         try { localStorage.setItem('nt_background_v1', JSON.stringify({ type: kind, source: 'url', name: meta.name || '自訂背景', url: meta.url })); }
                         catch (_) { /* The legacy URL remains usable without a metadata migration. */ }
                     }
-                    applyMedia(meta.url, kind, meta.name || '自訂背景');
+                    applyMedia(meta.url, kind, meta.name || '自訂背景', safeRead('nt_background_v1'));
+                    applied = true;
                 }
             }
         } catch (_) { /* Keep the default background if saved storage or media is unavailable. */ }
+        finally {
+            clearTimeout(deadline);
+            if (!applied && started === revision) finishStartup(true);
+        }
     }
 
     fileInput.addEventListener('change', function () {
@@ -416,7 +526,7 @@
         if (currentType === 'video') video.style.display = 'none';
     });
     video.addEventListener('loadeddata', function () {
-        if (currentType === 'video') video.style.display = 'block';
+        if (currentType === 'video' && !mediaFailed) video.style.display = 'block';
     });
     global.NewtabBackground = {
         openUpload: openUpload, openAbout: openAbout, syncControls: syncControls,

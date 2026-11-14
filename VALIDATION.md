@@ -1,4 +1,24 @@
-# Release 2026.11.14.8
+# Release 2026.11.14.9
+
+Validation date: 2026-11-14 (Asia/Taipei).
+
+- Reproduced the cold-start flash in the actual installed Brave wrapper: unpositioned search appeared before saved geometry, with the full character/icons arriving around 1.74 seconds in the recorded baseline. The 1,029,528-byte legacy asset script was the largest measured startup request.
+- Replaced embedded legacy artwork with a roughly 2.4KB registry pointing to the existing licensed files. Kept its public API and made the wallpaper URL absolute. Preloaded primary character/launcher artwork, loaded local modules in dependency order with `defer`, and made optional external font styles nonblocking.
+- A small pre-paint step restores valid cached background previews and background opacity/blur. Main controls remain hidden until stored layout and appearance are applied; a bounded failure message provides keyboard-operable reload. Background decoding proceeds independently of usable search. Original media, layout, extension settings and authentication storage are unchanged.
+- A preview is bounded to 180,000 characters/960px and paired with exact saved background metadata. Decode/selection/reset guards prevent stale previews; no seek, extra playback restart or per-loop capture occurs. Invalid or unavailable media clears the temporary preview.
+- Prepared public HTML/code snapshots serve repeat navigation locally. New HTML becomes current only after all required versioned CSS/JS succeed; current and previous snapshots remain available. Optional artwork warming occurs after activation. External APIs, conversations and personal uploaded media are excluded; denied storage falls back to ordinary loading.
+
+| Verification | Observed result |
+| --- | --- |
+| First paint and recovery | 9/9 actual Brave suites passed: delayed essential JS never reveals raw/unpositioned widgets, unresolved external fonts do not block usable UI, missing/late modules recover through a 12-second bounded message and real reload, exact-identity WebP/JPEG previews obey saved effects, malformed/mismatched/default/oversized preview cases fail safely, and 1920/3440/5120 layouts retain positions. |
+| Preview/media | 7/7 preview scenarios passed, including bounded/reused capture, same-name replacements, original-byte preservation, late reset, quota/security errors and corrupt/slow media. Existing playback 2/2 and legacy compatibility 5/5 passed. |
+| Cache | Final 10/10 Brave scenarios passed; prior 9 Edge scenarios passed. A cached fixture navigation took about 28ms despite a 1.2-second HTML delay. Optional artwork did not delay critical activation. Atomic rollback/update, old-version URL lookup, offline shell, cache bounds and storage-denied fallback were covered. These fixture timings are not the actual site's complete render time. |
+| Existing features | Four desktop/mobile × motion-preference UI scenarios, full character-chat fixtures and 27 search/resize unit checks passed. |
+| Actual installed extension | Compatibility suite passed: website search/shortcut/in-page chat, website-to-iframe localStorage/IndexedDB, settings/alarms and cold restart. Actual GitHub iframe permits CacheStorage and service-worker APIs in the disposable Brave profile. Installed extension files and personal profile were not modified. |
+
+After-publication native-wrapper filmstrip and cache-control measurements are recorded separately in ignored `.impeccable/review/`. First network load, media decode and browser-owned new-tab painting cannot be guaranteed instantaneous on every device; the fix removes the observed raw-layout flash and avoids repeating completed downloads where caching is permitted.
+
+# Release 2026.11.14.8 (historical results)
 
 Validation date: 2026-11-14 (Asia/Taipei).
 
