@@ -6,16 +6,7 @@
         if (!canvas) return;
         var reduced = matchMedia('(prefers-reduced-motion: reduce)');
         var fine = matchMedia('(hover: hover) and (pointer: fine)');
-        var tooltip = document.createElement('div');
-        tooltip.id = 'app-destination';
-        tooltip.className = 'app-destination';
-        tooltip.setAttribute('role', 'tooltip');
-        tooltip.setAttribute('aria-hidden', 'true');
-        tooltip.hidden = true;
-        document.body.appendChild(tooltip);
-        var active = null, pending = null, showTimer, hideTimer, removeTimer;
-        var pointerFrame = 0, point = null, targets = [], lastShown = 0;
-        var dismissed = null;
+        var pointerFrame = 0, point = null, targets = [];
         var submit = document.getElementById('search-submit');
         function resetSubmit() {
             if (!submit) return;
@@ -41,54 +32,6 @@
             return Array.from(canvas.querySelectorAll('.widget[data-type="app"][data-active="true"] .app-tile'))
                 .filter(function (link) { return link.getClientRects().length && !link.closest('[inert]'); });
         }
-        function describe(link, enabled) {
-            if (!link) return;
-            var ids = (link.getAttribute('aria-describedby') || '').split(/\s+/).filter(function (id) { return id && id !== tooltip.id; });
-            if (enabled) ids.push(tooltip.id);
-            if (ids.length) link.setAttribute('aria-describedby', ids.join(' '));
-            else link.removeAttribute('aria-describedby');
-        }
-        function hideTooltip(immediate) {
-            clearTimeout(showTimer); clearTimeout(hideTimer); clearTimeout(removeTimer);
-            hideTimer = null;
-            pending = null;
-            describe(active, false);
-            active = null;
-            tooltip.classList.remove('is-visible');
-            tooltip.setAttribute('aria-hidden', 'true');
-            if (immediate || reduced.matches) tooltip.hidden = true;
-            else removeTimer = setTimeout(function () { tooltip.hidden = true; }, 120);
-        }
-        function showTooltip(link) {
-            if (blocked() || !link.isConnected || link === dismissed) return;
-            clearTimeout(hideTimer); clearTimeout(removeTimer);
-            hideTimer = null;
-            describe(active, false);
-            active = link;
-            pending = null;
-            var hostname;
-            try { hostname = new URL(link.href).hostname.replace(/^www\./, ''); } catch (_) { return hideTooltip(true); }
-            tooltip.textContent = hostname;
-            tooltip.hidden = false;
-            var rect = link.getBoundingClientRect();
-            var tip = tooltip.getBoundingClientRect();
-            var above = rect.top >= tip.height + 20;
-            tooltip.dataset.side = above ? 'above' : 'below';
-            tooltip.style.left = Math.max(10, Math.min(innerWidth - tip.width - 10, rect.left + rect.width / 2 - tip.width / 2)) + 'px';
-            tooltip.style.top = (above ? rect.top - tip.height - 12 : rect.bottom + 10) + 'px';
-            tooltip.setAttribute('aria-hidden', 'false');
-            describe(link, true);
-            requestAnimationFrame(function () { if (active === link) tooltip.classList.add('is-visible'); });
-            lastShown = performance.now();
-        }
-        function queueTooltip(link, keyboard) {
-            clearTimeout(hideTimer);
-            hideTimer = null;
-            if (link === active || link === pending || link === dismissed) return;
-            clearTimeout(showTimer);
-            pending = link;
-            showTimer = setTimeout(function () { showTooltip(link); }, keyboard || performance.now() - lastShown < 700 ? 0 : 240);
-        }
         function resetDock() {
             if (pointerFrame) cancelAnimationFrame(pointerFrame);
             pointerFrame = 0; point = null;
@@ -98,7 +41,7 @@
             });
             targets = [];
         }
-        function clearInteraction() { hideTooltip(true); resetDock(); resetSubmit(); dismissed = null; }
+        function clearInteraction() { resetDock(); resetSubmit(); }
         function paintDock() {
             pointerFrame = 0;
             if (!point || reduced.matches || blocked()) return resetDock();
@@ -113,8 +56,6 @@
             if (event.pointerType !== 'mouse' || !fine.matches || blocked()) return clearInteraction();
             var link = event.target.closest('.widget[data-type="app"] .app-tile');
             if (link && canvas.contains(link)) {
-                if (dismissed && dismissed !== link) dismissed = null;
-                queueTooltip(link, false);
                 if (!reduced.matches) {
                     if (!targets.length) targets = links().map(function (item) {
                         var rect = item.getBoundingClientRect();
@@ -125,30 +66,11 @@
                 }
             } else {
                 resetDock();
-                if (!tooltip.contains(event.target)) {
-                    dismissed = null;
-                    clearTimeout(showTimer); pending = null;
-                    if (!hideTimer) hideTimer = setTimeout(function () { hideTimer = null; hideTooltip(false); }, 120);
-                } else { clearTimeout(hideTimer); hideTimer = null; }
             }
         }, { passive: true });
-        canvas.addEventListener('focusin', function (event) {
-            var link = event.target.closest('.app-tile');
-            if (link) { dismissed = null; queueTooltip(link, true); }
-        });
-        canvas.addEventListener('focusout', function (event) {
-            if (event.target.closest('.app-tile')) hideTooltip(false);
-        });
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && (active || pending)) {
-                dismissed = active || pending;
-                hideTooltip(true);
-                resetDock();
-            }
+            if (event.key === 'Escape') clearInteraction();
         });
-        document.addEventListener('pointerdown', function (event) {
-            if (!event.target.closest('.app-destination')) hideTooltip(true);
-        }, { passive: true });
         document.addEventListener('pointerleave', clearInteraction);
         window.addEventListener('blur', clearInteraction);
         window.addEventListener('resize', clearInteraction, { passive: true });

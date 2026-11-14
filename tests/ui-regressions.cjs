@@ -363,21 +363,23 @@ async function exerciseCompanion(page, mobile, reducedMotion) {
 async function exerciseMotion(page, mobile, reducedMotion) {
     await home(page);
     await page.waitForFunction(() => document.documentElement.dataset.motionReady === 'true');
-    const app = page.locator('.widget[data-type="app"][data-active="true"] .app-tile').first();
+    const app = page.locator('.widget[data-type="app"][data-active="true"] .app-tile[data-app-id="gmail"]');
     const icon = app.locator('.app-tile-icon');
     const tooltip = page.locator('#app-destination');
-    const expectedHost = await app.evaluate((link) => new URL(link.href).hostname.replace(/^www\./, ''));
+    const expectedUrl = await app.evaluate(link => link.href);
+    assert.equal(await app.locator('.app-tile-label').innerText(), 'Gmail', 'The shortcut keeps its visible name');
     const stableTarget = await app.boundingBox();
     const point = { x: stableTarget.x + stableTarget.width / 2, y: stableTarget.y + Math.min(28, stableTarget.height / 2) };
 
     if (!mobile) {
         await page.mouse.move(point.x, point.y);
-        await page.waitForFunction(() => document.getElementById('app-destination').classList.contains('is-visible'));
+        await page.waitForTimeout(320); // Beyond the removed 240ms hover delay.
+        assert.equal(await tooltip.count(), 0, 'Hover never creates a destination tooltip');
         if (reducedMotion === 'reduce') {
             assert.equal(await icon.evaluate((element) => getComputedStyle(element).transform), 'none', 'reduced motion keeps dock icons stationary');
         } else {
             await page.waitForFunction(() => {
-                const icon = document.querySelector('.widget[data-type="app"][data-active="true"] .app-tile-icon');
+                const icon = document.querySelector('.widget[data-type="app"][data-active="true"] .app-tile[data-app-id="gmail"] .app-tile-icon');
                 const transform = getComputedStyle(icon).transform;
                 return transform !== 'none' && new DOMMatrix(transform).m42 < -0.1;
             });
@@ -389,39 +391,39 @@ async function exerciseMotion(page, mobile, reducedMotion) {
         }
     }
 
-    // The destination hint also works without a mouse and follows the actual URL.
+    // Keyboard users retain the app name without an unsolicited URL description.
     await app.focus();
-    await page.waitForFunction(() => document.getElementById('app-destination').classList.contains('is-visible'));
-    assert.equal(await tooltip.textContent(), expectedHost);
-    assert.match(await app.getAttribute('aria-describedby'), /(?:^|\s)app-destination(?:\s|$)/);
+    await page.waitForTimeout(320);
+    assert.equal(await tooltip.count(), 0, 'Keyboard focus creates no destination tooltip');
+    assert.equal(await app.getAttribute('aria-describedby'), null);
+    assert.equal(await app.getAttribute('title'), null, 'No replacement native URL tooltip');
+    assert.equal(await page.getByRole('link', { name: 'Gmail', exact: true }).count(), 1);
     if (reducedMotion === 'reduce') {
         assert.equal(await icon.evaluate((element) => getComputedStyle(element).transform), 'none', 'keyboard focus also respects reduced motion');
     }
     await page.keyboard.press('Escape');
-    assert.equal(await tooltip.isVisible(), false);
-    assert.equal(await app.evaluate((link) => document.activeElement === link), true, 'dismissing the tooltip does not move keyboard focus');
+    assert.equal(await tooltip.count(), 0);
+    assert.equal(await app.evaluate((link) => document.activeElement === link), true, 'Escape does not move keyboard focus');
     assert.equal(await app.getAttribute('aria-describedby'), null);
     if (!mobile) {
         await page.mouse.move(point.x + 1, point.y);
         await page.waitForTimeout(300);
-        assert.equal(await tooltip.isVisible(), false, 'Escape keeps the tooltip dismissed while the pointer remains on the same shortcut');
+        assert.equal(await tooltip.count(), 0, 'Pointer movement does not recreate a destination tooltip');
     }
 
     await page.locator('#side-rail-tab').focus();
     await app.focus();
-    await page.waitForFunction(() => document.getElementById('app-destination').classList.contains('is-visible'));
     await page.evaluate(() => NewtabWidgets.enterArrange());
-    await page.waitForFunction(() => document.getElementById('app-destination').hidden);
+    await page.waitForFunction(() => document.querySelector('.app-tile[data-app-id="gmail"]').style.getPropertyValue('--dock-lift') === '');
     assert.equal(await app.evaluate((link) => link.style.getPropertyValue('--dock-lift')), '', 'arranging clears proximity state');
     assert.equal(await app.evaluate((link) => link.style.getPropertyValue('--dock-scale')), '');
     assert.equal(await app.getAttribute('aria-describedby'), null);
     await page.getByRole('button', { name: '完成主畫面編輯', exact: true }).click();
 
     await app.focus();
-    await page.waitForFunction(() => document.getElementById('app-destination').classList.contains('is-visible'));
     const viewport = page.viewportSize();
     await page.setViewportSize({ width: viewport.width + 24, height: viewport.height });
-    await page.waitForFunction(() => document.getElementById('app-destination').hidden);
+    await page.waitForFunction(() => document.querySelector('.app-tile[data-app-id="gmail"]').style.getPropertyValue('--dock-lift') === '');
     assert.equal(await app.evaluate((link) => link.style.getPropertyValue('--dock-lift')), '', 'resizing clears proximity state');
     assert.equal(await app.evaluate((link) => link.style.getPropertyValue('--dock-scale')), '');
     assert.equal(await app.getAttribute('aria-describedby'), null);
@@ -432,6 +434,12 @@ async function exerciseMotion(page, mobile, reducedMotion) {
     await hitTest(page, '#search-input');
     await hitTest(page, '#search-submit');
     await destination(page, () => page.locator('#search-submit').click(), 'https://www.google.com/search?q=motion%20check');
+
+    await page.route('https://mail.google.com/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Test destination: Gmail</title>' }));
+    await home(page);
+    await destination(page, () => mobile ? app.tap() : app.click(), expectedUrl);
+    await home(page); await app.focus();
+    await destination(page, () => page.keyboard.press('Enter'), expectedUrl);
 }
 
 (async () => {

@@ -1257,7 +1257,6 @@
             labelEl.className = 'bookmark-label';
             var display = link.label || truncateUrlLabel(link.url) || '連結';
             labelEl.textContent = display;
-            labelEl.title = link.label || link.url || '';
             a.appendChild(iconWrap);
             a.appendChild(labelEl);
             // Labels remain ordinary links. Editing lives in the visible

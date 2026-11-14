@@ -179,10 +179,6 @@ body.has-custom-background .home-help { padding: 0 12px; border-radius: 12px; ba
 .widget[data-type="folder"] .folder-tile:active .folder-preview { transform: translateY(1px) scale(.96); }
 .widget[data-type="app"] .app-tile:is(:hover, :focus-visible) .app-tile-label { color: #2c4b62; }
 body.is-arranging .app-tile:hover .app-tile-icon { transform: none; filter: none; }
-.app-destination { position: fixed; z-index: 140; width: max-content; max-width: min(260px, calc(100vw - 20px)); padding: 8px 12px; border-radius: 9px; background: #384f62; color: #f5faff; font: 500 12px/1.5 var(--font-ui); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; box-shadow: 0 4px 12px rgba(38, 59, 78, .12); opacity: 0; transform: translateY(4px) scale(.97); transition: opacity 120ms ease, transform 180ms var(--home-ease); pointer-events: auto; }
-.app-destination[data-side="below"] { transform: translateY(-4px) scale(.97); }
-.app-destination.is-visible { opacity: 1; transform: translateY(0) scale(1); }
-.app-destination[hidden] { display: none; }
 body.is-arranging .widget[data-type="search"] .search-input-wrapper { background: rgba(240, 246, 250, .16); box-shadow: none; border-color: transparent; }
 body.is-arranging .widget[data-type="search"] .search-submit { visibility: hidden; }
 body.is-arranging .home-help, body.is-arranging .home-tools { visibility: hidden; }
@@ -278,7 +274,6 @@ body.home-header-obstructed .home-brand { display: none; }
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
     .widget[data-type="app"] .app-tile .app-tile-icon { transform: none !important; }
     .widget[data-type="folder"] .folder-tile .folder-preview { transform: none !important; }
-    .app-destination { transform: none !important; }
     .search-submit svg { transform: none !important; }
 }
 /* The desktop entry recedes until the pointer approaches or the keyboard focuses it. */

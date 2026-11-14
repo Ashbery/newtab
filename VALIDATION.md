@@ -1,3 +1,11 @@
+# Release 2026.11.14.18
+
+## Quiet shortcut hover
+
+Removed the app destination tooltip and its timers, positioning, accessibility-description bindings and CSS. Shortcut names, links, dock hover/press effects and search-button motion remain. Bookmark labels no longer expose the raw URL through a native title tooltip; folder links were already free of destination tooltips.
+
+Focused isolated Brave checks passed at 1440 and 390 px with normal/reduced motion (4/4): no hover/focus URL tooltip, retained names, fixed click targets, dock motion, arrange/resize cleanup, search submission and Gmail mouse/keyboard navigation to intercepted test pages. A separate bookmark check passed for absent title, retained name and mouse/keyboard opening. Existing motion regression assertions were updated to the requested behavior; no unrelated full suite was repeated.
+
 # Release 2026.11.14.17
 
 ## Weather actions and forecast recovery
