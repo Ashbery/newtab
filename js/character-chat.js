@@ -11,6 +11,67 @@
         loginTimer: 0, loginUntil: 0, connectionGeneration: 0, composing: false, followLatest: true,
         characterPrompt: persona.defaultPrompt, personaEditing: false, personaGeneration: 0, personaImporting: false, personaReadError: '' };
     var ui = {};
+    var motionPreference = global.matchMedia('(prefers-reduced-motion: reduce)');
+    var motions = new Map(), ghosts = new Set();
+
+    function reducedMotion() { return motionPreference.matches || !!(global.NewtabMotion && global.NewtabMotion.reduced()); }
+    function cancelMotion(el) { var animation = motions.get(el); if (animation) { motions.delete(el); animation.cancel(); } }
+    function animate(el, frames, token) {
+        cancelMotion(el);
+        if (!el || !el.isConnected || reducedMotion() || !el.animate) return Promise.resolve();
+        var style = getComputedStyle(el), value = style.getPropertyValue('--motion-' + token).trim();
+        var duration = parseFloat(value) * (/ms$/.test(value) ? 1 : 1000);
+        if (!isFinite(duration)) duration = token === 'panel' ? 320 : token === 'fast' ? 120 : 180;
+        var animation;
+        try { animation = el.animate(frames, { duration: duration,
+            easing: style.getPropertyValue('--motion-ease').trim() || 'cubic-bezier(.22,1,.36,1)' }); }
+        catch (_) { return Promise.resolve(); }
+        motions.set(el, animation);
+        function finish() { if (motions.get(el) === animation) motions.delete(el); }
+        return animation.finished.then(finish, finish);
+    }
+    function clearGhosts() { ghosts.forEach(function (el) { cancelMotion(el); el.remove(); }); ghosts.clear(); }
+    function cancelAllMotion() { motions.forEach(function (animation) { animation.cancel(); }); motions.clear(); clearGhosts(); }
+    function snapshot(el, className, parent) {
+        if (reducedMotion()) return null;
+        var clone = el.cloneNode(true);
+        clone.classList.add(className); clone.removeAttribute('open'); clone.setAttribute('aria-hidden', 'true'); clone.inert = true;
+        [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function (node) {
+            node.removeAttribute('id'); node.removeAttribute('autofocus'); node.removeAttribute('aria-labelledby'); node.removeAttribute('aria-describedby');
+        });
+        var fields = el.querySelectorAll('textarea');
+        clone.querySelectorAll('textarea').forEach(function (field, index) { field.value = fields[index].value; });
+        parent.appendChild(clone); ghosts.add(clone);
+        var sourceScroll = [el].concat(Array.from(el.querySelectorAll('*')));
+        [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function (node, index) { node.scrollTop = sourceScroll[index].scrollTop; });
+        return clone;
+    }
+    function switchView(settings) {
+        if (!ui.stage) return;
+        if (!state.dialog.open) { ui.settings.hidden = !settings; state.dialog.classList.toggle('is-settings', settings); return; }
+        clearGhosts();
+        var old = settings ? ui.conversation : ui.settings;
+        var next = settings ? ui.settings : ui.conversation;
+        var oldStyle = getComputedStyle(old);
+        var oldFrame = { opacity: oldStyle.opacity, transform: oldStyle.transform };
+        var ghost = state.dialog.open ? snapshot(old, 'character-chat-view-ghost', ui.stage) : null;
+        ui.settings.hidden = !settings; state.dialog.classList.toggle('is-settings', settings);
+        var direction = settings ? 1 : -1;
+        if (ghost) animate(ghost, [oldFrame, { opacity: 0, transform: 'translateX(' + (-direction * 12) + 'px)' }], 'control')
+            .then(function () { ghost.remove(); ghosts.delete(ghost); });
+        animate(next, [{ opacity: 0, transform: 'translateX(' + (direction * 14) + 'px)' }, { opacity: 1, transform: 'translateX(0)' }], 'panel');
+        if (!settings) resizeComposer(false);
+    }
+    function resizeComposer(motion) {
+        if (!ui.input || !ui.input.getClientRects().length) return;
+        var before = ui.input.getBoundingClientRect().height;
+        cancelMotion(ui.input); ui.input.style.height = 'auto';
+        var height = Math.max(44, Math.min(132, ui.input.scrollHeight));
+        ui.input.style.height = height + 'px'; ui.input.style.overflowY = ui.input.scrollHeight > height ? 'auto' : 'hidden';
+        if (motion !== false && Math.abs(before - height) > 1) animate(ui.input, [{ height: before + 'px' }, { height: height + 'px' }], 'control');
+    }
+    motionPreference.addEventListener('change', function () { if (reducedMotion()) cancelAllMotion(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) cancelAllMotion(); });
 
     function transport() { return global.NewtabChatTransport; }
     function statusLayout() {
@@ -108,13 +169,13 @@
     function editPersona() {
         state.personaGeneration++; state.personaEditing = true; state.personaImporting = false;
         ui.prompt.value = state.characterPrompt; ui.promptNotice.textContent = state.personaReadError;
-        ui.settings.hidden = false; state.dialog.classList.add('is-settings');
+        switchView(true);
         ui.personaToggle.setAttribute('aria-expanded', 'true');
         updatePromptControls(); ui.settingsTitle.focus({ preventScroll: true }); ui.settings.scrollTop = 0; ui.prompt.scrollTop = 0;
     }
     function closePersona(focus) {
         state.personaGeneration++; state.personaEditing = false; state.personaImporting = false;
-        ui.settings.hidden = true; state.dialog.classList.remove('is-settings');
+        switchView(false);
         ui.personaToggle.setAttribute('aria-expanded', 'false');
         if (focus) ui.personaToggle.focus();
     }
@@ -154,19 +215,37 @@
             ui.latest.hidden = true;
         } else ui.latest.hidden = false;
     }
-    function addMessage(message) {
+    function replyPhase(view, phase) {
+        if (!view.progress || view.row.dataset.phase === phase) return;
+        var previous = view.row.dataset.phase;
+        view.row.dataset.phase = phase;
+        view.progressLabel.textContent = phase === 'thinking' ? '正在思考' : phase === 'streaming' ? '正在回覆' : '';
+        view.progress.title = phase === 'complete' ? '回覆完成' : '';
+        if (phase === 'complete' && previous) animate(view.progress, [{ opacity: 0, transform: 'scale(.75)' }, { opacity: 1, transform: 'scale(1)' }], 'control');
+    }
+    function addMessage(message, entrance) {
         var row = element('article', 'character-chat-message is-' + message.role);
         row.setAttribute('aria-label', message.role === 'user' ? '你的訊息' : 'Nacho 回覆');
         var name = element('div', 'character-chat-speaker');
         if (message.role === 'assistant') name.appendChild(avatar('character-chat-avatar character-chat-reply-avatar'));
         name.appendChild(element('span', null, message.role === 'user' ? '你' : 'Nacho'));
+        var progress, progressLabel;
+        if (message.role === 'assistant') {
+            progress = element('span', 'character-chat-reply-state'); progress.setAttribute('aria-hidden', 'true');
+            var icon = element('span', 'character-chat-reply-state-icon');
+            icon.innerHTML = '<svg viewBox="0 0 16 16"><circle class="chat-state-ring" cx="8" cy="8" r="5"/><path class="chat-state-check" d="m4 8 2.5 2.5L12 5"/></svg>';
+            progressLabel = element('span'); progress.append(icon, progressLabel); name.appendChild(progress);
+        }
         var content = element('div', 'character-chat-text', message.content);
         if (message.role === 'assistant') renderReply(content, message.content);
         var note = element('span', 'character-chat-message-note');
         if (message.status === 'stopped') note.textContent = '已停止';
         if (message.status === 'failed') note.textContent = '回覆未完成';
         row.append(name, content, note); ui.messages.appendChild(row);
-        return { row: row, content: content, note: note };
+        var view = { row: row, content: content, note: note, progress: progress, progressLabel: progressLabel };
+        replyPhase(view, message.status === 'streaming' ? 'thinking' : message.status);
+        if (entrance === true) animate(row, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], 'control');
+        return view;
     }
     function renderHistory() {
         ui.messages.replaceChildren();
@@ -175,6 +254,9 @@
         scrollLatest(true);
     }
     function controls() {
+        var busyChanged = ui.lastBusy !== undefined && ui.lastBusy !== state.busy;
+        var oldAction = state.busy ? ui.send : ui.stop;
+        var actionFocused = document.activeElement === oldAction;
         ui.send.disabled = !state.canChat || state.busy || state.checking || !ui.input.value.trim();
         ui.stop.hidden = !state.busy;
         ui.send.hidden = state.busy;
@@ -187,6 +269,13 @@
         ui.retry.disabled = state.busy || state.checking || !state.canChat;
         ui.openSettings.hidden = state.canChat || state.checking || state.busy;
         ui.input.setAttribute('aria-describedby', 'character-chat-status character-chat-input-hint');
+        ui.composer.dataset.busy = String(state.busy);
+        if (busyChanged && state.dialog.open) {
+            var newAction = state.busy ? ui.stop : ui.send;
+            animate(newAction.querySelector('svg'), [{ opacity: 0, transform: 'scale(.7) rotate(-18deg)' }, { opacity: 1, transform: 'scale(1) rotate(0)' }], 'control');
+            if (actionFocused && !state.personaEditing) (state.busy ? ui.stop : ui.input).focus({ preventScroll: true });
+        }
+        ui.lastBusy = state.busy;
         statusLayout();
     }
     function errorText(error, fallback) {
@@ -296,8 +385,9 @@
         var lengthNotice = '回覆過長，已停止；可請 Nacho 分段回答';
         var reply = { role: 'assistant', content: '', status: 'streaming' };
         state.messages.push(reply);
-        var view = addMessage(reply);
-        view.row.classList.add('is-pending'); view.note.textContent = '正在思考…';
+        var view = addMessage(reply, true);
+        var streamText = document.createTextNode(''); view.content.appendChild(streamText);
+        view.row.classList.add('is-pending');
         ui.empty.hidden = true; controls(); scrollLatest(true); reaction('thinking'); announce('Nacho 正在回覆…', true);
         function delta(value) {
             if (id !== state.request || !state.busy || state.controller.signal.aborted) return;
@@ -305,9 +395,10 @@
             if (!text) return;
             var firstDelta = !reply.content;
             if (reply.content.length + text.length > 64000) tooLong = true;
-            reply.content = (reply.content + text).slice(0, 64000);
-            view.content.textContent = reply.content; view.note.textContent = ''; view.row.classList.remove('is-pending');
-            if (firstDelta) reaction('speaking'); scrollLatest(false);
+            var addition = text.slice(0, 64000 - reply.content.length);
+            reply.content += addition; streamText.appendData(addition);
+            view.note.textContent = ''; view.row.classList.remove('is-pending');
+            if (firstDelta) { replyPhase(view, 'streaming'); reaction('speaking'); } scrollLatest(false);
             if (tooLong) state.controller.abort();
         }
         try {
@@ -331,6 +422,7 @@
             if (id === state.request) {
                 state.busy = false; state.controller = null;
                 renderReply(view.content, reply.content);
+                replyPhase(view, reply.status);
                 view.row.classList.remove('is-pending'); reaction('idle'); controls(); save(); scrollLatest(false);
             }
         }
@@ -340,9 +432,10 @@
         if (state.busy || state.checking || !state.canChat || state.composing) return;
         var text = ui.input.value.trim();
         if (!text) return;
-        state.messages.push({ role: 'user', content: text.slice(0, 8000), status: 'complete' });
-        ui.input.value = ''; ui.input.style.height = '';
-        renderHistory(); save(); requestReply(state.messages.length - 1);
+        var message = { role: 'user', content: text.slice(0, 8000), status: 'complete' };
+        state.messages.push(message);
+        ui.input.value = ''; resizeComposer(true);
+        ui.empty.hidden = true; addMessage(message, true); scrollLatest(true); save(); requestReply(state.messages.length - 1);
     }
     function stop() { if (state.controller) { state.controller.abort(); announce('正在停止回覆…'); } }
     function retry() {
@@ -352,10 +445,18 @@
     }
     function close() {
         if (!state.dialog || !state.dialog.open) return;
+        var visual = getComputedStyle(state.dialog);
+        var from = { opacity: visual.opacity, transform: visual.transform };
+        var rect = { left: parseFloat(visual.left), top: parseFloat(visual.top), width: state.dialog.offsetWidth, height: state.dialog.offsetHeight };
+        cancelAllMotion();
+        var ghost = snapshot(state.dialog, 'character-chat-exit-ghost', document.body);
+        if (ghost) { ghost.style.inset = 'auto'; ghost.style.left = rect.left + 'px'; ghost.style.top = rect.top + 'px'; ghost.style.width = rect.width + 'px'; ghost.style.height = rect.height + 'px'; }
         if (state.busy) stop();
-        if (state.personaEditing) closePersona(false);
         state.connectionGeneration++; state.checking = false; stopLoginPolling();
         state.dialog.close();
+        if (state.personaEditing) closePersona(false);
+        if (ghost) animate(ghost, [from, { opacity: 0, transform: 'translateY(8px) scale(.985)' }], 'control')
+            .then(function () { ghost.remove(); ghosts.delete(ghost); });
     }
     function place() {
         if (!state.dialog) return;
@@ -392,6 +493,8 @@
         ui.personaToggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.6 2.3-2 .9-2.1-.7-2 3.4 1.6 1.7v2.8l-1.6 1.7 2 3.4 2.1-.7 2 .9.6 2.3h4.1l.6-2.3 2-.9 2.1.7 2-3.4-1.6-1.7v-2.8l1.6-1.7-2-3.4-2.1.7-2-.9L13.6 3Z"/><circle cx="11.5" cy="12" r="3"/></svg>';
         var headerActions = element('div', 'character-chat-header-actions'); headerActions.append(ui.personaToggle, dismiss);
         header.append(identity, headerActions); dialog.appendChild(header);
+        ui.stage = element('div', 'character-chat-stage'); dialog.appendChild(ui.stage);
+        ui.conversation = element('div', 'character-chat-conversation');
         var connectionBar = element('div', 'character-chat-connect');
         ui.connect = button('使用 ChatGPT 登入', 'character-chat-connect-button', login);
         ui.refresh = button('重新確認', 'character-chat-refresh', refresh);
@@ -422,20 +525,20 @@
         ui.promptSave = button('儲存設定', 'character-chat-prompt-save', savePersona);
         promptActions.append(ui.promptReset, promptCancel, ui.promptSave);
         ui.privacy = element('p', 'character-chat-privacy', '對話只暫存於目前分頁；角色設定保存在此瀏覽器。');
-        ui.settings.append(ui.settingsTitle, account, element('h4', 'character-chat-persona-title', '角色設定'), settingsIntro, promptLabel, ui.prompt, promptTools, ui.promptNotice, promptActions, ui.privacy); dialog.appendChild(ui.settings);
+        ui.settings.append(ui.settingsTitle, account, element('h4', 'character-chat-persona-title', '角色設定'), settingsIntro, promptLabel, ui.prompt, promptTools, ui.promptNotice, promptActions, ui.privacy); ui.stage.append(ui.settings, ui.conversation);
         var body = element('div', 'character-chat-body');
         ui.messages = element('div', 'character-chat-messages'); ui.messages.setAttribute('role', 'log'); ui.messages.setAttribute('aria-label', '對話內容'); ui.messages.setAttribute('aria-live', 'off'); ui.messages.tabIndex = 0;
         ui.messages.addEventListener('scroll', function () { state.followLatest = nearBottom(); ui.latest.hidden = state.followLatest; });
         ui.empty = element('div', 'character-chat-empty');
         ui.empty.append(element('p', null, '想聊些什麼？'));
         ui.latest = button('查看最新回覆', 'character-chat-latest', function () { state.followLatest = true; scrollLatest(true); }); ui.latest.hidden = true;
-        body.append(ui.messages, ui.empty, ui.latest); dialog.appendChild(body);
-        var form = element('form', 'character-chat-composer'); form.addEventListener('submit', send);
+        body.append(ui.messages, ui.empty, ui.latest); ui.conversation.appendChild(body);
+        var form = element('form', 'character-chat-composer'); ui.composer = form; form.addEventListener('submit', send);
         var label = element('label', 'sr-only', '傳送訊息給 Nacho'); label.htmlFor = 'character-chat-input';
         ui.input = element('textarea'); ui.input.id = 'character-chat-input'; ui.input.rows = 1; ui.input.maxLength = 8000; ui.input.placeholder = '和 Nacho 說點什麼…';
         ui.input.addEventListener('compositionstart', function () { state.composing = true; });
         ui.input.addEventListener('compositionend', function () { state.composing = false; controls(); });
-        ui.input.addEventListener('input', function () { ui.input.style.height = 'auto'; ui.input.style.height = Math.min(132, ui.input.scrollHeight) + 'px'; controls(); });
+        ui.input.addEventListener('input', function () { resizeComposer(true); controls(); });
         ui.input.addEventListener('keydown', function (event) {
             if (event.key !== 'Enter' || event.shiftKey || event.isComposing || state.composing || event.keyCode === 229) return;
             event.preventDefault(); send();
@@ -445,12 +548,12 @@
         ui.send = button('', 'character-chat-send'); ui.send.type = 'submit'; ui.send.setAttribute('aria-label', '傳送'); ui.send.title = '傳送（Enter）';
         ui.send.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 10 15-5.5L14 19.5l-3-6.5-6.5-3Z"/><path d="m11 13 8.5-8.5"/></svg>';
         ui.stop = button('', 'character-chat-stop', stop); ui.stop.setAttribute('aria-label', '停止回覆'); ui.stop.title = '停止回覆'; ui.stop.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>'; ui.stop.hidden = true;
-        composeActions.append(ui.send, ui.stop); form.append(label, inputHint, ui.input, composeActions); dialog.appendChild(form);
+        composeActions.append(ui.send, ui.stop); form.append(label, inputHint, ui.input, composeActions); ui.conversation.appendChild(form);
         ui.statusRow = element('div', 'character-chat-status-row is-quiet');
         ui.status = element('p', 'character-chat-status'); ui.status.id = 'character-chat-status'; ui.status.setAttribute('role', 'status'); ui.status.setAttribute('aria-live', 'polite');
         ui.retry = button('重試', 'character-chat-retry', retry); ui.retry.hidden = true;
         ui.openSettings = button('前往設定', 'character-chat-open-settings', editPersona); ui.openSettings.hidden = true;
-        ui.statusRow.append(ui.status, ui.retry, ui.openSettings); dialog.appendChild(ui.statusRow);
+        ui.statusRow.append(ui.status, ui.retry, ui.openSettings); ui.conversation.appendChild(ui.statusRow);
         dialog.addEventListener('cancel', function (event) { event.preventDefault(); close(); });
         dialog.addEventListener('keydown', function (event) {
             if (event.key === 'Tab') {
@@ -469,17 +572,25 @@
         dialog.addEventListener('click', function (event) { if (event.target !== dialog) return; var r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); });
         dialog.addEventListener('close', function () {
             if (dialog.open) return;
+            motions.forEach(function (_, el) { if (el === dialog || dialog.contains(el)) cancelMotion(el); });
+            if (state.busy) stop();
+            if (state.personaEditing) closePersona(false);
+            state.connectionGeneration++; state.checking = false; stopLoginPolling();
             if (state.opener && state.opener.isConnected) state.opener.focus({ preventScroll: true });
         });
-        global.addEventListener('resize', place);
+        global.addEventListener('resize', function () { place(); resizeComposer(false); });
         global.addEventListener('focus', function () { if (dialog.open && !state.canChat) refresh(); });
         document.body.appendChild(dialog); renderHistory(); controls();
     }
     function open(widgetId) {
         create(); state.widgetId = widgetId || 'companion-1';
-        if (!state.dialog.open) { state.connectionGeneration++; state.checking = false; state.loginUntil = 0; state.opener = document.activeElement; place(); state.dialog.showModal(); }
+        clearGhosts();
+        if (!state.dialog.open) {
+            state.connectionGeneration++; state.checking = false; state.loginUntil = 0; state.opener = document.activeElement; place(); state.dialog.showModal();
+            animate(state.dialog, [{ opacity: 0, transform: 'translateY(10px) scale(.985)' }, { opacity: 1, transform: 'translateY(0) scale(1)' }], 'panel');
+        }
         refresh();
-        ui.input.focus({ preventScroll: true }); scrollLatest(true);
+        ui.input.focus({ preventScroll: true }); resizeComposer(false); scrollLatest(true);
     }
     global.NewtabCharacterChat = { open: open, close: close, refresh: refresh, isOpen: function () { return !!state.dialog && state.dialog.open; } };
 })(window);

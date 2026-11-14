@@ -26,7 +26,7 @@ Motion responds to action, with stable clickable areas:
 | Interaction | Treatment |
 | --- | --- |
 | Application hover | Artwork lift up to 4px and scale up to 1.06, with distance-based falloff for adjacent icons; hitboxes do not move. |
-| Destination hint | 240ms initial pointer delay; immediate keyboard access. |
+| Destination hint | Removed at the owner's request; app labels and accessible names remain. |
 | Search submit | Internal motif moves at most 2px; the button stays fixed. |
 | Drawer tabs | One shared selected surface travels in 320ms. |
 | Press and release | 60–80ms press, 140–220ms release for standard control feedback. |
@@ -46,6 +46,22 @@ Independent design and interaction reviews informed these refinements. Release a
 
 ## Motion references
 Specific references and the supplied resource inventory are recorded in [DESIGN_RESOURCES.md](DESIGN_RESOURCES.md). Component-library examples are translated into the existing static HTML/CSS/JavaScript; no React library or shader runtime is required.
+
+### Whole-interface motion pass — 2026.11.14.19
+
+The brief is a frequent-use personal new tab, not a promotional animation demo. Preserve the current layout, character artwork, Manrope/Noto typography, porcelain (#f8fbfd), silver (#dce5eb), powder blue (#b7d6e4) and blue ink (#36596e). UI state changes should feel related and finish quickly. Do not add ambient loops, destination tooltips or page-wide whitening.
+
+Cult UI's **Halo Switch**, **Direction-Aware Tabs**, **Popover**, **Side Panel** and **Prompt Composer** inform switch travel, selected surfaces, directional disclosure and composer behavior. DesignBookmark Motion's **Toggle switch**, **Range slider**, **Tab pill**, **Spring dropdown**, **Streaming reply** and **Loading to success** inform control and response states. These are native CSS/WAAPI implementations tailored to this static site, not installed React components or copied branded artwork.
+
+- Controls: 120–180 ms state feedback, restrained spring travel on switch thumbs and selected tabs; the clickable target stays still. Range progress follows both direct dragging and numeric/reset changes.
+- Navigation: contained silver-blue drawer with reversible 320 ms entrance / 220 ms exit, transparent dismissal layer, shared active-tab pill, short directional panel changes. Hover submenus require deliberate pointer dwell and open only by click/keyboard on narrow/touch screens.
+- Dialogs and folders: small 6–12 px displacement, 140–280 ms transitions, immediate input deactivation on dismissal, cancellation of stale close operations. Folders no longer fly across an ultrawide display.
+- Search and weather: shorter first-reveal suggestions, immediate later query updates, reversible mobile search, moving forecast/unit selections and brief directional chart changes. Existing independent surface alpha, icon color and button fill remain authoritative.
+- Chat: auto-height composer, one send/stop slot, new-message entrance once, streaming text stays stable, thinking/completion feedback, cancellable settings/page transitions and transparent backdrop. Login, custom persona and message history retain their existing ownership.
+- Editing: landing states transition color only; coordinates and drag hit boxes never animate behind the pointer. Todo completion animates the tick; storing edits is synchronous with the action.
+- Accessibility: reduced motion resolves the shared animations and pending cleanup immediately, including a preference change while a panel is closing. Native controls, focus restoration, keyboard selection, touch targets and independent appearance settings remain testable product behavior.
+
+Acceptance uses real-browser interaction, screenshots, interruption/reopening, narrow and ultrawide layouts, state persistence and mocked-service error cases. Award-level craft is an aspiration; no award or universal frame-rate claim is made.
 
 ## Functional refinement after owner review
 Tapping Add creates an immediately usable widget and brings it into view on phones. Arrangement is explicit in Tools or entered through a deliberate long press. Right-click and Shift+F10 open the selected widget's menu; touch users can select it during editing and use the shared toolbar's Settings action. Individual three-dot buttons have been removed at the owner's request.

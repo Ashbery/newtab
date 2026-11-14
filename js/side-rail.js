@@ -37,7 +37,7 @@
 
     function keepFocusIn(panel, e) {
         if (e.key !== 'Tab') return;
-        var controls = $$('button:not(:disabled), input:not([type="hidden"]):not(:disabled), a[href], [tabindex="0"]', panel)
+        var controls = $$('button:not(:disabled), input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]', panel)
             .filter(function (el) { return el.getClientRects().length && !el.closest('[inert]'); });
         if (!controls.length) return;
         var first = controls[0];
@@ -441,6 +441,69 @@
         return global.NewtabWidgets ? NewtabWidgets.getLayout() : { widgets: [] };
     }
 
+    var railIconPaths = {
+        close: '<path d="m7 7 10 10M17 7 7 17"/>',
+        arrange: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="m17.5 13 1.3 3.2 3.2 1.3-3.2 1.3-1.3 3.2-1.3-3.2-3.2-1.3 3.2-1.3Z" fill="#b7d9e9"/>',
+        reset: '<path d="M4 9a8 8 0 1 1 1 8M4 4v5h5"/><path d="m12 8 1 2.8 3 1.2-3 1.2-1 2.8-1-2.8L8 12l3-1.2Z" fill="#b7d9e9" stroke-width="1.2"/>',
+        play: '<path d="m9 5 11 7-11 7Z" fill="#b7d9e9"/>',
+        pause: '<rect x="6" y="5" width="4" height="14" rx="1.4" fill="#b7d9e9"/><rect x="14" y="5" width="4" height="14" rx="1.4" fill="#b7d9e9"/>',
+        muted: '<path d="m11 4-5 4H3v8h3l5 4Z"/><path d="m16 9 5 6m0-6-5 6"/>',
+        sound: '<path d="m11 4-5 4H3v8h3l5 4Z"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+        about: '<path d="M6 5 8 2l3 3h2l3-3 2 3a8 8 0 1 1-12 0Z"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".7" fill="currentColor" stroke="none"/>'
+    };
+
+    function railIcon(name) {
+        return '<svg data-rail-icon="' + name + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + railIconPaths[name] + '</svg>';
+    }
+
+    function updateRailIcon(button, name) {
+        var icon = $('[data-rail-icon]', button);
+        if (icon && icon.dataset.railIcon !== name) {
+            icon.innerHTML = railIconPaths[name];
+            icon.dataset.railIcon = name;
+        }
+    }
+
+    function reduceMotion() {
+        return global.NewtabMotion ? NewtabMotion.reduced() : global.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function cancelPanelMotion(panel) {
+        if (global.NewtabMotion) NewtabMotion.cancel(panel);
+        if (panel._railAnimation) {
+            panel._railAnimation.cancel();
+            panel._railAnimation = null;
+        }
+    }
+
+    function revealPanel(panel, direction) {
+        if (!panel || reduceMotion()) return;
+        if (global.NewtabMotion) {
+            NewtabMotion.enter(panel, { x: direction * 10, y: 0, scale: 1, duration: 180 });
+        } else if (panel.animate) {
+            panel._railAnimation = panel.animate([
+                { opacity: .35, translate: (direction * 10) + 'px 0' },
+                { opacity: 1, translate: '0 0' }
+            ], { duration: 180, easing: 'cubic-bezier(.22,1,.36,1)' });
+        }
+    }
+
+    function syncRailControls() {
+        var video = document.getElementById('video-background');
+        var play = $('#side-rail [data-action="play-pause"]');
+        var sound = $('#side-rail [data-action="mute"]');
+        if (video && play) {
+            play.dataset.playing = String(!video.paused);
+            updateRailIcon(play, video.paused ? 'play' : 'pause');
+        }
+        if (video && sound) {
+            sound.setAttribute('aria-pressed', String(!video.muted));
+            // A stable toggle name accompanies the existing action description.
+            sound.setAttribute('aria-label', '背景聲音');
+            updateRailIcon(sound, video.muted ? 'muted' : 'sound');
+        }
+    }
+
     function setOpen(open) {
         var was = state.open;
         if (open && !was) {
@@ -488,7 +551,10 @@
 
     function setTab(name) {
         var next = name || 'personalize';
-        if (['components', 'apps', 'personalize', 'about'].indexOf(next) < 0) next = 'personalize';
+        var order = ['components', 'apps', 'personalize', 'about'];
+        if (order.indexOf(next) < 0) next = 'personalize';
+        var previous = state.tab;
+        var focusedPanel = document.activeElement && document.activeElement.closest('.side-rail-panel');
         state.tab = next;
 
         $$('.side-rail-tabs button').forEach(function (btn) {
@@ -500,7 +566,10 @@
         });
         $$('.side-rail-panel').forEach(function (p) {
             var name = p.getAttribute('data-panel');
+            cancelPanelMotion(p);
             p.classList.toggle('is-active', name === next);
+            p.hidden = name !== next;
+            p.inert = name !== next;
             p.id = 'rail-panel-' + name;
             p.setAttribute('aria-labelledby', 'rail-tab-' + name);
         });
@@ -509,6 +578,10 @@
             NewtabWidgets.setRailState({ open: state.open, tab: state.tab });
         }
         refreshLists();
+        if (state.open && previous !== next) {
+            revealPanel($('.side-rail-panel.is-active'), order.indexOf(next) > order.indexOf(previous) ? 1 : -1);
+            if (focusedPanel && focusedPanel.inert) $('.side-rail-tabs button[aria-selected="true"]').focus({ preventScroll: true });
+        }
     }
 
     function refreshLists() {
@@ -525,6 +598,7 @@
             if (next) next.focus({ preventScroll: true });
         }
         if (global.NewtabBackground && NewtabBackground.syncControls) NewtabBackground.syncControls();
+        syncRailControls();
     }
 
     function renderComponents() {
@@ -1309,8 +1383,8 @@
             '<div class="side-rail-header">' +
             '<h2>我的分頁</h2>' +
             '<button type="button" class="side-rail-close" id="side-rail-close" aria-label="關閉">' +
-            '<i class="fas fa-times" aria-hidden="true"></i></button></div>' +
-            '<nav class="side-rail-tabs" role="tablist">' +
+            railIcon('close') + '</button></div>' +
+            '<nav class="side-rail-tabs" role="tablist" aria-label="工具分類">' +
             '<button type="button" role="tab" data-panel="components" aria-selected="false">組件</button>' +
             '<button type="button" role="tab" data-panel="apps" aria-selected="false">應用</button>' +
             '<button type="button" role="tab" data-panel="personalize" aria-selected="true">個人化</button>' +
@@ -1325,22 +1399,24 @@
             '<div id="app-list"></div></div>' +
             '<div class="side-rail-panel is-active" data-panel="personalize" role="tabpanel">' +
             '<h3>版面與背景</h3>' +
+            '<div class="rail-action-group">' +
             '<button type="button" class="rail-action" id="arrange-home" data-action="arrange">' +
-            '<i class="fas fa-up-down-left-right" aria-hidden="true"></i>排列主畫面</button>' +
+            railIcon('arrange') + '<span>排列主畫面</span></button>' +
             '<button type="button" class="rail-action" data-action="reset-layout">' +
-            '<i class="fas fa-rotate-left" aria-hidden="true"></i>重設版面</button>' +
+            railIcon('reset') + '<span>重設版面</span></button>' +
             '<button type="button" class="rail-action" data-action="open-bg" id="background-home"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.2" fill="#b7d9e9"/><path d="m8 5-3-3v6l3-3 3-3v6Z" fill="#b7d9e9" stroke-linejoin="round"/></svg><span>更換背景</span></button>' +
-            '<button type="button" class="rail-action focus-button" data-action="focus" id="focus-home" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M9 14c0-3 6-3 6 0 0 2-2 1-3 1s-3 1-3-1Z" fill="#b7d9e9" stroke-width="1.2"/><g fill="currentColor" stroke="none"><circle cx="8.5" cy="10" r="1.1"/><circle cx="12" cy="8.5" r="1.1"/><circle cx="15.5" cy="10" r="1.1"/></g></svg><span>專注片刻</span></button>' +
+            '<button type="button" class="rail-action focus-button" data-action="focus" id="focus-home" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M9 14c0-3 6-3 6 0 0 2-2 1-3 1s-3 1-3-1Z" fill="#b7d9e9" stroke-width="1.2"/><g fill="currentColor" stroke="none"><circle cx="8.5" cy="10" r="1.1"/><circle cx="12" cy="8.5" r="1.1"/><circle cx="15.5" cy="10" r="1.1"/></g></svg><span>專注片刻</span><b class="rail-toggle-track" aria-hidden="true"></b></button>' +
+            '</div>' +
             '<section class="background-appearance" id="background-appearance" aria-label="背景外觀"></section>' +
             '<p class="rail-hint" id="rail-media-status">目前使用貓貓主題。</p>' +
             '<button type="button" class="rail-action" data-action="play-pause">' +
-            '<i class="fas fa-play" aria-hidden="true"></i>播放／暫停背景</button>' +
-            '<button type="button" class="rail-action" data-action="mute">' +
-            '<i class="fas fa-volume-mute" aria-hidden="true"></i>靜音／取消靜音</button>' +
+            railIcon('play') + '<span>播放背景影片</span></button>' +
+            '<button type="button" class="rail-action" data-action="mute" aria-label="背景聲音" aria-pressed="false">' +
+            railIcon('muted') + '<span>開啟背景聲音</span><b class="rail-toggle-track" aria-hidden="true"></b></button>' +
             '</div>' +
             '<div class="side-rail-panel" data-panel="about" role="tabpanel">' +
             '<button type="button" class="rail-action" data-action="about">' +
-            '<i class="fas fa-circle-info" aria-hidden="true"></i>關於此分頁與授權</button>' +
+            railIcon('about') + '<span>關於此分頁與授權</span></button>' +
             '</div></div>';
     }
 
@@ -1392,6 +1468,11 @@
 
         // Single delegated handler on rail (survives rebuildInner of children)
         if (rail) {
+            rail.addEventListener('click', function () {
+                // Reset and media actions are handled by their existing owners.
+                // Read their final values once, without creating another setting.
+                queueMicrotask(syncRailControls);
+            });
             rail.addEventListener('keydown', function (e) {
                 var currentTab = e.target.closest && e.target.closest('.side-rail-tabs button');
                 if (!currentTab || ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return;
@@ -1460,6 +1541,13 @@
 
         document.addEventListener('newtab:layout-change', function () {
             if (state.open) refreshLists();
+        });
+        var video = document.getElementById('video-background');
+        if (video) ['play', 'pause', 'volumechange', 'error', 'loadeddata', 'emptied'].forEach(function (name) {
+            video.addEventListener(name, syncRailControls);
+        });
+        global.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', function (event) {
+            if (event.matches) $$('.side-rail-panel').forEach(cancelPanelMotion);
         });
     }
 

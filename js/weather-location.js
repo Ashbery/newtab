@@ -52,9 +52,15 @@
         if (session.observer) session.observer.disconnect();
         if (active === session) active = null;
         session.onSelect = null;
-        if (session.dialog.open) session.dialog.close();
-        session.dialog.remove();
-        if (restoreFocus && !active && ownerExists(session)) {
+        session.dialog.inert = true;
+        function removeDialog() {
+            if (session.dialog.open) session.dialog.close();
+            session.dialog.remove();
+            if (restoreFocus && !active && ownerExists(session)) restoreOpener();
+        }
+        if (global.NewtabMotion) global.NewtabMotion.exit(session.dialog, { y: 6, scale: .99, duration: 140 }).then(removeDialog);
+        else removeDialog();
+        function restoreOpener() {
             var target = session.opener;
             if ((!target || !target.isConnected) && session.focusTarget) {
                 try { target = session.focusTarget(); } catch (_) { target = null; }
@@ -246,6 +252,7 @@
             if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dispose(session, true);
         });
         active = session; document.body.appendChild(dialog); dialog.showModal(); controls(session); input.focus(); input.select();
+        if (global.NewtabMotion) global.NewtabMotion.enter(dialog, { y: 12, scale: .985, duration: 280 });
         session.observer = new MutationObserver(function () { if (!dialog.isConnected || !ownerExists(session)) dispose(session, false); });
         session.observer.observe(document.body, { childList: true, subtree: true });
         return true;

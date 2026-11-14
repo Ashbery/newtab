@@ -1,3 +1,24 @@
+# Release 2026.11.14.19
+
+## Shared Nacho interaction and motion system
+
+Redesigned switches, range controls, active tabs, drawer disclosure, context menus, appearance/city/background dialogs, search suggestions and mobile search, weather selection, folders, focus/editing feedback and the in-page chat composer. Cult UI and DesignBookmark Motion are the verified interaction references; the character artwork, silver-blue palette, local data and custom surface settings remain intact. There is no new React/animation dependency and no startup entrance that delays the home screen.
+
+Real-browser review found and fixed three close/reopen races: closing context menus and background sheets could capture Escape intended for a new dialog; the first mobile search reopened during exit could lose input focus. Narrow-pointer submenu intent, stale close cancellation, focus ownership, dynamic reduced motion and duplicate CSS/WAAPI entrances were also corrected. Appearance dialogs now retain their heading, close control and footer while long settings scroll at 320 px.
+
+Validation used isolated Brave profiles and controlled service fixtures:
+
+- Independent interaction matrix: 320×640, 390×844, 1440×900, 1920×1080, 3440×1440 and 5120×1440, each with normal and reduced motion — 12 configurations passed. Covers interrupted search/dialog/folder/focus transitions, custom alpha, unchanged saved geometry and stable app hit boxes (0 CSS-pixel displacement).
+- Full UI regression: desktop/mobile × normal/reduced motion, all 4 configurations passed, including IME, offline search fallback, navigation, settings, focus and companion entry.
+- Existing appearance controls: 3 sizes passed; search appearance/button/suggestion controls: 5 sizes passed. Clock/background transparency, numeric bounds, resets, persistence and independent icon colors remain verified.
+- Context-menu browser regression: 8 cases passed. Five new `interaction-motion.cjs` regressions passed (four-case lifecycle run plus the independently added background-sheet case).
+- Weather dashboard and city/location tests: 21 cases passed with synthetic providers; no real location query was requested.
+- Existing chat coverage: 9 groups passed; new normal-motion chat lifecycle tests: 2 sizes passed, including eight rapid view switches, immediate transport abort and dynamic reduced-motion cleanup. No real authentication or model request was sent.
+- Side rail: 4 viewport sizes plus media/focus states passed, including rapid switching, keyboard operation, reset/reload and inline icons when external fonts are unavailable. Existing optional-widget scenarios passed on desktop and mobile (todo, notes, countdown, bookmarks and boundaries).
+- Startup regression: 9 cases passed, including delayed modules/fonts, bounded retry, poster handling and saved geometry at 16:9, 21:9 and 32:9. The browser address bar is not focused or modified by motion code.
+
+An actual 11.36-second UI recording and screenshots were reviewed for clipping, jumps and unexpected repaint; local evidence is in `.impeccable/review/motion-redesign/`. The recording uses the recorder's 25 fps and is a visual demonstration, not a claim about the page's rendering rate. Machine-specific headless samples and design review do not establish an award certification or performance on every device. No personal Brave profile, installed extension, ChatGPT helper, saved wallpaper or real account was modified by validation.
+
 # Release 2026.11.14.18
 
 ## Quiet shortcut hover

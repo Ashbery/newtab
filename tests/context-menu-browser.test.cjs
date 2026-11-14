@@ -113,6 +113,9 @@ for (const [width, height] of [[320, 640], [390, 844]]) {
                     await openSettings(page, widget, input);
                     await openTimeSubmenu(page, input);
                     await page.keyboard.press('Escape');
+                    assert.equal(await page.locator('.ctx-menu').evaluate(element => element.hidden || element.inert), true, 'dismissed menus stop accepting input immediately');
+                    await page.locator('.ctx-menu').waitFor({ state: 'hidden' });
+                    await page.locator('.ctx-sub').waitFor({ state: 'hidden' });
                     assert.equal(await page.locator('.ctx-menu').isVisible(), false);
                     assert.equal(await page.locator('.ctx-sub').isVisible(), false);
                     const opener = input === 'keyboard' ? widget : page.locator('#editor-widget-settings');

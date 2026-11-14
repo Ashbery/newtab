@@ -11,6 +11,20 @@
     var closeSubTimer = null;
     var returnFocus = null;
     var subParent = null;
+    var menuRevision = 0;
+    var subRevision = 0;
+
+    function conceal(el, classes, revision, currentRevision) {
+        if (!el || el.hidden) return;
+        el.inert = true;
+        var finish = function () {
+            if (revision !== currentRevision()) return;
+            el.classList.remove.apply(el.classList, classes);
+            el.hidden = true; el.innerHTML = ''; el.inert = false;
+        };
+        if (global.NewtabMotion) global.NewtabMotion.exit(el, { y: 3, scale: .985, duration: 120 }).then(finish);
+        else finish();
+    }
 
     function ensureMenu() {
         if (menuEl) return menuEl;
@@ -34,14 +48,13 @@
     }
 
     function closeSub() {
+        clearTimeout(openSubTimer); openSubTimer = null;
         if (closeSubTimer) {
             clearTimeout(closeSubTimer);
             closeSubTimer = null;
         }
         if (subEl) {
-            subEl.classList.remove('is-open', 'is-open-left');
-            subEl.hidden = true;
-            subEl.innerHTML = '';
+            conceal(subEl, ['is-open', 'is-open-left'], ++subRevision, function () { return subRevision; });
         }
         if (menuEl) {
             $$('.ctx-item.has-sub', menuEl).forEach(function (b) {
@@ -54,9 +67,7 @@
     function close(restoreFocus) {
         closeSub();
         if (menuEl) {
-            menuEl.classList.remove('is-visible');
-            menuEl.hidden = true;
-            menuEl.innerHTML = '';
+            conceal(menuEl, ['is-visible'], ++menuRevision, function () { return menuRevision; });
         }
         if (restoreFocus && returnFocus && returnFocus.isConnected) returnFocus.focus({ preventScroll: true });
         returnFocus = null;
@@ -124,8 +135,16 @@
                 btn.disabled = true;
             } else if (item.children && item.children.length) {
                 btn.addEventListener('mouseenter', function () {
-                    openSubFor(btn, item.children);
+                    // A pointer crossing a row is not a submenu choice. On a
+                    // narrow screen the submenu overlaps the next menu item.
+                    if (global.innerWidth < 640 || !global.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+                    clearTimeout(openSubTimer);
+                    openSubTimer = setTimeout(function () {
+                        openSubTimer = null;
+                        if (!menuEl.hidden && !menuEl.inert && btn.matches(':hover')) openSubFor(btn, item.children);
+                    }, 140);
                 });
+                btn.addEventListener('mouseleave', function () { clearTimeout(openSubTimer); openSubTimer = null; });
                 btn.addEventListener('click', function (e) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -169,11 +188,16 @@
     }
 
     function openSubFor(parentBtn, children) {
+        clearTimeout(openSubTimer); openSubTimer = null;
         if (closeSubTimer) {
             clearTimeout(closeSubTimer);
             closeSubTimer = null;
         }
         var sub = ensureSub();
+        if (subParent === parentBtn && !sub.hidden && !sub.inert) return;
+        subRevision++;
+        if (global.NewtabMotion) global.NewtabMotion.cancel(sub);
+        sub.inert = false;
         $$('.ctx-item.has-sub', menuEl).forEach(function (b) {
             b.classList.remove('is-open');
         });
@@ -203,10 +227,14 @@
         sub.style.left = left + 'px';
         sub.style.top = top + 'px';
         sub.classList.toggle('is-open-left', openLeft);
+        if (global.NewtabMotion) global.NewtabMotion.enter(sub, { x: openLeft ? 4 : -4, y: 0, scale: .985, duration: 180 });
     }
 
     function openAt(x, y, items) {
         var el = ensureMenu();
+        var token = ++menuRevision;
+        if (global.NewtabMotion) global.NewtabMotion.cancel(el);
+        el.inert = false;
         returnFocus = document.activeElement;
         closeSub();
         el.classList.remove('is-visible');
@@ -232,8 +260,9 @@
         el.style.setProperty('--ctx-origin', originX + ' ' + originY);
 
         requestAnimationFrame(function () {
-            if (el.hidden) return;
+            if (el.hidden || token !== menuRevision) return;
             el.classList.add('is-visible');
+            if (global.NewtabMotion) global.NewtabMotion.enter(el, { y: 4, scale: .975, duration: 200 });
             focusFirst(el);
         });
     }
@@ -539,7 +568,7 @@
         document.addEventListener('newtab:layout-change', syncWidgetButtons);
         document.addEventListener('contextmenu', onContextMenu);
         document.addEventListener('pointerdown', function (e) {
-            if (!menuEl || menuEl.hidden) return;
+            if (!menuEl || menuEl.hidden || menuEl.inert) return;
             if (e.target.closest && (e.target.closest('.ctx-menu') || e.target.closest('.ctx-sub'))) return;
             close();
         });
@@ -554,7 +583,7 @@
                     return;
                 }
             }
-            if (!menuEl || menuEl.hidden) return;
+            if (!menuEl || menuEl.hidden || menuEl.inert) return;
             var current = document.activeElement;
             var container = current && current.closest && current.closest('.ctx-sub, .ctx-menu');
             if (e.key === 'Escape') {

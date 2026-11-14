@@ -135,7 +135,7 @@
             const item = existing[index] || document.createElement('div');
             item.id = 'search-suggestion-' + index;
             item.className = 'suggestion-item' + (animate ? ' is-entering' : '');
-            item.style.animationDelay = animate ? (0.04 + index * 0.03) + 's' : '';
+            item.style.animationDelay = animate ? Math.min(index * 16, 64) + 'ms' : '';
             item.setAttribute('role', 'option');
             item.setAttribute('aria-selected', 'false');
             item.dataset.suggestion = suggestion;

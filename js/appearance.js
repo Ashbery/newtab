@@ -153,12 +153,16 @@
         range.type = 'range'; range.min = '0'; range.max = String(max); range.step = '1';
         range.setAttribute('aria-label', label + '滑桿');
         var value = Math.round(initial);
-        function paint(next) { value = Math.round(next); range.value = number.value = String(value); }
+        function paint(next) {
+            value = Math.round(next); range.value = number.value = String(value);
+            range.style.setProperty('--range-progress', (max > 0 ? value / max * 100 : 0) + '%');
+        }
         function update(event) {
             // Empty intermediate input must not silently reset a setting to zero.
             if (event.target.value.trim() === '' || !Number.isFinite(event.target.valueAsNumber)) return;
             var next = Math.round(Math.max(0, Math.min(max, event.target.valueAsNumber)));
             value = next; range.value = String(next);
+            range.style.setProperty('--range-progress', (max > 0 ? next / max * 100 : 0) + '%');
             if (event.target === range || event.type === 'change') number.value = String(next);
             change(next);
         }
@@ -194,7 +198,10 @@
     function openWidget(id) {
         var widget = widgetById(id);
         if (!widget) return;
-        if (dialog) dialog.close();
+        if (dialog) {
+            if (global.NewtabMotion) global.NewtabMotion.cancel(dialog);
+            dialog.close();
+        }
         var opener = document.activeElement;
         dialog = document.createElement('dialog');
         dialog.className = 'appearance-dialog';
@@ -332,7 +339,13 @@
         var done = document.createElement('button'); done.type = 'button'; done.className = 'appearance-done'; done.textContent = '完成';
         actions.append(reset, done); dialog.appendChild(actions);
         var panel = dialog;
-        function finish() { panel.close(); }
+        var closing = false;
+        function finish() {
+            if (closing) return;
+            closing = true; panel.inert = true;
+            if (global.NewtabMotion) global.NewtabMotion.exit(panel, { y: 6, scale: .99, duration: 140 }).then(function (complete) { if (complete && panel.open) panel.close(); });
+            else panel.close();
+        }
         close.addEventListener('click', finish);
         done.addEventListener('click', finish);
         panel.addEventListener('close', function () {
@@ -365,6 +378,7 @@
             }
         });
         document.body.appendChild(panel); panel.showModal();
+        if (global.NewtabMotion) global.NewtabMotion.enter(panel, { y: 12, scale: .985, duration: 280 });
         document.dispatchEvent(new CustomEvent('newtab:appearance-dialog', { detail: { open: true } }));
         close.focus();
     }

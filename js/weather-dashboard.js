@@ -37,7 +37,11 @@
         ['C', 'F'].forEach(function (unit) {
             var button = node('button', 'weather-unit', '°' + unit); button.type = 'button'; button.dataset.unit = unit;
             button.setAttribute('aria-label', unit === 'C' ? '攝氏' : '華氏');
-            button.addEventListener('click', function () { state.unit = unit; options.onUnit(unit); updateTemperatures(); updateChart(); });
+            button.addEventListener('click', function () {
+                if (state.unit === unit) return;
+                state.unit = unit; options.onUnit(unit); updateTemperatures(); updateChart(true);
+                if (global.NewtabMotion) global.NewtabMotion.enter(temp, { y: 3, scale: 1, duration: 180 });
+            });
             units.appendChild(button);
         });
         main.append(glyph, temp, units);
@@ -56,6 +60,7 @@
         details.addEventListener('click', function () {
             state.expanded = !state.expanded; body.classList.toggle('weather-expanded', state.expanded);
             details.setAttribute('aria-expanded', String(state.expanded)); details.textContent = state.expanded ? '收起預報' : '查看預報';
+            if (state.expanded && global.NewtabMotion) global.NewtabMotion.enter(forecast, { y: 6, scale: 1, duration: 240 });
         });
         details.textContent = state.expanded ? '收起預報' : '查看預報';
         body.appendChild(details);
@@ -70,7 +75,11 @@
         ['temp', 'rain', 'wind'].forEach(function (metric) {
             var tab = node('button', 'weather-metric', labels[metric]); tab.type = 'button'; tab.dataset.metric = metric;
             tab.id = panelId + '-' + metric; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', panelId);
-            tab.addEventListener('click', function () { state.metric = metric; state.index = 0; updateChart(); });
+            tab.addEventListener('click', function () {
+                if (state.metric === metric) return;
+                var direction = ['temp', 'rain', 'wind'].indexOf(metric) > ['temp', 'rain', 'wind'].indexOf(state.metric) ? 1 : -1;
+                state.metric = metric; state.index = 0; updateChart(true, direction);
+            });
             tab.addEventListener('keydown', function (event) {
                 var index = ['temp', 'rain', 'wind'].indexOf(metric);
                 if (event.key === 'ArrowRight') index = (index + 1) % 3;
@@ -97,7 +106,12 @@
             var button = node('button', 'weather-day'); button.type = 'button'; button.dataset.date = day.date;
             var icon = node('span', 'weather-day-icon'); icon.innerHTML = options.glyph(day.code);
             button.append(node('span', 'weather-day-name', dayName(day.date, today)), icon, node('span', 'weather-day-range'));
-            button.addEventListener('click', function () { state.date = day.date; state.index = 0; updateChart(); });
+            button.addEventListener('click', function () {
+                if (state.date === day.date) return;
+                var direction = day.date > state.date ? 1 : -1;
+                state.date = day.date; state.index = 0; updateChart(true, direction);
+                if (global.NewtabMotion) global.NewtabMotion.play(icon, [{ scale: '.86' }, { scale: '1' }], { duration: 240 });
+            });
             dayStrip.appendChild(button);
         });
         var selected = [];
@@ -115,6 +129,7 @@
         }
         function updateTemperatures() {
             temp.textContent = temperature(data.temp);
+            units.dataset.unit = state.unit;
             units.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.unit === state.unit)); });
             var todayForecast = days.find(function (day) { return day.date === today; });
             var high = todayForecast ? todayForecast.high : data.high, low = todayForecast ? todayForecast.low : data.low;
@@ -147,7 +162,8 @@
             if (dot) { dot.setAttribute('cx', point(state.index)); dot.setAttribute('cy', chart._weatherY(value(h))); dot.style.display = number(value(h)) ? '' : 'none'; }
             reading.setAttribute('aria-live', announce ? 'polite' : 'off');
         }
-        function updateChart() {
+        function updateChart(animate, direction) {
+            if (animate && global.NewtabMotion) global.NewtabMotion.enter(panel, { x: (direction || 0) * 6, y: 0, scale: 1, duration: 200 });
             var metricIndex = ['temp', 'rain', 'wind'].indexOf(state.metric);
             intervalNote.textContent = state.metric === 'rain' && !hasProbability ? '雨量依各預報區間顯示，時長見上方數值。' : '';
             tabs.style.setProperty('--weather-tab', metricIndex);

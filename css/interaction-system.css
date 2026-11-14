@@ -1,0 +1,165 @@
+/* One calm motion language: powder-blue selection, silver rims, legible ink.
+   Motion belongs to the control's state, never to its pointer hit target. */
+:root {
+    --motion-fast: 120ms;
+    --motion-control: 180ms;
+    --motion-panel: 320ms;
+    --motion-ease: cubic-bezier(.22, 1, .36, 1);
+    --motion-spring: linear(0, .22 10%, .61 25%, .88 43%, 1.015 66%, 1.005 84%, 1);
+    --control-ink: #36596e;
+    --control-track: #dce5eb;
+    --control-selected: #b7d6e4;
+}
+
+/* Form controls retain native keyboard and accessibility behavior. */
+:is(.appearance-dialog, .weather-location-dialog, .bookmark-modal, .video-upload-container, .about-page-container) :is(button, select, input, textarea) {
+    transition: background-color var(--motion-control) ease, border-color var(--motion-control) ease,
+        box-shadow var(--motion-control) ease, color var(--motion-control) ease;
+}
+:is(.appearance-dialog, .weather-location-dialog, .bookmark-modal, .video-upload-container) :is(input:not([type="range"]):not([type="checkbox"]):not([type="color"]), select, textarea) {
+    border-color: #cbd9e2;
+    background-color: #ffffffa8;
+    box-shadow: 0 1px 2px #344e6205;
+}
+:is(.appearance-dialog, .weather-location-dialog, .bookmark-modal, .video-upload-container) :is(input, select, textarea):focus-visible {
+    outline: 2px solid #527f99;
+    outline-offset: 3px;
+}
+:is(.appearance-dialog, .weather-location-dialog, .bookmark-modal, .video-upload-container) button:not(:disabled):active {
+    box-shadow: inset 0 0 0 2px #527f9929;
+}
+:is(.appearance-dialog, .weather-location-dialog, .bookmark-modal, .video-upload-container) button svg {
+    transition: scale var(--motion-control) var(--motion-spring), rotate var(--motion-control) var(--motion-ease);
+}
+:is(.appearance-dialog, .weather-location-dialog, .bookmark-modal, .video-upload-container) button:active svg { scale: .9; }
+.appearance-dialog input[type="checkbox"] {
+    appearance: none; position: relative; flex: 0 0 42px; width: 42px; height: 24px;
+    margin: 10px 0; border: 1px solid #b8cad7; border-radius: 999px;
+    background: var(--control-track); cursor: pointer;
+    transition: background-color var(--motion-control) ease, border-color var(--motion-control) ease;
+}
+.appearance-dialog input[type="checkbox"]::before {
+    content: ''; position: absolute; width: 16px; height: 16px; top: 3px; left: 3px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #304a5b30;
+    transition: translate var(--motion-panel) var(--motion-spring), scale var(--motion-fast) ease;
+}
+.appearance-dialog input[type="checkbox"]::after { content: ''; position: absolute; inset: -11px -4px; }
+.appearance-dialog input[type="checkbox"]:checked { background: #698da5; border-color: #698da5; }
+.appearance-dialog input[type="checkbox"]:checked::before { translate: 18px 0; }
+.appearance-dialog input[type="checkbox"]:active::before { scale: 1.13 .88; }
+.appearance-dialog input[type="checkbox"]:disabled { opacity: .5; cursor: default; }
+
+/* Track progress and a tactile thumb; value changes remain synchronous. */
+:is(.appearance-dialog, .background-appearance, .side-rail, .icon-crop-modal) input[type="range"] {
+    appearance: none; background: transparent; height: 32px; cursor: pointer;
+}
+:is(.appearance-dialog, .background-appearance, .side-rail, .icon-crop-modal) input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 8px;
+    background: linear-gradient(90deg, #698da5 var(--range-progress, 50%), #dce5eb var(--range-progress, 50%));
+}
+:is(.appearance-dialog, .background-appearance, .side-rail, .icon-crop-modal) input[type="range"]::-webkit-slider-thumb {
+    appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 3px solid #fff; border-radius: 50%;
+    background: #698da5; box-shadow: 0 0 0 1px #b8cbd7, 0 2px 5px #304a5b1a;
+    transition: scale var(--motion-control) var(--motion-spring), box-shadow var(--motion-control) ease;
+}
+:is(.appearance-dialog, .background-appearance, .side-rail, .icon-crop-modal) input[type="range"]:active::-webkit-slider-thumb { scale: 1.2; box-shadow: 0 0 0 5px #698da51c; }
+
+/* Menus use the shared interruptible motion helper, not competing transforms. */
+.ctx-menu, .ctx-sub { transform: none; transition: none; transform-origin: var(--ctx-origin, top left); }
+.ctx-menu.is-visible, .ctx-sub.is-open { transform: none; opacity: 1; }
+.ctx-menu.is-visible, .ctx-sub.is-open, .weather-location-dialog[open] { animation: none; }
+.ctx-item { transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease; }
+.ctx-chevron { display: inline-block; transition: translate var(--motion-control) var(--motion-ease); }
+.ctx-item.is-open .ctx-chevron { translate: 2px 0; }
+.ctx-item:active { background-color: #c8dfed; }
+
+/* Search feedback stays inside the customized surface. */
+.suggestion-item { transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease; }
+.suggestion-item :is(svg, i) { transition: translate var(--motion-control) var(--motion-ease); }
+.suggestion-item:is(:hover, .selected) :is(svg, i) { translate: 2px 0; }
+.search-box .clear-btn { transition: opacity var(--motion-fast) ease, scale var(--motion-control) var(--motion-spring); }
+.search-box:not(.has-text) .clear-btn { scale: .85; }
+.search-box .suggestion-item.is-entering { animation-duration: 180ms; }
+.search-box .suggestions-container, .search-box.active .suggestions-container,
+.widget[data-type="search"] .search-box .suggestions-container {
+    transition: opacity 150ms ease, transform 220ms var(--motion-ease), grid-template-rows 220ms var(--motion-ease);
+}
+.search-input-wrapper:focus-within { outline-offset: 3px; }
+.search-expand-layer .search-expand-panel { transform: translateY(8px) scale(.98); transition: transform 260ms var(--motion-ease), opacity 180ms ease; }
+.search-expand-layer.is-open .search-expand-panel { transform: none; }
+.search-expand-layer.is-closing .search-expand-panel { transform: translateY(6px) scale(.99); transition-duration: 180ms; }
+
+/* Direction-aware forecast tabs. The selection moves; the text stays still. */
+.has-forecast .weather-metrics { border-bottom: 0; gap: 0; }
+.has-forecast .weather-metric { border-radius: 10px; }
+.has-forecast .weather-metric-indicator {
+    bottom: 2px; height: calc(100% - 4px); border-radius: 10px;
+    background: color-mix(in srgb, currentColor 9%, transparent);
+    transition: transform var(--motion-panel) var(--motion-spring);
+}
+.has-forecast .weather-units { position: relative; isolation: isolate; }
+.has-forecast .weather-units::before {
+    content: ''; position: absolute; pointer-events: none; z-index: -1;
+    top: 7px; bottom: 0; left: 0; width: 50%; border-radius: 8px;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    translate: 0 0; transition: translate var(--motion-panel) var(--motion-spring);
+}
+.has-forecast .weather-units[data-unit="F"]::before { translate: 100% 0; }
+.has-forecast .weather-unit[aria-pressed="true"] { background: transparent; }
+.has-forecast :is(.weather-day, .weather-metric, .weather-unit) { transition: background-color var(--motion-control) ease, color var(--motion-control) ease; }
+.has-forecast .weather-day { border-radius: 12px; }
+.has-forecast .weather-day-icon { transform-origin: 50% 70%; }
+.weather-actions button svg { transition: scale var(--motion-control) var(--motion-spring); }
+.weather-actions button:active svg { scale: .86; }
+.weather-retry:disabled svg { animation: nacho-weather-refresh 850ms linear infinite; }
+@keyframes nacho-weather-refresh { to { rotate: 1turn; } }
+@container weather (max-width: 259px) or (max-height: 289px) { .has-forecast .weather-units::before { top: 0; } }
+
+/* Folder disclosure stays anchored without flying across a wide monitor. */
+.folder-overlay-panel { transition: opacity 180ms ease, transform 280ms var(--motion-ease); }
+.folder-overlay.is-open:not(.is-visible) .folder-overlay-panel { transform: translateY(12px) scale(.975); }
+.folder-overlay.is-visible .folder-open-item { animation: nacho-folder-item 240ms var(--motion-ease) both; }
+.folder-overlay.is-visible .folder-open-item:nth-child(n+5) { animation-delay: 90ms; }
+@keyframes nacho-folder-item { from { opacity: 0; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
+
+/* Small task states: preserve labels and editable backgrounds. */
+.todo-item input[type="checkbox"] { accent-color: #698da5; cursor: pointer; }
+.todo-item { transition: opacity var(--motion-control) ease; }
+.todo-item.is-done .todo-text { opacity: .56; }
+.todo-item .todo-text { transition: opacity var(--motion-control) ease; }
+.todo-item .todo-check::before { border-radius: 6px; transition: background-color var(--motion-control) ease, border-color var(--motion-control) ease; }
+.todo-item .todo-check::after { transition: opacity var(--motion-fast) ease, scale var(--motion-panel) var(--motion-spring); }
+.todo-item button { transition: background-color var(--motion-control) ease, color var(--motion-control) ease; }
+.notes-body textarea:focus, .countdown-title-input:focus, .countdown-date-input:focus { outline-color: #698da5; }
+.bookmark-modal-panel, .icon-crop-panel, .upload-box, .about-page {
+    transition-timing-function: var(--motion-ease);
+}
+.widget:is([data-type="app"], [data-type="folder"], [data-type="companion"]) {
+    transition: opacity var(--motion-control) ease, visibility 0s;
+}
+body.is-focus-mode .widget:is([data-type="app"], [data-type="folder"], [data-type="companion"]) {
+    transition: opacity var(--motion-control) ease, visibility 0s var(--motion-control);
+}
+.widget-select-ring { transition: opacity var(--motion-fast) ease, border-color var(--motion-fast) ease; }
+#home-drop-preview { transition: border-color var(--motion-control) ease, background-color var(--motion-control) ease; }
+#home-editor-toolbar { opacity: 1; transform: translateY(0); transition: opacity var(--motion-control) ease, transform var(--motion-panel) var(--motion-ease); }
+#home-editor-toolbar button { transition: background-color var(--motion-fast) ease; }
+#home-editor-toolbar button:active { box-shadow: inset 0 0 0 2px #36596e26; }
+@starting-style { #home-editor-toolbar:not([hidden]) { opacity: 0; transform: translateY(8px); } }
+
+/* Native dialogs keep their readable surface, with a restrained backdrop. */
+.appearance-dialog, .weather-location-dialog {
+    border-color: #cad9e3; box-shadow: 0 16px 54px #243e5526, 0 2px 8px #243e550b;
+}
+.appearance-dialog[open] { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
+.appearance-dialog .appearance-fields { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 8px; margin-right: -8px; }
+.appearance-dialog > footer { padding-top: 16px; border-top: 1px solid #d0dfe8; }
+.appearance-dialog::backdrop, .weather-location-dialog::backdrop { background: #172d4026; }
+
+@media (prefers-reduced-motion: reduce) {
+    :root { --motion-fast: 0ms; --motion-control: 0ms; --motion-panel: 0ms; }
+    .folder-overlay.is-visible .folder-open-item { animation: none; }
+    .weather-retry:disabled svg { animation: none; }
+    .appearance-dialog input[type="checkbox"]:active::before { scale: 1; }
+    :is(.appearance-dialog, .background-appearance, .side-rail, .icon-crop-modal) input[type="range"]:active::-webkit-slider-thumb { scale: 1; }
+}

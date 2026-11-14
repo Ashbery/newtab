@@ -1,6 +1,6 @@
 # 設計資源與使用界線
 
-整理日期：2026-11-14。保留 21 個網站資源及 4 個已安裝技能的來源；未逐站確認目前功能與收費。
+整理日期：2026-11-14。保留原始 21 個網站資源及 4 個已安裝技能的來源，另收錄本次使用的 DesignBookmark Motion 與 Cult UI；未逐站確認所有資源目前的功能與收費。
 
 ## 最終使用原則
 
@@ -9,6 +9,17 @@
 角色的銀灰、粉藍、白、水色與炭灰，延伸到九枚生成應用圖示、透明人物圖與細緻緞帶／紙飛機搜尋 SVG。搜尋不使用已被否決的黑貓送出按鈕。淺瓷色抽屜與淺紙色表單，以炭灰文字及藍色重點維持清楚層次；具體方向見 [DESIGN.md](DESIGN.md)。
 
 ## 已安裝技能與實際用途
+
+### 2026-11-14 全介面動效參考
+
+| 資源 | 已檢視內容及採用方式 |
+| --- | --- |
+| [DesignBookmark Motion](https://designbookmark.com/motion) | Toggle switch、Range slider、Tab pill、Spring dropdown 的互動方向；另檢視官方 Streaming reply / Loading to success 範例程式，以首次訊息進場、穩定串流文字和回覆完成狀態改寫。本站自行實作，不把目錄中的所有外站素材視為免費或共用授權。 |
+| [Cult UI](https://github.com/nolly-studio/cult-ui) | 檢視官方 Halo Switch、Direction-Aware Tabs、Popover、Side Panel、Prompt Composer 原始碼／文件（來源 commit `d71b1428b811c2779d46ea41b7ef8c9f9c9991c2`）。採用彈簧拇指、滑動選中面、方向感切換、自適應輸入與送出／停止交接的設計方式，改寫為原生 CSS / WAAPI；沒有引入 React 或其品牌色。其程式庫為 [MIT](https://github.com/nolly-studio/cult-ui/blob/main/LICENSE.md)，這不表示連結的其他服務或素材也適用相同授權。 |
+
+這一輪使用兩個新增來源改造操作狀態；角色圖示、立繪、色彩與現有個人化資料仍沿用本專案。具體設計及取捨見 [DESIGN.md](DESIGN.md) 的 Whole-interface motion pass。
+
+### 已安裝技能
 
 | 技能 | 來源 | 本次用途 |
 | --- | --- | --- |

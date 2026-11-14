@@ -201,7 +201,7 @@
             }
             if (focus && focus.isConnected && typeof focus.focus === 'function') focus.focus();
             previousFocus = null;
-        }, 200);
+        }, global.NewtabMotion && global.NewtabMotion.reduced() ? 0 : 180);
     }
 
     function isOpen() {

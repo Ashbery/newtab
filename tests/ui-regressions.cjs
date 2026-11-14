@@ -340,7 +340,8 @@ async function exerciseCompanion(page, mobile, reducedMotion) {
         assert.equal(page.context().pages().length, pageCount, 'pointer and keyboard activation never open another page');
         assert.equal(await page.locator('.character-chat-message.is-assistant').count(), 0, 'disconnected UI fabricates no assistant reply');
         await page.keyboard.press('Escape');
-        await page.locator('.character-chat-dialog').waitFor({ state: 'hidden' });
+        await page.locator('.character-chat-dialog:not(.character-chat-exit-ghost)').waitFor({ state: 'hidden' });
+        await page.locator('.character-chat-exit-ghost').waitFor({ state: 'detached' });
         assert.equal(await trigger.evaluate(element => element === document.activeElement), true, 'chat close returns focus to the character');
     }
     if (reducedMotion === 'reduce') {
@@ -349,6 +350,7 @@ async function exerciseCompanion(page, mobile, reducedMotion) {
     await openTools(page);
     await page.locator('#focus-home').click();
     assert.equal(await widget.evaluate(e => e.inert), true);
+    await widget.waitFor({ state: 'hidden' });
     assert.equal(await widget.isVisible(), false, 'focus mode removes the companion and its keyboard target');
     await page.keyboard.press('Escape');
     assert.equal(await widget.evaluate(e => e.inert), false);

@@ -348,19 +348,32 @@
     }
 
     function openDialog(element) {
-        returnFocus.set(element, document.activeElement);
+        if (element.style.display !== 'flex') returnFocus.set(element, document.activeElement);
+        element._motionRevision = (element._motionRevision || 0) + 1;
+        element.inert = false;
+        if (global.NewtabMotion) global.NewtabMotion.cancel(element);
         closeMenu();
         element.style.display = 'flex';
+        if (global.NewtabMotion) global.NewtabMotion.enter(element.querySelector('.upload-box, .about-page') || element.firstElementChild, { y: 10, scale: .985, duration: 280 });
         element.querySelector('button').focus();
     }
 
     function closeDialog(element) {
         if (element === dialog && busy) return;
-        element.style.display = 'none';
-        var previous = returnFocus.get(element);
-        if (previous && previous.isConnected && previous.getClientRects().length && !previous.disabled && !previous.closest('[inert]')) previous.focus();
-        else if (previous && menu.contains(previous) && gear.getClientRects().length) gear.focus();
-        else { var tab = document.getElementById('side-rail-tab'); if (tab) tab.focus(); }
+        var token = element._motionRevision = (element._motionRevision || 0) + 1;
+        element.inert = true;
+        function finish() {
+            if (element._motionRevision !== token) return;
+            element.style.display = 'none'; element.inert = false;
+            var active = document.activeElement;
+            if (document.querySelector('dialog[open]') || (active && active !== document.body && !element.contains(active))) return;
+            var previous = returnFocus.get(element);
+            if (previous && previous.isConnected && previous.getClientRects().length && !previous.disabled && !previous.closest('[inert]')) previous.focus();
+            else if (previous && menu.contains(previous) && gear.getClientRects().length) gear.focus();
+            else { var tab = document.getElementById('side-rail-tab'); if (tab) tab.focus(); }
+        }
+        if (global.NewtabMotion) global.NewtabMotion.exit(element, { y: 0, scale: 1, duration: 140 }).then(finish);
+        else finish();
     }
 
     function openUpload() { if (!busy) resetForm(); openDialog(dialog); }
@@ -499,7 +512,7 @@
         element.addEventListener('click', function (event) { if (event.target === element) closeDialog(element); });
     });
     document.addEventListener('keydown', function (event) {
-        var activeDialog = [dialog, about].find(function (element) { return element.style.display === 'flex'; });
+        var activeDialog = [dialog, about].find(function (element) { return element.style.display === 'flex' && !element.inert; });
         if (!activeDialog) return;
         if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); closeDialog(activeDialog); }
         if (event.key === 'Tab') {

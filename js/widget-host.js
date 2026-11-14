@@ -2804,8 +2804,32 @@
         return layer;
     }
 
+    function focusExpandedSearch(session, input) {
+        if (!input || document.activeElement === input) return;
+        var previous = document.activeElement;
+        var request = session.focusRequest = (session.focusRequest || 0) + 1;
+        try { input.focus({ preventScroll: true }); } catch (_) { /* Host can temporarily reject focus. */ }
+        // A visibility reversal or reparenting inside focusin can reject the
+        // first focus. Retry only for this session and without stealing a newer
+        // deliberate focus choice from a different control.
+        setTimeout(function () {
+            if (state.searchExpand !== session || session.closing || session.focusRequest !== request) return;
+            if (document.activeElement === previous || document.activeElement === document.body) input.focus({ preventScroll: true });
+        }, 40);
+    }
+
     function openSearchExpand() {
-        if (state.arranging || state.searchExpand) return;
+        if (state.arranging) return;
+        if (state.searchExpand) {
+            if (state.searchExpand.closing) {
+                clearTimeout(state.searchExpand.closeTimer);
+                state.searchExpand.closing = false;
+                var reopening = document.getElementById('search-expand-layer');
+                if (reopening) { reopening.classList.remove('is-closing'); reopening.classList.add('is-open'); }
+            }
+            focusExpandedSearch(state.searchExpand, document.getElementById('search-input'));
+            return;
+        }
         var box = document.getElementById('search-box');
         var searchWidget = document.querySelector('.widget[data-type="search"][data-active="true"]');
         if (!box || !searchWidget) return;
@@ -2831,15 +2855,7 @@
         void layer.offsetWidth;
         layer.classList.add('is-open');
 
-        var input = document.getElementById('search-input');
-        if (input) {
-            try { input.focus(); } catch (err) { /* */ }
-            // Moving a focused input during focusin can let the original focus
-            // operation clear focus again. Restore it after that operation ends.
-            setTimeout(function () {
-                if (state.searchExpand && !state.searchExpand.closing && document.activeElement !== input) input.focus();
-            }, 40);
-        }
+        focusExpandedSearch(state.searchExpand, document.getElementById('search-input'));
     }
 
     function closeSearchExpand() {
@@ -2858,7 +2874,8 @@
             layer.classList.add('is-closing');
             layer.classList.remove('is-open');
         }
-        setTimeout(function () {
+        se.closeTimer = setTimeout(function () {
+            if (state.searchExpand !== se || !se.closing) return;
             if (se.parent) {
                 if (se.nextSibling && se.nextSibling.parentNode === se.parent) {
                     se.parent.insertBefore(se.host, se.nextSibling);
@@ -2874,7 +2891,7 @@
                 se.widget.setAttribute('tabindex', '0');
                 se.widget.focus({ preventScroll: true });
             }
-        }, 200);
+        }, global.NewtabMotion && global.NewtabMotion.reduced() ? 0 : 180);
     }
 
     function clearBlankLP() {
