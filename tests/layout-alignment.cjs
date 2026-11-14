@@ -33,19 +33,20 @@ function near(a,b,label){assert(Math.abs(a-b)<.1,label+': '+a+' vs '+b);}
       const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(8000);await page.goto(base);
       const original=await geometry(page,'app-images'),last=await geometry(page,'app-maps');
       await add(page,'Play');await menu(page,'個人化');await page.locator('#arrange-home').click();
-      // Aim at the nearby visible grid slot, not an exact fractional legacy coordinate.
-      const rowPreview=await drag(page,'app-play',768,original.box.y+original.box.height/2+(legacy?5:0));
+      // Aim two pixels from the existing rhythm: the fine-grid magnet no
+      // longer pulls a pointer12px away back into a legacy coarse cell.
+      const rowPreview=await drag(page,'app-play',last.box.x+(legacy?92:96)+original.box.width/2+2,original.box.y+original.box.height/2+2);
       assert.equal(rowPreview.state,'place');const row=await geometry(page,'app-play');
       for(const part of ['box','icon','label'])near(row[part].y,original[part].y,'new/old same row '+part);
       near(row.box.x-last.box.x,legacy?92:96,'new item continues existing row spacing');
       near(row.box.y,rowPreview.top,'row preview equals drop');
-      await add(page,'新聞');const colPreview=await drag(page,'app-news',384,original.box.y+149);
+      await add(page,'新聞');const colPreview=await drag(page,'app-news',original.box.x+original.box.width/2+2,original.box.y+104+original.box.height/2+2);
       assert.equal(colPreview.state,'place');const col=await geometry(page,'app-news');
       for(const part of ['box','icon','label'])near(col[part].x,original[part].x,'new/old same column '+part);
       near(col.box.x,colPreview.left,'column preview equals drop');
       await page.locator('.widget[data-id=app-news]').focus();
       await page.keyboard.press('ArrowDown');const moved=await geometry(page,'app-news');
-      near(moved.box.x,col.box.x,'keyboard preserves legacy column');near(moved.box.y-col.box.y,104,'keyboard preserves row phase');
+      near(moved.box.x,col.box.x,'keyboard preserves legacy column');near(moved.box.y-col.box.y,13,'keyboard uses one fine step while preserving the row phase');
       await page.keyboard.press('ArrowUp');const returned=await geometry(page,'app-news');near(returned.box.y,col.box.y,'keyboard returns to aligned row');
       await page.locator('#arrange-done-bar').click();await page.reload();
       for(const id of ['app-images','app-play','app-news']) {
@@ -63,10 +64,10 @@ function near(a,b,label){assert(Math.abs(a-b)<.1,label+': '+a+' vs '+b);}
     {
       const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
       await context.addInitScript(data=>localStorage.setItem('nt_layout_v1',JSON.stringify(data)),fixture);
-      const page=await context.newPage();await page.goto(base);await menu(page,'應用');
+      const page=await context.newPage();await page.goto(base);const original=await geometry(page,'app-images'),last=await geometry(page,'app-maps');await menu(page,'應用');
       const icon=page.locator('[data-place-kind=app][data-place-type=drive] .list-icon');const start=await icon.boundingBox();
       await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await delay(650);
-      await page.mouse.move(768,589,{steps:14});
+      await page.mouse.move(last.box.x+92+original.box.width/2+2,original.box.y+original.box.height/2+2,{steps:14});
       const preview=await page.locator('#home-drop-preview').evaluate(e=>({left:parseFloat(e.style.left),top:parseFloat(e.style.top),state:e.dataset.state}));
       assert.equal(preview.state,'place');near(preview.left,721.6,'direct catalog continues92px pitch');near(preview.top,544,'direct catalog aligns legacy row');
       await page.mouse.up();await page.mouse.move(1400,50);await delay(100);

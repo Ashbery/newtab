@@ -59,6 +59,65 @@ test('widget resize uses meaningful spans and snapping is idempotent',()=>{
         assert.deepEqual(L.homeSnap(rect,'notes',grid,true),rect);
     }
 });
+
+test('fine XY steps are separate from semantic cells and retain default dimensions',()=>{
+    for (const [width,height] of [[320,640],[390,844],[600,900],[1440,900],[3440,1440],[5120,1440]]) {
+        const grid=L.homeGrid(width,height);
+        assert.equal(grid.stepX,grid.pitchX/8); assert.equal(grid.stepY,13);
+        const original=L.homeDefaultRect({type:'app',options:{homeSeed:0}},grid);
+        const moved=L.homeSnap({...original,left:original.left+grid.stepX,top:original.top+grid.stepY},'app',grid,false);
+        assert.equal(moved.left-original.left,grid.stepX); assert.equal(moved.top-original.top,grid.stepY);
+        assert.equal(moved.width,original.width); assert.equal(moved.height,original.height);
+        assert.deepEqual(L.homeSnap(moved,'app',grid,false),moved);
+        assert.deepEqual({...L.homePlacementRect(L.homePlacement(moved,'app',grid),'app',grid)},{...moved});
+    }
+});
+
+test('fractional resized spans keep exact pixels through profile reload and a resolution roundtrip',()=>{
+    const grid=L.homeGrid(1440,900);
+    const rect=L.homeSnap({left:352,top:302,width:292,height:213},'notes',grid,true);
+    assert.equal(rect.width,292); assert.equal(rect.height,213);
+    const saved=L.homePlacement(rect,'notes',grid);
+    assert.equal(saved.spanX,null); assert.equal(saved.spanY,null); assert.equal(saved.v,3);
+    for (const [width,height] of [[1920,1080],[3440,1440],[5120,1440],[1440,900]]) {
+        const restored=L.homePlacementRect(saved,'notes',L.homeGrid(width,height));
+        assert.equal(restored.width,292); assert.equal(restored.height,213);
+        if(width===1440) assert.deepEqual({...restored},{...rect});
+    }
+});
+
+test('fine snapping remains idempotent at edges, partial cells and below-view positions',()=>{
+    for(const [width,height] of [[320,640],[390,844],[601,900],[1440,900],[3440,1440],[5120,1440]]) {
+        const grid=L.homeGrid(width,height);
+        for(const type of ['app','notes']) for(const resize of [false,true]) {
+            if(type==='app'&&resize)continue;
+            for(const [left,top] of [[-100,-100],[16,16],[width/2+3,grid.top+39],[width-20,height-20],[width/2,height+250]]) {
+                const rect=L.homeSnap({left,top,width:type==='app'?68:281,height:type==='app'?80:214},type,grid,resize);
+                assert(rect.left>=16&&rect.left+rect.width<=width-16&&rect.top>=16);
+                assert.deepEqual(L.homeSnap(rect,type,grid,resize),rect,`${width} ${type} ${left},${top}`);
+            }
+        }
+    }
+});
+
+test('nearest placement finds an84px launcher pitch and catalog fallback uses a fine-only hole',()=>{
+    const grid=L.homeGrid(1440,900), rect={left:62,top:94,width:68,height:80};
+    const nearest=L.homeNearestFree(rect,'app',[{...rect,id:'original'}],grid);
+    assert.equal(nearest.left,146); assert.equal(nearest.top,94); assert.equal(nearest.left-rect.left-rect.width,16);
+    const blockers=[{id:'left',left:0,top:0,width:140,height:10000},{id:'right',left:220,top:0,width:1220,height:10000}];
+    const next=L.homeNextFree(rect,'app',blockers,grid);
+    assert(next); assert.equal(next.left,146); assert.equal(next.top,94); assert(L.homeFits(next,blockers));
+    assert.deepEqual(L.homeSnap(next,'app',grid,false),next);
+});
+
+test('nearest fine placement does not scan every column of a full ultrawide canvas',()=>{
+    for(const width of [1440,5120]) {
+        const grid=L.homeGrid(width,1440); let reads=0;
+        const full={id:'full',get left(){reads++;return 0;},top:0,width,height:10000};
+        assert.equal(L.homeNearestFree({left:width/2,top:400,width:280,height:200},'notes',[full],grid),null);
+        assert(reads<6000,'collision checks stay bounded by obstacle boundaries, not monitor columns: '+reads);
+    }
+});
 test('an occupied target is rejected, swapping can explicitly ignore its target',()=>{
     const rect={left:24,top:24,width:68,height:80};
     assert.equal(L.homeFits(rect,[{...rect,id:'other'}]),false);

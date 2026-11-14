@@ -1,6 +1,12 @@
 /* A calm, explicit workspace. The grid describes real placement cells. */
 body.is-arranging #widget-canvas { overflow-y: auto; pointer-events: auto; touch-action: pan-y; padding-bottom: 120px; }
-body.is-arranging #widget-canvas::before { content: ''; position: absolute; inset: 0 0 auto; height: var(--canvas-content-height, 100vh); pointer-events: none; background-image: radial-gradient(circle, #88a7b9 1px, transparent 1.5px); background-size: var(--editor-pitch-x, 96px) 104px; background-position: var(--editor-grid-left, 24px) var(--editor-grid-top, 24px); opacity: .48; }
+body.is-arranging #widget-canvas::before {
+    content: ''; position: absolute; inset: 0 0 auto; height: var(--canvas-content-height, 100vh); pointer-events: none;
+    background-image: radial-gradient(circle, #6c90a7 .9px, transparent 1.3px), radial-gradient(circle, rgb(108 144 167 / .45) .65px, transparent 1px);
+    background-size: var(--editor-pitch-x, 96px) var(--editor-pitch-y, 104px), var(--editor-step-x, 12px) var(--editor-step-y, 13px);
+    background-position: var(--editor-major-left, -24px) var(--editor-major-top, -28px), var(--editor-grid-left, 18px) var(--editor-grid-top, 17.5px);
+    opacity: .48;
+}
 body.is-arranging .widget { cursor: grab; outline: 1px solid transparent; outline-offset: 4px; border-radius: 14px; }
 body.is-arranging .widget.is-editor-selected { outline-color: #527b91; background-color: rgba(238, 247, 251, .32); }
 body.is-arranging .widget.is-dragging { cursor: grabbing; z-index: 899 !important; opacity: .82; transition: none !important; }

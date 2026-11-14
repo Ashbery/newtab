@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
-const fixture={v:4,rail:{open:false,width:300,tab:'personalize'},widgets:[
+// Coordinate compatibility is isolated from the separately tested one-time companion migration.
+const fixture={v:4,companionMigrated:true,rail:{open:false,width:300,tab:'personalize'},widgets:[
  {id:'app-images',type:'app',x:.225,y:.61,w:.07,h:.11,z:1,options:{appId:'images',size:'m',appearance:{opacity:.8}}},
  {id:'notes-owned',type:'notes',x:.02,y:.72,w:.15,h:.18,z:2,options:{content:'保留原本筆記\nKeep my saved content'}}
 ]};
@@ -14,7 +15,8 @@ const base=process.env.NEWTAB_TEST_URL||'http://127.0.0.1:4173';
   const rect=()=>page.locator('.widget[data-id=app-images]').evaluate(el=>({left:parseFloat(el.style.left),top:parseFloat(el.style.top),width:parseFloat(el.style.width),height:parseFloat(el.style.height)}));
   const original=await rect();assert.deepEqual(original,{left:324,top:549,width:68,height:80});
   await page.mouse.move(1438,64);await page.locator('#side-rail-tab').click();await page.getByRole('tab',{name:'個人化',exact:true}).click();await page.locator('#arrange-home').click();
-  async function dragTo(x,y){const r=await page.locator('.widget[data-id=app-images]').boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(x,y,{steps:12});await page.mouse.up();}
+  // Editing still requires the same hold gesture as the user-facing launcher.
+  async function dragTo(x,y){const r=await page.locator('.widget[data-id=app-images]').boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.waitForTimeout(620);await page.mouse.move(x,y,{steps:12});await page.mouse.up();}
   await dragTo(96,134);assert.notDeepEqual(await rect(),original);
   await dragTo(358,589);assert.deepEqual(await rect(),original,'legacy off-grid position is a valid exact return target');
   await page.locator('#arrange-done-bar').click();await page.reload();assert.deepEqual(await rect(),original);

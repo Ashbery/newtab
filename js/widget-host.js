@@ -1612,7 +1612,8 @@
         var candidates = [editor.views[editor.family].initial[w.id], state.baselineRects && state.baselineRects[w.id]];
         candidates.forEach(function (anchor) {
             if (anchor && Math.abs(rect.width - anchor.width) < 1 && Math.abs(rect.height - anchor.height) < 1 &&
-                Math.abs(rect.left - anchor.left) < 22 && Math.abs(rect.top - anchor.top) < 22 && L.homeFits(anchor, otherPixelRects(w.id)) &&
+                Math.abs(rect.left - anchor.left) < Math.min(5, (editor.grid.stepX || editor.grid.pitchX) * 0.4) &&
+                Math.abs(rect.top - anchor.top) < Math.min(5, (editor.grid.stepY || editor.grid.pitchY) * 0.4) && L.homeFits(anchor, otherPixelRects(w.id)) &&
                 Math.hypot(rect.left - anchor.left, rect.top - anchor.top) < Math.hypot(rect.left - snapped.left, rect.top - snapped.top)) {
                 snapped = Object.assign({}, anchor); editor.previewGuides = [];
             }
@@ -1636,9 +1637,31 @@
         else if (r.top < 32) canvas.scrollTop -= 32 - r.top;
     }
 
+    function syncEditorGrid(type, rect) {
+        var editor = state.editor, canvas = $('#widget-canvas');
+        if (!editor || !canvas) return;
+        var selected = findWidget(editor.selected), grid = editor.grid;
+        type = type || selected && selected.type || 'notes';
+        rect = rect || editor.rects[editor.selected];
+        var offset = rect && L.homeColumnOffset ? L.homeColumnOffset(rect.width, type, grid) : grid.gap / 2;
+        var origin = grid.left + offset;
+        var stepX = grid.stepX || grid.pitchX, stepY = grid.stepY || grid.pitchY;
+        // Gradient dots are centered inside each tile. Offset by half a tile
+        // so the displayed intersections share the selected item's snap phase.
+        canvas.style.setProperty('--editor-step-x', stepX + 'px');
+        canvas.style.setProperty('--editor-step-y', stepY + 'px');
+        canvas.style.setProperty('--editor-pitch-x', grid.pitchX + 'px');
+        canvas.style.setProperty('--editor-pitch-y', grid.pitchY + 'px');
+        canvas.style.setProperty('--editor-grid-left', (origin - stepX / 2) + 'px');
+        canvas.style.setProperty('--editor-grid-top', (grid.top - stepY / 2) + 'px');
+        canvas.style.setProperty('--editor-major-left', (origin - grid.pitchX / 2) + 'px');
+        canvas.style.setProperty('--editor-major-top', (grid.top - grid.pitchY / 2) + 'px');
+    }
+
     function selectEditorWidget(id) {
         if (!state.editor) return;
         state.editor.selected = id;
+        syncEditorGrid();
         $$('.widget[data-active="true"]').forEach(function (el) {
             var w = findWidget(el.getAttribute('data-id'));
             el.classList.toggle('is-editor-selected', !!id && w && w.id === id);
@@ -1660,8 +1683,8 @@
         if (!state.editor) enterArrange();
         selectEditorWidget(id);
         var rect = Object.assign({}, state.editor.rects[id]);
-        rect.left += Math.sign(Number(dx) || 0) * state.editor.grid.pitchX;
-        rect.top += Math.sign(Number(dy) || 0) * state.editor.grid.pitchY;
+        rect.left += Math.sign(Number(dx) || 0) * (state.editor.grid.stepX || state.editor.grid.pitchX);
+        rect.top += Math.sign(Number(dy) || 0) * (state.editor.grid.stepY || state.editor.grid.pitchY);
         var snapped = snapEditorRect(w, rect, false);
         if (!L.homeFits(snapped, otherPixelRects(id))) {
             editorMessage('這個方向已有項目');
@@ -1771,11 +1794,7 @@
         var normalRects = visibleProjection(state.layout);
         var canvas = document.getElementById('widget-canvas');
         var contentHeight = state.editor ? (global.innerHeight || 800) : 0;
-        if (canvas && state.editor) {
-            canvas.style.setProperty('--editor-pitch-x', state.editor.grid.pitchX + 'px');
-            canvas.style.setProperty('--editor-grid-left', state.editor.grid.left + 'px');
-            canvas.style.setProperty('--editor-grid-top', state.editor.grid.top + 'px');
-        }
+        if (canvas && state.editor) syncEditorGrid();
         state.renderedRects = Object.create(null);
         state.layout.widgets.forEach(function (w) {
             var el = document.querySelector('.widget[data-id="' + w.id + '"]');
@@ -1884,13 +1903,36 @@
         state.editor.dirty = true;
     }
 
+    function resizedEditorRect(id, start, type, handle, dx, dy) {
+        var editor = state.editor, grid = editor.grid;
+        var initial = editor.views[editor.family].initial[id] || start;
+        var next = Object.assign({}, start);
+        var stepX = grid.stepX || grid.pitchX, stepY = grid.stepY || grid.pitchY;
+        var deltaX = Math.round(dx / stepX) * stepX, deltaY = Math.round(dy / stepY) * stepY;
+        var minimum = L.homeSnap({ left: start.left, top: start.top, width: 0, height: 0 }, type, grid, true);
+        var west = handle.indexOf('w') >= 0, north = handle.indexOf('n') >= 0;
+        // Resize relative to the saved rectangle, including old off-grid sizes.
+        // Only the dragged axes change; the opposite edges remain anchored.
+        if (west || handle.indexOf('e') >= 0) {
+            var maxWidth = west ? start.left + start.width - 16 : grid.width - 16 - start.left;
+            next.width = Math.min(maxWidth, Math.max(Math.min(start.width, initial.width, minimum.width), start.width + (west ? -deltaX : deltaX)));
+            if (west) next.left = start.left + start.width - next.width;
+        }
+        if (north || handle.indexOf('s') >= 0) {
+            var maxHeight = north ? start.top + start.height - 16 : Infinity;
+            next.height = Math.min(maxHeight, Math.max(Math.min(start.height, initial.height, minimum.height), start.height + (north ? -deltaY : deltaY)));
+            if (north) next.top = start.top + start.height - next.height;
+        }
+        return next;
+    }
+
     function resizeSelected(amount, axis) {
         var editor = state.editor, w = editor && findWidget(editor.selected);
         if (!w || w.pinned || !handlesForType(w.type).length) return;
-        var rect = Object.assign({}, editor.rects[w.id]);
-        if (axis !== 'y') rect.width += editor.grid.pitchX * amount;
-        if (axis !== 'x') rect.height += editor.grid.pitchY * amount;
-        var next = L.homeSnap(rect, w.type, editor.grid, true);
+        var handle = axis === 'x' ? 'e' : axis === 'y' ? 's' : 'se';
+        var next = resizedEditorRect(w.id, editor.rects[w.id], w.type, handle,
+            (editor.grid.stepX || editor.grid.pitchX) * amount,
+            (editor.grid.stepY || editor.grid.pitchY) * amount);
         if (!L.homeFits(next, otherPixelRects(w.id))) { editorMessage('這個尺寸會重疊，請先移到空位'); return; }
         commitEditorRect(w.id, next); applyPositions();
         editorMessage('已調整尺寸；完成後儲存');
@@ -2346,12 +2388,7 @@
         var dy = e.clientY - r.startY;
         if (!r.moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) r.moved = true;
 
-        var raw = Object.assign({}, r.startRect);
-        if (r.handle.indexOf('e') >= 0) raw.width += dx;
-        if (r.handle.indexOf('s') >= 0) raw.height += dy;
-        if (r.handle.indexOf('w') >= 0) { raw.left += dx; raw.width -= dx; }
-        if (r.handle.indexOf('n') >= 0) { raw.top += dy; raw.height -= dy; }
-        var next = L.homeSnap(raw, r.type, state.editor.grid, true);
+        var next = resizedEditorRect(r.id, r.startRect, r.type, r.handle, dx, dy);
         r.valid = L.homeFits(next, otherPixelRects(r.id));
         var painted = r.valid ? next : r.startRect;
         r.el.style.left = painted.left + 'px';
@@ -2484,12 +2521,14 @@
         rect = aligned.rect; state.editor.previewGuides = aligned.guides;
         var valid = L.homeFits(rect, otherPixelRects(null));
         state.editor.catalogPreview = { type: type, rect: rect, valid: valid };
+        syncEditorGrid(type, rect);
         showEditorPreview(rect, valid ? 'place' : 'blocked', valid ? '放開新增至此位置' : '這裡已有項目，請移到空位');
         return Object.assign({ valid: valid }, rect);
     }
 
     function clearCatalogPreview() {
         if (state.editor) state.editor.catalogPreview = null;
+        syncEditorGrid();
         showEditorPreview(null);
     }
 
@@ -2498,12 +2537,12 @@
         if (!preview || !preview.valid || preview.type !== type) { clearCatalogPreview(); return { ok: false, error: 'occupied' }; }
         var opts = Object.assign({}, options || {}, { left: preview.rect.left, top: preview.rect.top, strictPlacement: true });
         clearCatalogPreview();
-        var result = addFromCatalog(type, opts);
+        var result = addFromCatalog(type, opts, preview.rect);
         if (result.ok) revealEditorSelection();
         return result;
     }
 
-    function addFromCatalog(type, opts) {
+    function addFromCatalog(type, opts, previewRect) {
         opts = opts || {};
         var res = L.addWidget(state.layout, type, opts);
         if (!res.ok) return res;
@@ -2511,7 +2550,12 @@
         var newRect = Object.assign(L.toPixels(res.widget), L.homeNewFootprint(type, res.widget.options, grid));
         var others = state.layout.widgets.map(function (w) { return Object.assign({ id: w.id }, state.renderedRects[w.id] || L.toPixels(w)); });
         var specified = typeof opts.left === 'number' && typeof opts.top === 'number';
-        var requested = specified ? L.homeAlignedRect(Object.assign({}, newRect, { left: opts.left, top: opts.top }), type, others, grid).rect : null;
+        // A catalog drop applies the already displayed rectangle exactly;
+        // another magnet pass could move it to a different nearby alignment.
+        var requested = previewRect ? Object.assign({}, previewRect) : specified ?
+            L.homeAlignedRect(Object.assign({}, newRect, { left: opts.left, top: opts.top }), type, others, grid).rect : null;
+        if (previewRect && (Math.abs(previewRect.width - newRect.width) > 0.1 || Math.abs(previewRect.height - newRect.height) > 0.1 ||
+            previewRect.left < 16 || previewRect.top < 16 || previewRect.left + previewRect.width > grid.width - 16)) requested = null;
         var placed = requested && L.homeFits(requested, others) ? requested : opts.strictPlacement ? null : L.homeNextFree(newRect, type, others, grid);
         if (!placed) { editorMessage('畫面已滿，請先移動或移除一個項目'); return { ok: false, error: 'no-space' }; }
         if (state.editor) {

@@ -1256,9 +1256,12 @@
         // not shift by half a cell on wide screens. Edges remain usable below.
         if (!narrow && cols > 14) cols -= cols % 2;
         var pitch = narrow ? (vw - 40) / cols : 96;
-        return { width: vw, height: vh, columns: cols, pitchX: pitch, pitchY: 104,
+        return { width: vw, height: vh, columns: cols, pitchX: pitch, pitchY: 104, stepX: pitch / 8, stepY: 13,
             left: (vw - cols * pitch) / 2, top: narrow ? 96 : Math.max(0, (vh - 760) / 2) + 24, gap: 8, narrow: narrow };
     }
+
+    function homeStepX(grid) { return grid.stepX || grid.pitchX / 8; }
+    function homeStepY(grid) { return grid.stepY || grid.pitchY / 8; }
 
     function homeDefaultRect(widget, grid) {
         var seed = widget.options && widget.options.homeSeed;
@@ -1365,35 +1368,34 @@
         // Large icons deliberately retain their larger footprint.
         if (type === 'app' && grid.narrow && grid.width <= 350 && r.width <= 68) r.width = Math.min(r.width, 64);
         var min = minPxFor(type, { vw: grid.width, vh: grid.height });
+        var stepX = homeStepX(grid), stepY = homeStepY(grid);
         if (resize) {
             var minimumRows = ['notes', 'todo', 'countdown', 'weather'].indexOf(type) >= 0 ? 2 : 1;
             var minimumCols = grid.narrow ? 4 : 2;
-            var cols = Math.max(minimumCols, Math.ceil((min.w + grid.gap) / grid.pitchX), Math.round((r.width + grid.gap) / grid.pitchX));
-            var rows = Math.max(minimumRows, Math.ceil((min.h + grid.gap) / grid.pitchY), Math.round((r.height + grid.gap) / grid.pitchY));
-            r.width = Math.min(grid.width - 32, cols * grid.pitchX - grid.gap);
-            r.height = rows * grid.pitchY - grid.gap;
+            var minWidth = Math.max(minimumCols, Math.ceil((min.w + grid.gap) / grid.pitchX)) * grid.pitchX - grid.gap;
+            var minHeight = Math.max(minimumRows, Math.ceil((min.h + grid.gap) / grid.pitchY)) * grid.pitchY - grid.gap;
+            r.width = Math.min(grid.width - 32, Math.max(minWidth, Math.round((r.width + grid.gap) / stepX) * stepX - grid.gap));
+            r.height = Math.max(minHeight, Math.round((r.height + grid.gap) / stepY) * stepY - grid.gap);
         }
         r.width = Math.min(r.width, grid.width - 32);
         var centerOffset = homeColumnOffset(r.width, type, grid);
         var origin = grid.left + centerOffset;
-        var maxCol = Math.max(0, grid.columns - homeColumnSpan(r.width, type, grid));
-        var col = Math.max(0, Math.min(maxCol, Math.round((r.left - origin) / grid.pitchX)));
-        var minimumRow = grid.narrow ? 0 : Math.ceil((16 - grid.top) / grid.pitchY);
-        var row = Math.max(minimumRow, Math.round((r.top - grid.top) / grid.pitchY));
-        var snappedLeft = origin + col * grid.pitchX;
-        if (!grid.narrow) {
-            // Edge slots cover the remaining partial cells. A pointer near a
-            // screen edge must never snap back into the centered composition.
-            var right = grid.width - r.width - 16;
-            if (r.left < origin - grid.pitchX / 2 || r.left <= 24) snappedLeft = 16;
-            if (r.left > origin + maxCol * grid.pitchX + grid.pitchX / 2 || r.left >= right - 8) snappedLeft = right;
-            snappedLeft = Math.min(right, snappedLeft);
-        }
+        var right = grid.width - r.width - 16;
+        var minCol = Math.ceil((16 - origin) / stepX), maxCol = Math.floor((right - origin) / stepX);
+        var col = Math.max(minCol, Math.min(maxCol, Math.round((r.left - origin) / stepX)));
+        var minimumRow = grid.narrow ? 0 : Math.ceil((16 - grid.top) / stepY);
+        var row = Math.max(minimumRow, Math.round((r.top - grid.top) / stepY));
+        var snappedLeft = minCol > maxCol ? 16 : origin + col * stepX;
+        // Edges are additional slots, not a separate coarse snapping region.
+        // This also leaves the original lattice phase and all seeded slots intact.
+        if (Math.abs(r.left - 16) < Math.abs(r.left - snappedLeft)) snappedLeft = 16;
+        if (Math.abs(r.left - right) < Math.abs(r.left - snappedLeft)) snappedLeft = right;
+        snappedLeft = Math.min(right, snappedLeft);
         r.left = Math.max(16, snappedLeft);
-        var snappedTop = grid.top + row * grid.pitchY;
+        var snappedTop = grid.top + row * stepY;
         if (!grid.narrow) {
             var bottom = grid.height - r.height - 16;
-            if (r.top <= 24 || r.top < grid.top + minimumRow * grid.pitchY - grid.pitchY / 2) snappedTop = 16;
+            if (Math.abs(r.top - 16) < Math.abs(r.top - snappedTop)) snappedTop = 16;
             // A viewport-bottom slot is optional. Scrolled placements beyond
             // this view remain valid instead of being clamped back on screen.
             if (bottom >= 16 && r.top >= bottom - 8 && r.top < grid.height) snappedTop = bottom;
@@ -1406,10 +1408,11 @@
     function homeAlignedRect(raw, type, others, grid, referenceRects) {
         var snapped = homeSnap(raw, type, grid, false);
         var references = others.concat(referenceRects || []);
-        var width = snapped.width, height = snapped.height, threshold = 22;
+        var width = snapped.width, height = snapped.height;
+        var thresholdX = Math.min(5, homeStepX(grid) * 0.4), thresholdY = Math.min(5, homeStepY(grid) * 0.4);
         var xs = [{ value: snapped.left, guide: null, priority: 0 }], ys = [{ value: snapped.top, guide: null, priority: 0 }];
         function add(list, value, origin, guide, priority, rowTop) {
-            if (Math.abs(value - origin) > threshold) return;
+            if (Math.abs(value - origin) > (list === xs ? thresholdX : thresholdY)) return;
             var existing = list.filter(function (c) { return Math.abs(c.value - value) < 0.05; })[0];
             priority = priority || 1;
             if (existing) {
@@ -1430,15 +1433,15 @@
             add(ys, other.top + other.height - height, raw.top, { axis: 'y', value: other.top + other.height, from: other.left, to: other.left + other.width }, priority);
             // A column can continue below a legacy row without switching back
             // to the default grid's different vertical phase.
-            if (sameWidth && sameHeight && Math.abs(raw.left - other.left) <= threshold) {
-                var row = Math.round((raw.top - other.top) / grid.pitchY);
-                add(ys, other.top + row * grid.pitchY, raw.top, null, 2);
+            if (sameWidth && sameHeight && Math.abs(raw.left - other.left) <= thresholdX) {
+                var row = Math.round((raw.top - other.top) / homeStepY(grid));
+                add(ys, other.top + row * homeStepY(grid), raw.top, null, 2);
             }
         });
         // Continue an existing evenly spaced launcher row, including older
         // 92px rows. This prevents a new shortcut introducing a 96px gap.
         if (type === 'app' || type === 'folder') references.forEach(function (anchor) {
-            if (Math.abs(raw.top - anchor.top) > threshold || Math.abs(anchor.width - width) >= 1 || Math.abs(anchor.height - height) >= 1) return;
+            if (Math.abs(raw.top - anchor.top) > thresholdY || Math.abs(anchor.width - width) >= 1 || Math.abs(anchor.height - height) >= 1) return;
             var row = references.filter(function (other) { return Math.abs(other.top - anchor.top) < 1 && Math.abs(other.width - width) < 1 && Math.abs(other.height - height) < 1; })
                 .sort(function (a, b) { return a.left - b.left; });
             if (row.length < 2) return;
@@ -1448,17 +1451,19 @@
             add(xs, row[0].left + index * pitch, raw.left, null, row.length >= 3 ? 3 : 2, anchor.top);
             add(ys, anchor.top, raw.top, { axis: 'y', value: anchor.top, from: row[0].left, to: row[row.length - 1].left + width }, 2);
         });
-        var result = snapped, guides = [], score = Infinity, bestPriority = -1, bestAxes = -1;
+        var result = snapped, guides = [], score = Infinity, bestPriority = -1, bestAxes = -1, bestExact = false;
         xs.forEach(function (x) { ys.forEach(function (y) {
             var candidate = { left: x.value, top: y.value, width: width, height: height };
             if (candidate.left < 16 || candidate.left + width > grid.width - 16 || candidate.top < 16 || !homeFits(candidate, others)) return;
             var distance = Math.pow(candidate.left - raw.left, 2) + Math.pow(candidate.top - raw.top, 2);
             var xPriority = x.rowTop == null || Math.abs(y.value - x.rowTop) < 1 ? x.priority : 0;
             var priority = Math.max(xPriority, y.priority), axes = xPriority + y.priority;
+            var exact = distance < 0.000001;
             // Repeated launcher rows outrank same-size item alignment, then
-            // generic widget edges, then the otherwise empty default grid.
-            if (priority < bestPriority || priority === bestPriority && (axes < bestAxes || axes === bestAxes && distance >= score)) return;
-            bestPriority = priority; bestAxes = axes; score = distance; result = candidate; guides = [x.guide, y.guide].filter(Boolean);
+            // generic widget edges. An exact valid position wins over a new
+            // nearby magnet, so committing a preview cannot snap it again.
+            if (bestExact && !exact || exact === bestExact && (priority < bestPriority || priority === bestPriority && (axes < bestAxes || axes === bestAxes && distance >= score))) return;
+            bestExact = exact; bestPriority = priority; bestAxes = axes; score = distance; result = candidate; guides = [x.guide, y.guide].filter(Boolean);
         }); });
         return { rect: result, guides: guides };
     }
@@ -1468,15 +1473,50 @@
         return !others.some(function (other) { return !skip[other.id] && rectsIntersect(rect, other, 6); });
     }
 
+    // At a fixed Y, a closest free X is either the requested lattice point,
+    // a canvas edge, or the first lattice point beyond an occupied interval.
+    // Check those boundaries rather than every 12px column on wide monitors.
+    function homeFreeAtRow(rect, type, others, grid, top, targetLeft) {
+        var base = homeSnap(Object.assign({}, rect, { left: targetLeft, top: top }), type, grid, false);
+        if (homeFits(base, others)) return base;
+        var origin = grid.left + homeColumnOffset(base.width, type, grid), step = homeStepX(grid);
+        var right = grid.width - base.width - 16;
+        var xs = [];
+        function add(left) {
+            if (left < 16 || left > right || xs.indexOf(left) >= 0) return;
+            xs.push(left);
+        }
+        add(16); add(right);
+        others.forEach(function (other) {
+            if (base.top + base.height + 6 <= other.top || other.top + other.height + 6 <= base.top) return;
+            add(origin + Math.floor((other.left - base.width - 6 - origin) / step) * step);
+            add(origin + Math.ceil((other.left + other.width + 6 - origin) / step) * step);
+        });
+        xs.sort(function (a, b) { return Math.abs(a - targetLeft) - Math.abs(b - targetLeft) || a - b; });
+        for (var i = 0; i < xs.length; i++) {
+            var candidate = Object.assign({}, base, { left: xs[i] });
+            if (homeFits(candidate, others)) return candidate;
+        }
+        return null;
+    }
+
     function homeNextFree(rect, type, others, grid) {
         var maxRows = grid.narrow ? 100 : Math.max(1, Math.floor((grid.height - grid.top - 132) / grid.pitchY));
+        var offset = homeColumnOffset(homeSnap(rect, type, grid, false).width, type, grid);
         for (var row = 0; row < maxRows; row++) {
             for (var col = 0; col < grid.columns; col++) {
                 var candidate = homeSnap(Object.assign({}, rect, {
-                    left: grid.left + col * grid.pitchX, top: grid.top + row * grid.pitchY
+                    left: grid.left + col * grid.pitchX + offset, top: grid.top + row * grid.pitchY
                 }), type, grid, false);
                 if (homeFits(candidate, others)) return candidate;
             }
+        }
+        // Keep established catalogue rows first; use fine gaps only when the
+        // semantic cells are full. Collision-boundary X candidates bound work.
+        var stepY = homeStepY(grid);
+        for (var fineRow = 0; fineRow < Math.ceil(maxRows * grid.pitchY / stepY); fineRow++) {
+            var fine = homeFreeAtRow(rect, type, others, grid, grid.top + fineRow * stepY, 16);
+            if (fine) return fine;
         }
         // A full forecast needs more room than the original compact weather
         // card. If no visible slot fits it, append on the same scrolling grid
@@ -1495,15 +1535,25 @@
     }
 
     function homeNearestFree(rect, type, others, grid) {
-        var closest = null, distance = Infinity;
+        var snapped = homeSnap(rect, type, grid, false);
+        if (homeFits(snapped, others)) return snapped;
+        var closest = null, distance = Infinity, stepY = homeStepY(grid), ys = [];
         var rows = Math.min(60, Math.max(8, Math.ceil((rect.top + rect.height - grid.top) / grid.pitchY) + 4));
-        for (var row = 0; row < rows; row++) {
-            for (var col = 0; col < grid.columns; col++) {
-                var candidate = homeSnap(Object.assign({}, rect, { left: grid.left + col * grid.pitchX, top: grid.top + row * grid.pitchY }), type, grid, false);
-                if (!homeFits(candidate, others)) continue;
-                var delta = Math.pow(candidate.left - rect.left, 2) + Math.pow(candidate.top - rect.top, 2);
-                if (delta < distance) { closest = candidate; distance = delta; }
-            }
+        var firstRow = grid.narrow ? 0 : Math.ceil((16 - grid.top) / stepY);
+        for (var row = firstRow; row < Math.ceil(rows * grid.pitchY / stepY); row++) {
+            ys.push(grid.top + row * stepY);
+        }
+        if (!grid.narrow) {
+            ys.push(16);
+            if (grid.height - snapped.height - 16 >= 16) ys.push(grid.height - snapped.height - 16);
+        }
+        ys.sort(function (a, b) { return Math.abs(a - rect.top) - Math.abs(b - rect.top) || a - b; });
+        for (var i = 0; i < ys.length; i++) {
+            if (Math.pow(ys[i] - rect.top, 2) > distance) break;
+            var candidate = homeFreeAtRow(snapped, type, others, grid, ys[i], rect.left);
+            if (!candidate) continue;
+            var delta = Math.pow(candidate.left - rect.left, 2) + Math.pow(candidate.top - rect.top, 2);
+            if (delta < distance) { closest = candidate; distance = delta; }
         }
         return closest;
     }
@@ -1514,6 +1564,7 @@
 
     global.NewtabLayout = {
         homeGrid: homeGrid,
+        homeColumnOffset: homeColumnOffset,
         homeNewFootprint: homeNewFootprint,
         homeDefaultRect: homeDefaultRect,
         homePlacement: homePlacement,
