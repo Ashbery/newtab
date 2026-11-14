@@ -105,6 +105,26 @@
 			"Id": "ParamNachoWind",
 			"GroupId": "",
 			"Name": "Gentle ambient air"
+		},
+		{
+			"Id": "ParamNachoHeadTilt",
+			"GroupId": "",
+			"Name": "Gentle head lean"
+		},
+		{
+			"Id": "ParamNachoHeadNod",
+			"GroupId": "",
+			"Name": "Small head nod"
+		},
+		{
+			"Id": "ParamNachoEarL",
+			"GroupId": "",
+			"Name": "Left ear tip"
+		},
+		{
+			"Id": "ParamNachoEarR",
+			"GroupId": "",
+			"Name": "Right ear tip"
 		}
 	],
 	"ParameterGroups": [
@@ -259,6 +279,14 @@
 		{
 			"Id": "ArtMeshFrontHairR2",
 			"Name": "front hair-outer-r"
+		},
+		{
+			"Id": "ArtMeshEarsL",
+			"Name": "ears-l"
+		},
+		{
+			"Id": "ArtMeshEarsR",
+			"Name": "ears-r"
 		},
 		{
 			"Id": "ArtMeshHandwearL",

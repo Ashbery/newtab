@@ -1,3 +1,25 @@
+# Release 2026.11.14.16
+
+## Gentle head and ear motion
+
+The layered Nacho model now has 32 source layers/drawables, 45 deformers, 25 parameters and 6 hair-physics groups. Four custom controls add a restrained head lean, small nod and independently rooted ears. The original face and eye bindings remain together under native head rotation. A shared upper-body field connects neck, hair and collar movement and fades to zero below source Y850. Same-source concealed overlaps remove filtering seams. Generic head/body angles remain zero; the image fallback retains its fixed head.
+
+The first new candidate exposed hair-cut, jaw and shoulder/collar seams during both endpoint checks and ordinary playback. The final r7 model corrects the motion ownership and overlaps; it retains the full authored ±1.25° head lean, ±2.5px nod and ±2.5° ear ranges. Normal playback uses smaller amplitudes, slow blended head cycles and occasional asymmetric ear gestures, with a .8s fade from static mode. No full perspective turn or audio lip synchronization is claimed.
+
+| Check | Final evidence |
+| --- | --- |
+| Actual model | Unmodified official Web Core loaded the MOC, passed consistency and 325 parameter samples. 32 real drawables; MOC SHA-256 `1dda19739bb0405e8053fbf5705519a437100c0edd8e6af9260ff2cff9b56f5f`. |
+| Binding direction and geometry | Twelve head tilt/nod combinations matched the measured source-space rigid transform within .00260 source pixels. Nineteen non-expression endpoint/combination poses introduced no signed triangle flips or compression below 10% of the nondegenerate neutral area. The expression cases are assessed separately because eyelid closure intentionally collapses its aperture. |
+| Visual review | Independent and owning reviews inspected 21 dark/light poses including independent/opposed ears, four head corners, blink/mouth/hair combinations and close-up neck/hair-root regions. The previous seams were absent. Neutral appearance is retained, but not pixel-identical: whole-image white-background RGB mean absolute difference versus r5 is .0843/255; same-source overlap edges account for small differences. |
+| Continuous playback | A separate 20-second actual WebGL run retained 198 timed samples and 13 selected compositor frames. Neck opaque-gap candidates were zero in every sample; selected full/neck contact sheets showed no recurrence of the identified seams. This is sampled visual inspection, not a claim that every video frame was reviewed at full resolution. |
+| Motion scope | At full authored head endpoints, hands did not move; the plush's uppermost tip moved at most .499 source pixels with the shared upper field. All vertices originally below Y850 had at most .0896px interpolation residue, and below Y870 at most .0115px. Upper garment movement is intentional. These are raw mesh measurements, not whole-body translation. |
+| Runtime | 13/13 isolated Brave browser scenarios passed against the final repository WebP/MOC, including actual custom-parameter mesh movement, pause/resume/resize, reduced motion/off, multi-widget/remount, failure fallback and in-page chat. Layouts 1920×1080, 3440×1440 and 5120×1440 at DPR2 remained within their widgets. |
+| Motion timing | 6/6 production-class unit checks passed: bounded slow movement, asymmetric ear pulse/rest/recoil, equivalent poses at 30/60/120/200Hz, neutral/resume fade, chat-state transitions and older-model compatibility. Actual frame rate still depends on the device. |
+| Editable model | Final CMO imported, rendered, saved and reopened in PSD2Live3.6.7 with the same 32 layers/meshes, 45 deformers, 25 parameters and 6 physics groups. All 11 frozen source hashes matched. CMO SHA-256 `62232b10371b120af492a75ee61fe716e1ad6dd6010f96e1ab2fcd3272e10697`. Official Cubism Editor GUI was not tested. |
+| Final preview and source package | Recorded the final repository model at 600×800 and at its normal 280×360 widget size, including head cycles, asymmetric ears and chat-state transitions. The 19.5-second 60fps MP4 contains 1,170 frames; it is a recording format, not a universal runtime frame-rate guarantee. The editable/source ZIP's 81 members were reread and SHA-verified after creation. |
+
+The lossless WebP preserves alpha and every visible RGB pixel of the exported PNG. Exact runtime hashes are in `assets/character/live2d/artifact-hashes.json`. Existing settings, extension, authentication helper and personal Brave profile were not changed. Local QA artifacts remain outside the published application. The original r5 source package and rejected r6 candidate remain available separately.
+
 # Release 2026.11.14.15
 
 Validation date: 2026-11-14 (Asia/Taipei). Model revision: **r5**.

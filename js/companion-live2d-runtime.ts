@@ -56,6 +56,12 @@ class CharacterModel extends CubismUserModel {
     private blinkStart = -1;
     private nextBlink = 2.8 + Math.random() * 3.5;
     private mouth = 0;
+    private idleFade = 0;
+    private activityTilt = 0;
+    private activityNod = 0;
+    private earStart = 2.8 + Math.random() * 1.6;
+    private earLeft = Math.random() < .5;
+    private earAmplitude = .6 + Math.random() * .08;
     private matrix = new CubismMatrix44();
     private bounds: { x: number, y: number, width: number, height: number };
     private preserveCanvas = false;
@@ -92,6 +98,9 @@ class CharacterModel extends CubismUserModel {
     neutral() {
         this._model.loadParameters();
         this.set('ParamEyeLOpen', 1); this.set('ParamEyeROpen', 1); this.set('ParamMouthOpenY', 0);
+        this.idleFade = 0; this.activityTilt = 0; this.activityNod = 0;
+        this.set('ParamNachoHeadTilt', 0); this.set('ParamNachoHeadNod', 0);
+        this.set('ParamNachoEarL', 0); this.set('ParamNachoEarR', 0);
         this.lockHead();
         if (this._pose) this._pose.updateParameters(this._model, 0);
         if (this._physics) this._physics.stabilization(this._model);
@@ -116,10 +125,44 @@ class CharacterModel extends CubismUserModel {
         this.set('ParamMouthOpenY', this.mouth);
         this.set('ParamBreath', .5 - .5 * Math.cos(this.time * Math.PI * 2 / 5.2));
         this.set('ParamNachoWind', .17 * Math.sin(this.time * Math.PI * 2 / 6.8) + .06 * Math.sin(this.time * Math.PI * 2 / 10.7));
+        this.advanceIdle(seconds);
         this.lockHead();
         if (this._pose) this._pose.updateParameters(this._model, seconds);
         if (this._physics) this._physics.evaluate(this._model, seconds);
         this.lockHead(); this._model.update();
+    }
+    private advanceIdle(seconds: number) {
+        // The authored neck/ear deformers move independently of the generic
+        // head and body angles. No pointer position feeds this idle motion.
+        // Only active animation advances this clock, so background/drag pauses
+        // retain their pose; returning from neutral fades in without a snap.
+        this.idleFade = Math.min(1, this.idleFade + seconds / .8);
+        const fade = this.idleFade * this.idleFade * (3 - 2 * this.idleFade);
+        const blend = 1 - Math.exp(-seconds / .8);
+        this.activityTilt += ((this.activity === 'thinking' ? .07 : 0) - this.activityTilt) * blend;
+        this.activityNod += ((this.activity === 'thinking' ? -.035 : this.activity === 'replying' ? .035 : 0) - this.activityNod) * blend;
+        const cycle = Math.PI * 2 * this.time;
+        this.set('ParamNachoHeadTilt', fade * (.42 * Math.sin(cycle / 14.2) + .16 * Math.sin(cycle / 23.7) + this.activityTilt));
+        this.set('ParamNachoHeadNod', fade * (.3 * Math.sin(cycle / 11.3) + .15 * Math.sin(cycle / 19.1) + this.activityNod));
+
+        // An occasional leading ear and a smaller, delayed response. Each
+        // pulse has zero velocity at its ends and a restrained recoil. Event
+        // times use the animation clock, not frame counts or wall-clock timers.
+        while (this.time >= this.earStart + 1.04) {
+            this.earStart += 1.04 + 7 + Math.random() * 5;
+            this.earLeft = Math.random() < .67 ? !this.earLeft : this.earLeft;
+            this.earAmplitude = .6 + Math.random() * .08;
+        }
+        const leading = fade * this.earAmplitude * this.earPulse(this.time - this.earStart);
+        const following = fade * this.earAmplitude * .2 * this.earPulse(this.time - this.earStart - .18);
+        this.set('ParamNachoEarL', this.earLeft ? leading : following);
+        this.set('ParamNachoEarR', this.earLeft ? following : leading);
+    }
+    private earPulse(t: number) {
+        if (t < 0 || t >= .86) return 0;
+        if (t < .16) { const v = t / .16; return v * v * (3 - 2 * v); }
+        if (t < .46) { const v = (t - .16) / .3; return 1 - v * v * (3 - 2 * v); }
+        return -.12 * Math.sin(Math.PI * (t - .46) / .4) ** 2;
     }
     setActivity(value: string) { this.activity = value === 'replying' ? 'replying' : value === 'thinking' ? 'thinking' : 'idle'; }
     paint(gl: WebGL2RenderingContext, width: number, height: number) {
@@ -134,7 +177,7 @@ class CharacterModel extends CubismUserModel {
     }
     describe() {
         const values: Record<string, number> = {};
-        ['ParamAngleX', 'ParamAngleY', 'ParamAngleZ', 'ParamBodyAngleX', 'ParamBodyAngleY', 'ParamBodyAngleZ', 'ParamEyeLOpen', 'ParamEyeROpen', 'ParamMouthOpenY', 'ParamBreath', 'ParamNachoWind'].forEach(id => {
+        ['ParamAngleX', 'ParamAngleY', 'ParamAngleZ', 'ParamBodyAngleX', 'ParamBodyAngleY', 'ParamBodyAngleZ', 'ParamEyeLOpen', 'ParamEyeROpen', 'ParamMouthOpenY', 'ParamBreath', 'ParamNachoWind', 'ParamNachoHeadTilt', 'ParamNachoHeadNod', 'ParamNachoEarL', 'ParamNachoEarR'].forEach(id => {
             const index = this.parameters.get(id); if (index !== undefined) values[id] = this._model.getParameterValueByIndex(index);
         });
         return { parameters: values, drawables: this._model.getDrawableCount(), animationTime: this.time, activity: this.activity,

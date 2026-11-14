@@ -10,7 +10,7 @@ paw.svg is an authored interface motif.
 
 ## Animated companion
 
-The primary companion now uses an authored, layered **Cubism MOC3** in `live2d/`, with the matching official Web SDK in `../vendor/cubism/`. It preserves the original artwork canvas and fixed head. Separate eye apertures, lashes, local mouth features, garments, hands, plush and hair meshes support continuous blinks, a small text-reply mouth expression, subtle chest breathing and delayed hair-tip motion. Head/body angle parameters stay zero.
+The primary companion uses an authored, layered **Cubism MOC3** in `live2d/`, with the matching official Web SDK in `../vendor/cubism/`. It preserves the original artwork canvas and neutral portrait. Separate eye apertures, lashes, local mouth features, garments, hands, plush and hair meshes support continuous blinks, a small text-reply mouth expression, subtle chest breathing and delayed hair-tip motion. Model-specific controls add a restrained head tilt/nod and independent rooted ear movement. Generic head/body angle parameters stay zero; the new motion uses measured custom bindings, with the neck and hair transitions checked separately.
 
 The original portrait appears immediately while the optional model loads. The new runtime follows display refresh and respects the existing animation preference, reduced motion, hidden/offscreen state and widget editing pauses. Clicking the character still opens the existing in-page conversation. No camera or microphone is used. Model/runtime details, version hashes and verification scope are documented in `live2d/README.md`, `../vendor/cubism/README.md` and the current release entry in `../../VALIDATION.md`.
 

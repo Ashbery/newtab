@@ -11,6 +11,7 @@ const fixture = `<!doctype html><meta charset="utf-8"><style>body{margin:0;backg
 window.make=(id,extra={})=>{const root=document.createElement('div');root.className='home-companion';root.id=id;root.innerHTML='<button class="companion-trigger" aria-label="與角色聊天"><img class="companion-portrait" src="/assets/character/nacho-companion.webp"><canvas class="companion-canvas"></canvas></button>';document.body.append(root);root.querySelector('button').onclick=()=>window.chatOpened=(window.chatOpened||0)+1;return NewtabCompanionLive2D.mount({root,canvas:root.querySelector('canvas'),modelUrl:'${modelUrl}',onError:e=>window.lastFailure=String(e),...extra})};
 </script>`;
 const MIME = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
+const anatomy = ['ParamNachoHeadTilt', 'ParamNachoHeadNod', 'ParamNachoEarL', 'ParamNachoEarR'];
 let total = 0;
 (async () => {
     const browser = await chromium.launch({ executablePath: process.env.NEWTAB_BROWSER_PATH || 'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe', headless: true });
@@ -33,7 +34,7 @@ let total = 0;
         finally { await context.close(); }
     }
     try {
-        await scenario('real moc3 paints, fixed head, blink/breath and text-reply expression', async page => {
+        await scenario('real moc3 paints, custom head/ears, generic angle locks and text-reply expression', async page => {
             assert.equal(await page.evaluate(async () => { window.character = make('one'); return character.ready; }), true);
             const initial = await page.evaluate(() => character.state());
             assert.equal(initial.renderer, 'live2d');
@@ -47,8 +48,43 @@ let total = 0;
             assert(samples.some(p => p.ParamEyeLOpen < .2)); assert(samples.some(p => p.ParamMouthOpenY > .1));
             assert(samples.some(p => p.ParamBreath > .6)); assert(samples.every(p => p.ParamAngleX === 0 && p.ParamAngleY === 0 && p.ParamAngleZ === 0));
             assert(samples.every(p => Object.entries(p).filter(([id]) => id.startsWith('ParamBodyAngle')).every(([, value]) => value === 0)));
+            if (modelFile !== 'Haru.model3.json') {
+                anatomy.forEach(id => assert.equal(typeof initial.parameters[id], 'number', 'The Nacho rig must author ' + id));
+                assert(samples.some(p => Math.abs(p.ParamNachoHeadTilt) > .3));
+                assert(samples.some(p => Math.abs(p.ParamNachoHeadNod) > .2));
+                assert(samples.some(p => Math.abs(p.ParamNachoEarL - p.ParamNachoEarR) > .4), 'The ear reaction is visible and asymmetric');
+                assert(samples.every(p => Math.abs(p.ParamNachoHeadTilt) <= .65 && Math.abs(p.ParamNachoHeadNod) <= .485));
+            }
             assert(!first.equals(await page.locator('canvas').screenshot()));
             await page.getByRole('button', { name: '與角色聊天' }).click(); assert.equal(await page.evaluate(() => chatOpened), 1);
+            await page.evaluate(() => character.destroy());
+        });
+        if (modelFile !== 'Haru.model3.json') await scenario('custom anatomy parameters deform real moc3 vertices and preserve lower-body geometry', async (page, context) => {
+            const core = fs.readFileSync(path.join(root, 'assets/vendor/cubism/live2dcubismcore.min.js'), 'utf8');
+            await context.route('**/live2dcubismcore.min.js*', route => route.fulfill({ contentType: 'text/javascript', body: core + '\n;{const original=Live2DCubismCore.Model.fromMoc;Live2DCubismCore.Model.fromMoc=function(...args){const model=original.apply(this,args);window.reviewCore=model;return model;};}' }));
+            await page.evaluate(async () => { window.character = make('one', { animationMode: 'off' }); await character.ready; });
+            const result = await page.evaluate(ids => {
+                const model = window.reviewCore, values = model.parameters.values, defaults = Array.from(model.parameters.defaultValues);
+                values.set(defaults); model.update();
+                const baseline = model.drawables.vertexPositions.map(points => Array.from(points));
+                return ids.map(id => {
+                    const index = model.parameters.ids.indexOf(id); if (index < 0) return { id, missing: true };
+                    values.set(defaults); values[index] = .6; model.update();
+                    let moved = 0, stable = 0, lowerMoved = 0, lowerMaxSourcePx = 0;
+                    const lowerMeshes = new Set();
+                    model.drawables.vertexPositions.forEach((points, mesh) => {
+                        for (let p = 0; p < points.length; p += 2) {
+                            const delta = Math.hypot(points[p] - baseline[mesh][p], points[p + 1] - baseline[mesh][p + 1]);
+                            // Authored head-follow hair tapers to source Y850;
+                            // Y<-0.14 is below source Y876 on the1086x1448 canvas.
+                            if (delta > .00001) { moved++; if (baseline[mesh][p + 1] < -.14) { lowerMoved++; lowerMaxSourcePx = Math.max(lowerMaxSourcePx, delta * model.canvasinfo.PixelsPerUnit); lowerMeshes.add(model.drawables.ids[mesh]); } } else stable++;
+                        }
+                    });
+                    values.set(defaults); model.update(); return { id, moved, stable, lowerMoved, lowerMaxSourcePx, lowerMeshes: [...lowerMeshes] };
+                });
+            }, anatomy);
+            console.log('Authored anatomy geometry: ' + JSON.stringify(result));
+            result.forEach(result => { assert(!result.missing, result.id); assert(result.moved > 3, result.id + ' moves authored geometry'); assert(result.stable > 3, result.id + ' preserves independent stationary geometry'); assert(result.lowerMaxSourcePx <= .1, result.id + ' leaves the lower body fixed within the 0.1 source-pixel export/interpolation tolerance'); });
             await page.evaluate(() => character.destroy());
         });
         await scenario('off/reduced motion neutral; explicit on overrides OS and resumes', async page => {
@@ -56,17 +92,21 @@ let total = 0;
             await page.evaluate(async () => { window.character=make('one'); await character.ready; });
             const before=await page.evaluate(()=>character.state());await page.waitForTimeout(180);
             assert.equal(await page.evaluate(()=>character.state().frames),before.frames);assert.equal(before.motion,'reduced');
+            if (modelFile !== 'Haru.model3.json') anatomy.forEach(id => assert.equal(before.parameters[id], 0));
             await page.evaluate(()=>character.setMode('on'));await page.waitForTimeout(180);assert((await page.evaluate(()=>character.state().frames))>before.frames);
             await page.evaluate(()=>{character.setActivity({state:'replying'});character.setMode('off');});
             const stopped=await page.evaluate(()=>character.state());await page.waitForTimeout(180);
             assert.equal(await page.evaluate(()=>character.state().frames),stopped.frames);assert.equal(stopped.parameters.ParamEyeLOpen,1);assert.equal(stopped.parameters.ParamMouthOpenY,0);
+            if (modelFile !== 'Haru.model3.json') anatomy.forEach(id => assert.equal(stopped.parameters[id], 0));
             await page.evaluate(()=>character.destroy());
         });
         await scenario('arrange/drag/manual pause, responsive backing size and clean destroy', async page => {
             await page.evaluate(async()=>{window.character=make('one');await character.ready;document.body.classList.add('is-dragging-widget');});await page.waitForTimeout(80);
             const paused=await page.evaluate(()=>character.state());await page.waitForTimeout(180);assert.equal(await page.evaluate(()=>character.state().frames),paused.frames);
+            assert.deepEqual(await page.evaluate(()=>character.state().parameters),paused.parameters,'A paused pose remains exactly unchanged');
             await page.evaluate(()=>{document.body.classList.remove('is-dragging-widget');character.setPaused(true);document.querySelector('.home-companion').style.cssText='width:260px;height:350px';});await page.waitForTimeout(150);
             const resized=await page.evaluate(()=>character.state());assert.equal(resized.width,260);assert.equal(resized.height,350);assert.equal(resized.motion,'paused');
+            assert.deepEqual(resized.parameters,paused.parameters,'Resizing a paused widget preserves its current pose');
             await page.waitForTimeout(150);assert.equal(await page.evaluate(()=>character.state().frames),resized.frames);
             await page.evaluate(()=>character.setPaused(false));await page.waitForTimeout(150);assert((await page.evaluate(()=>character.state().frames))>resized.frames);
             await page.evaluate(()=>dispatchEvent(new PageTransitionEvent('pagehide')));const hidden=await page.evaluate(()=>character.state());await page.waitForTimeout(150);assert.equal(await page.evaluate(()=>character.state().frames),hidden.frames);
