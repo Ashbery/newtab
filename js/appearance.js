@@ -51,6 +51,24 @@
     function applyWidget(el, widget) {
         if (!el || !widget) return;
         var a = resolved(widget);
+        applySurface(el, a);
+        if (widget.type === 'search') {
+            applySearchButton(el, a);
+            // The compact panel moves this same container out of its widget.
+            // Keep all surface/text tokens and ownership on the moving node.
+            var container = el.querySelector('.search-container');
+            if (container) container.setAttribute('data-search-appearance-owner', String(widget.id));
+            else container = Array.prototype.find.call(document.querySelectorAll('.search-container[data-search-appearance-owner]'), function (candidate) {
+                return candidate.getAttribute('data-search-appearance-owner') === String(widget.id);
+            });
+            if (container) {
+                applySurface(container, a);
+                applySearchButton(container, a);
+            }
+        }
+    }
+
+    function applySurface(el, a) {
         var rgb = [1, 3, 5].map(function (i) { return parseInt(a.tint.slice(i, i + 2), 16); }).join(', ');
         el.setAttribute('data-appearance-preset', a.preset);
         el.setAttribute('data-appearance-text', a.text);
@@ -62,17 +80,6 @@
         el.style.setProperty('--widget-image', a.bgDataUrl ? 'url("' + a.bgDataUrl.replace(/["\\\r\n]/g, '') + '")' : 'none');
         el.toggleAttribute('data-appearance-image', !!a.bgDataUrl);
         el.style.setProperty('--widget-image-alpha', String(a.bgAlpha));
-        if (widget.type === 'search') {
-            applySearchButton(el, a);
-            // The mobile search panel moves this same container out of its
-            // widget. Keep its tokens and ownership on the moving DOM node.
-            var container = el.querySelector('.search-container');
-            if (container) container.setAttribute('data-search-appearance-owner', String(widget.id));
-            else container = Array.prototype.find.call(document.querySelectorAll('.search-container[data-search-appearance-owner]'), function (candidate) {
-                return candidate.getAttribute('data-search-appearance-owner') === String(widget.id);
-            });
-            if (container) applySearchButton(container, a);
-        }
     }
 
     function applySearchButton(el, value) {

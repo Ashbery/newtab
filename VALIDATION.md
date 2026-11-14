@@ -1,4 +1,22 @@
-# Release 2026.11.14.7
+# Release 2026.11.14.8
+
+Validation date: 2026-11-14 (Asia/Taipei).
+
+- Search suggestions now share the search widget's fill, transparency, blur, border, radius and shadow. Matched/unmatched text, icons and pointer/keyboard selection follow the selected light/dark text scheme.
+- The original search container carries its complete appearance when moved into the compact search dialog. That dialog paints one connected surface; its outer shell, input and suggestion children remain transparent, preventing an opaque parent or stacked alpha from hiding the selected settings. Focus feedback uses an outline independently of the user's shadow.
+- Existing button-only reset keeps the surface settings; whole-widget reset restores the search and suggestions together. Changed CSS/script URLs are versioned. Search navigation and suggestion-fetching logic are unchanged.
+
+| Verification | Observed result |
+| --- | --- |
+| Search behavior | 14/14 unit checks passed, including original-query versus selected-suggestion submission, IME, late responses, URL handling and dismissal. |
+| Rendered search appearance | Five viewport scenarios passed at 1440×900,390×844,320×640,3440×1440 and5120×1440. Real settings and synthetic Google JSONP suggestions exercise shared surface/text styling, selected/hover rows, expanded live updates, reload, independent button settings and both reset scopes. |
+| Existing appearance | 1440/390/320px scenarios passed against this release preview: percentage bounds, persistence, scoped reset, transparent clocks/labels and readable text. |
+| Independent Brave review | Desktop1440px and mobile390px verified dark/light schemes, alpha0, a single expanded surface and no page errors. Review identified a competing fixed inner-list radius; the final scoped active-list rule makes clipping inherit the configured corners. |
+| Visual review | Desktop and320px custom-search screenshots inspected; mobile retains the connected sheet and desktop retains its detached dropdown. |
+
+The initial generic appearance run used its old default preview port and timed out before the app was ready; rerunning with the authoritative4174 preview passed all three widths. Isolated browser profiles/screenshots remain in ignored `.impeccable/review/`; personal Brave settings were not changed.
+
+# Release 2026.11.14.7 (historical results)
 
 Validation date: 2026-11-14 (Asia/Taipei).
 

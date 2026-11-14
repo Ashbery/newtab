@@ -12,6 +12,8 @@ body.has-custom-background .widget[data-type="clock"][data-layout] .clock-glass,
 body .widget[data-type="clock"][data-layout] .clock-glass,
 body .widget[data-type="search"][data-layout] .search-input-wrapper,
 body .widget[data-type="search"][data-layout] .search-box:focus-within .search-input-wrapper,
+body .search-container[data-search-appearance-owner] .search-box .suggestions-container,
+body .search-expand-panel .search-container[data-search-appearance-owner],
 body .widget[data-type="app"][data-layout] .app-tile-icon,
 body .widget[data-type="folder"][data-layout] .folder-preview {
     background-color: var(--widget-fill, rgba(248, 251, 253, .3));
@@ -41,8 +43,10 @@ body .widget[data-type="app"] .app-tile-label,
 body .widget[data-type="folder"] .folder-label {
     background: transparent; border: 0; box-shadow: none; padding: 0;
 }
-.widget[data-appearance-text="light"] { --appearance-ink: #f4f8fc; --appearance-muted: #e0eaf2; }
-.widget[data-appearance-text="dark"] { --appearance-ink: #303945; --appearance-muted: #536477; }
+.widget[data-appearance-text="light"],
+.search-container[data-search-appearance-owner][data-appearance-text="light"] { --appearance-ink: #f4f8fc; --appearance-muted: #e0eaf2; }
+.widget[data-appearance-text="dark"],
+.search-container[data-search-appearance-owner][data-appearance-text="dark"] { --appearance-ink: #303945; --appearance-muted: #536477; }
 body .widget[data-appearance-text] :is(.widget-surface, .clock-glass, .time, .date, .clock-time, .clock-date, .home-greeting, .app-tile-label, .folder-label, .search-input, .notes-body textarea, .todo-label, .countdown-title-input, .weather-temp, .weather-city, .weather-meta, .weather-status, .countdown-value, .countdown-label, .countdown-date-input, .todo-add-input, .bookmark-chip) {
     color: var(--appearance-ink);
 }
@@ -52,6 +56,34 @@ body .widget[data-appearance-text] .widget-empty-hint { color: var(--appearance-
 body .widget[data-appearance-text] #clock,
 body .widget[data-appearance-text] #clock :is(.date, .clock-period, .clock-weekday, .clock-seconds, .clock-divider),
 body .widget[data-appearance-text] :is(.todo-text, .countdown-days, .countdown-unit, .countdown-date) { color: var(--appearance-ink); }
+
+/* Suggestions belong to the search surface, including its compact portal. */
+body .search-container[data-search-appearance-owner] .search-box .suggestions-list,
+body .search-container[data-search-appearance-owner] .search-box.active .suggestions-list { border-radius: inherit; scrollbar-color: var(--appearance-muted) transparent; }
+body .search-container[data-search-appearance-owner] .search-box :is(.search-input, .suggestion-text, .suggestion-text .match, .suggestion-text .rest) { color: var(--appearance-ink); text-shadow: none; }
+body .search-container[data-search-appearance-owner] .search-box .search-input::placeholder { color: var(--appearance-muted); }
+body .search-container[data-search-appearance-owner] .search-box :is(.suggestion-icon, .search-icon, .clear-btn, .search-back) { color: var(--appearance-muted); }
+body .search-container[data-search-appearance-owner] .search-box .suggestion-icon { background: transparent; }
+body .search-container[data-search-appearance-owner] .search-box .suggestion-item::after { color: var(--appearance-muted); }
+body .search-container[data-search-appearance-owner] .search-box .suggestion-item:is(:hover, .selected) {
+    background: color-mix(in srgb, var(--appearance-ink) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--appearance-ink) 24%, transparent);
+}
+body .search-container[data-search-appearance-owner] .search-box .suggestion-item:is(:hover, .selected) .suggestion-icon { color: var(--appearance-ink); }
+body .search-container[data-search-appearance-owner] .search-box :is(.clear-btn, .search-back):hover { color: var(--appearance-ink); background: color-mix(in srgb, var(--appearance-ink) 12%, transparent); }
+body .search-container[data-search-appearance-owner] .suggestions-list::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--appearance-muted) 60%, transparent); }
+
+/* One painted layer in the connected sheet: child alpha must not stack. */
+body .search-expand-panel:has(> .search-container[data-search-appearance-owner]) {
+    background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+body .search-expand-panel .search-container[data-search-appearance-owner] { overflow: hidden; box-sizing: border-box; }
+body .search-expand-panel .search-container[data-search-appearance-owner] .search-box :is(.search-input-wrapper, .suggestions-container) {
+    background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+body .search-expand-panel .search-container[data-search-appearance-owner] .search-box .search-input-wrapper { border-radius: var(--widget-corner) var(--widget-corner) 0 0; }
+body .search-expand-panel .search-container[data-search-appearance-owner] .search-box .search-input-wrapper:focus-within { outline: 2px solid var(--appearance-muted); outline-offset: -2px; }
+body .search-expand-panel .search-container[data-search-appearance-owner] .search-box .suggestions-container { border-radius: 0 0 var(--widget-corner) var(--widget-corner); }
 
 .background-appearance { margin: 22px 0 18px; padding-top: 4px; }
 .appearance-control { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; margin: 14px 0; }
