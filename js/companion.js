@@ -1,29 +1,39 @@
-/* Local 2D character rig: illustrated blinks and a gently deforming mesh. */
+/* Local portrait rig: continuous pose, articulated regional weights and drawn eyelids. */
 (function () {
     'use strict';
     var instances = new Map();
     var ART = 'assets/character/nacho-companion.webp';
     var BLINK = 'assets/character/nacho-blink.webp';
-    var WEBGL_FPS = 90, CANVAS_FPS = 60;
-    // Match the previous 30 Hz response without making the gaze catch up
-    // faster on high-refresh screens.
-    var POINTER_RESPONSE_MS = -(1000 / 30) / Math.log(.82);
-
     function createFramePacer() {
-        var previous = null, budget = 0, sincePaint = 0;
+        var previous = null, sincePaint = 0, samples = [], cursor = 0, count = 0, cycle = 0;
+        var refreshMs = 1000 / 60, divisor = 1;
         return {
-            reset: function () { previous = null; budget = sincePaint = 0; },
-            advance: function (now, interval) {
+            reset: function () {
+                previous = null; sincePaint = cycle = cursor = count = 0;
+                samples.length = 0; refreshMs = 1000 / 60; divisor = 1;
+            },
+            target: function () { return Math.round(1000 / refreshMs / divisor); },
+            advance: function (now, fallback) {
                 if (previous === null) { previous = now; return 0; }
                 var delta = Math.max(0, now - previous); previous = now;
-                budget += delta; sincePaint += delta;
-                // Keep the fractional remainder. Resetting the deadline to
-                // "now" would turn 90 fps into 72 fps on a 144 Hz screen.
-                // The tiny tolerance only absorbs timestamp rounding.
-                if (budget + .05 < interval) return null;
-                budget = Math.max(0, budget - Math.floor((budget + .05) / interval) * interval);
+                // GPU paints every display refresh. The software renderer uses
+                // whole refresh periods (60 at120Hz,72 at144Hz,66.7 at200Hz),
+                // avoiding the old uneven90/60FPS beat against fast displays.
+                if (delta >= 2 && delta <= 40) {
+                    samples[cursor++ % 16] = delta; count++;
+                    if (count === 8 || count % 16 === 0) {
+                        var ordered = samples.slice().sort(function (a, b) { return a - b; });
+                        refreshMs = ordered[Math.floor(ordered.length / 2)];
+                        var next = fallback ? Math.max(1, Math.floor((1000 / refreshMs + 1) / 60)) : 1;
+                        if (next !== divisor) { divisor = next; cycle = 0; }
+                    }
+                }
+                sincePaint += delta;
+                if (++cycle < divisor) return null;
+                cycle = 0;
                 var elapsed = sincePaint; sincePaint = 0;
-                return elapsed;
+                // A blocked main thread must not teleport hair or eyelids.
+                return Math.min(elapsed, 80);
             }
         };
     }
@@ -40,35 +50,29 @@
         if (!gl) return null;
         var vertex = [
             'attribute vec2 a_uv; varying vec2 v_uv;',
-            'uniform float u_time; uniform float u_motion; uniform float u_greet; uniform vec2 u_pointer;',
+            'uniform float u_motion; uniform vec4 u_head; uniform vec4 u_secondary; uniform vec2 u_body;',
             'void main(){ v_uv=a_uv; vec2 p=a_uv;',
-            'float head=1.0-smoothstep(0.38,0.55,p.y);',
-            'float breath=sin(u_time*1.35)*0.005*u_motion;',
-            'p.y-=breath*(0.38+0.62*head);',
-            'p.x+=(p.x-0.5)*breath*smoothstep(0.4,0.7,p.y);',
-            'float hair=smoothstep(0.16,0.3,abs(p.x-0.51))*smoothstep(0.22,0.5,p.y)*(1.0-smoothstep(0.84,1.0,p.y));',
-            'p.x+=sin(u_time*1.05+p.y*5.0)*0.008*hair*u_motion;',
-            'p.y+=cos(u_time*0.95+p.x*3.0)*0.0025*hair*u_motion;',
-            'float ear=(1.0-smoothstep(0.12,0.23,p.y))*smoothstep(0.10,0.2,abs(p.x-0.5));',
-            'float earBeat=pow(max(0.0,sin(u_time*0.68)),18.0);',
-            'p.x+=sign(p.x-0.5)*ear*(sin(u_time*12.0)*earBeat*0.003+u_greet*0.005)*u_motion;',
-            'p.y-=ear*u_greet*0.004*u_motion;',
-            'float headTurn=sin(u_time*0.47)*0.007*u_motion;',
-            'vec2 d=p-vec2(0.52,0.46); p+=vec2(-d.y,d.x)*headTurn*head;',
-            'p+=u_pointer*vec2(0.0045,0.0025)*head*u_motion;',
-            'float plush=max(0.0,1.0-length((a_uv-vec2(0.55,0.65))/vec2(0.20,0.15)));',
-            'p.y-=plush*u_greet*0.005*u_motion;',
+            'float head=1.0-smoothstep(0.39,0.48,p.y);',
+            'vec2 torso=p-vec2(0.5,0.91); p+=vec2(-torso.y,torso.x)*u_body.x*u_motion;',
+            'p.y-=u_body.y*(0.30+0.70*head)*u_motion;',
+            'p.x+=(a_uv.x-0.5)*u_body.y*0.55*smoothstep(0.42,0.7,a_uv.y)*u_motion;',
+            'vec2 neck=p-vec2(0.53,0.44); p+=(vec2(-neck.y,neck.x)*u_head.z+u_head.xy)*head*u_motion;',
+            'float lockY=smoothstep(0.32,0.56,a_uv.y)*(1.0-smoothstep(0.76,0.94,a_uv.y));',
+            'float leftLock=(1.0-smoothstep(0.08,0.17,abs(a_uv.x-(0.29-0.16*a_uv.y))))*lockY;',
+            'float rightLock=(1.0-smoothstep(0.07,0.16,abs(a_uv.x-(0.70+0.16*a_uv.y))))*lockY;',
+            'p.x+=(leftLock*u_secondary.x+rightLock*u_secondary.y)*u_motion;',
+            'p.y+=(leftLock*u_secondary.x-rightLock*u_secondary.y)*0.25*u_motion;',
+            'float leftEar=(1.0-smoothstep(0.65,1.0,length((a_uv-vec2(0.28,0.13))/vec2(0.12,0.12))))*(1.0-smoothstep(0.18,0.24,a_uv.y));',
+            'float rightEar=(1.0-smoothstep(0.6,1.0,length((a_uv-vec2(0.66,0.08))/vec2(0.12,0.13))))*(1.0-smoothstep(0.12,0.20,a_uv.y));',
+            'vec2 dl=a_uv-vec2(0.32,0.22),dr=a_uv-vec2(0.65,0.17);',
+            'p+=(vec2(-dl.y,dl.x)*u_secondary.z*leftEar+vec2(-dr.y,dr.x)*u_secondary.w*rightEar)*u_motion;',
             'gl_Position=vec4(p.x*2.0-1.0,1.0-p.y*2.0,0.0,1.0); }'
         ].join('\n');
         var fragment = [
             'precision mediump float; varying vec2 v_uv;',
             'uniform sampler2D u_art; uniform sampler2D u_closed; uniform float u_blink;',
-            'void main(){ vec4 base=texture2D(u_art,v_uv); vec4 closed=texture2D(u_closed,v_uv);',
-            // Only the illustrated eye regions replace the original texture.
-            'vec2 left=(v_uv-vec2(0.435,0.317))/vec2(0.084,0.041);',
-            'vec2 right=(v_uv-vec2(0.619,0.283))/vec2(0.082,0.041);',
-            'float eye=max(1.0-smoothstep(0.55,1.0,dot(left,left)),1.0-smoothstep(0.55,1.0,dot(right,right)));',
-            'gl_FragColor=mix(base,closed,eye*u_blink); }'
+            window.NewtabCompanionEyes.fragment,
+            'void main(){ gl_FragColor=applyEyes(v_uv); }'
         ].join('\n');
         var program, v, f, buffer, textures = [];
         function shader(type, source) {
@@ -117,14 +121,16 @@
                 gl.uniform1i(gl.getUniformLocation(program, index ? 'u_closed' : 'u_art'), index);
             });
             var uniforms = {};
-            ['time','motion','greet','pointer','blink'].forEach(function (name) { uniforms[name] = gl.getUniformLocation(program, 'u_' + name); });
+            ['motion','head','secondary','body','blink'].forEach(function (name) { uniforms[name] = gl.getUniformLocation(program, 'u_' + name); });
             return {
-                kind: 'webgl', frameInterval: 1000 / WEBGL_FPS,
+                kind: 'webgl',
                 draw: function (state) {
                     gl.viewport(0, 0, canvas.width, canvas.height);
                     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-                    gl.uniform1f(uniforms.time, state.time); gl.uniform1f(uniforms.motion, state.motion);
-                    gl.uniform1f(uniforms.greet, state.greet); gl.uniform2f(uniforms.pointer, state.x, state.y);
+                    gl.uniform1f(uniforms.motion, state.motion);
+                    gl.uniform4f(uniforms.head, state.headX, state.headY, state.headRoll, 0);
+                    gl.uniform4f(uniforms.secondary, state.hairLeft, state.hairRight, state.earLeft, state.earRight);
+                    gl.uniform2f(uniforms.body, state.bodyRoll, state.breath);
                     gl.uniform1f(uniforms.blink, blinkImage ? state.blink : 0);
                     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2);
                 },
@@ -140,30 +146,18 @@
         var ctx;
         try { ctx = canvas.getContext('2d', { alpha: true }); } catch (_) { return null; }
         if (!ctx) return null;
-        var source = document.createElement('canvas');
-        source.width = 544; source.height = 725;
-        var base = source.getContext('2d');
-        base.imageSmoothingQuality = 'high'; base.drawImage(image, 0, 0, source.width, source.height);
-        var eyes = document.createElement('canvas'); eyes.width = source.width; eyes.height = source.height;
-        var eyePainter = eyes.getContext('2d');
-        if (blinkImage) {
-            eyePainter.drawImage(blinkImage, 0, 0, eyes.width, eyes.height);
-            var mask = document.createElement('canvas'); mask.width = eyes.width; mask.height = eyes.height;
-            var maskPainter = mask.getContext('2d');
-            [[.435,.317,.084,.041],[.619,.283,.082,.041]].forEach(function (eye) {
-                maskPainter.save(); maskPainter.translate(eye[0] * mask.width, eye[1] * mask.height);
-                maskPainter.scale(eye[2] * mask.width, eye[3] * mask.height);
-                var gradient = maskPainter.createRadialGradient(0, 0, .74, 0, 0, 1);
-                gradient.addColorStop(0, '#fff'); gradient.addColorStop(1, 'transparent');
-                maskPainter.fillStyle = gradient; maskPainter.fillRect(-1, -1, 2, 2); maskPainter.restore();
-            });
-            eyePainter.globalCompositeOperation = 'destination-in'; eyePainter.drawImage(mask, 0, 0);
-        }
-        var blended = document.createElement('canvas'); blended.width = source.width; blended.height = source.height;
-        var blendPainter = blended.getContext('2d');
+        var eyeRig = window.NewtabCompanionEyes.createCanvas(image, blinkImage, 544, 725);
+        var source = eyeRig.paint(0);
         var cols = 8, rows = 12, nodes = [], warped = [], cells = [];
         for (var row = 0; row <= rows; row++) for (var col = 0; col <= cols; col++) {
-            nodes.push({ x: col / cols, y: row / rows }); warped.push({ x: 0, y: 0 });
+            var nx = col / cols, ny = row / rows;
+            var lockY = smooth(.32, .56, ny) * (1 - smooth(.76, .94, ny));
+            nodes.push({ x: nx, y: ny, head: 1 - smooth(.39, .48, ny), chest: smooth(.42, .7, ny),
+                hairL: (1 - smooth(.08, .17, Math.abs(nx - (.29 - .16 * ny)))) * lockY,
+                hairR: (1 - smooth(.07, .16, Math.abs(nx - (.70 + .16 * ny)))) * lockY,
+                earL: (1 - smooth(.65, 1, Math.hypot((nx - .28) / .12, (ny - .13) / .12))) * (1 - smooth(.18, .24, ny)),
+                earR: (1 - smooth(.6, 1, Math.hypot((nx - .66) / .12, (ny - .08) / .13))) * (1 - smooth(.12, .20, ny)) });
+            warped.push({ x: 0, y: 0 });
         }
         for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) {
             var i = y * (cols + 1) + x;
@@ -171,28 +165,30 @@
         }
         function smooth(a, b, v) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
         function deform(uv, s, point) {
-            var x = uv.x, y = uv.y, head = 1 - smooth(.38, .55, y);
-            var breath = Math.sin(s.time * 1.35) * .005 * s.motion;
-            y -= breath * (.38 + .62 * head); x += (x - .5) * breath * smooth(.4, .7, y);
-            var hair = smooth(.16, .3, Math.abs(x - .51)) * smooth(.22, .5, y) * (1 - smooth(.84, 1, y));
-            x += Math.sin(s.time * 1.05 + y * 5) * .008 * hair * s.motion;
-            y += Math.cos(s.time * .95 + x * 3) * .0025 * hair * s.motion;
-            var ear = (1 - smooth(.12, .23, y)) * smooth(.1, .2, Math.abs(x - .5));
-            var beat = Math.pow(Math.max(0, Math.sin(s.time * .68)), 18);
-            x += Math.sign(x - .5) * ear * (Math.sin(s.time * 12) * beat * .003 + s.greet * .005) * s.motion;
-            y -= ear * s.greet * .004 * s.motion;
-            var turn = Math.sin(s.time * .47) * .007 * s.motion, dx = x - .52, dy = y - .46;
-            x -= dy * turn * head; y += dx * turn * head;
-            x += s.x * .0045 * head * s.motion; y += s.y * .0025 * head * s.motion;
-            var plush = Math.max(0, 1 - Math.hypot((uv.x - .55) / .2, (uv.y - .65) / .15));
-            y -= plush * s.greet * .005 * s.motion;
+            var x = uv.x, y = uv.y, m = s.motion;
+            x -= (uv.y - .91) * s.bodyRoll * m; y += (uv.x - .5) * s.bodyRoll * m;
+            y -= s.breath * (.30 + .70 * uv.head) * m;
+            x += (uv.x - .5) * s.breath * .55 * uv.chest * m;
+            var dx = x - .53, dy = y - .44;
+            x += (-dy * s.headRoll + s.headX) * uv.head * m;
+            y += (dx * s.headRoll + s.headY) * uv.head * m;
+            x += (uv.hairL * s.hairLeft + uv.hairR * s.hairRight) * m;
+            y += (uv.hairL * s.hairLeft - uv.hairR * s.hairRight) * .25 * m;
+            x -= ((uv.y - .22) * s.earLeft * uv.earL + (uv.y - .17) * s.earRight * uv.earR) * m;
+            y += ((uv.x - .32) * s.earLeft * uv.earL + (uv.x - .65) * s.earRight * uv.earR) * m;
             point.x = x * canvas.width; point.y = y * canvas.height;
         }
-        function tracePoint(point, centerX, centerY, first) {
-            // A subpixel overlap closes antialiased triangle seams without
-            // changing the source silhouette or creating separate layers.
-            var vx = point.x - centerX, vy = point.y - centerY, length = Math.hypot(vx, vy) || 1;
-            var x = point.x + vx / length * .6, y = point.y + vy / length * .6;
+        function tracePoint(point, previous, next, orientation, first) {
+            // Offset both adjoining edges by a full backing pixel. Moving a
+            // vertex away from the centroid leaves smaller perpendicular gaps
+            // along diagonal edges, visible as seams on dark backgrounds.
+            var ax = point.x - previous.x, ay = point.y - previous.y;
+            var bx = next.x - point.x, by = next.y - point.y;
+            var al = Math.hypot(ax, ay) || 1, bl = Math.hypot(bx, by) || 1;
+            var nx = ay / al * orientation, ny = -ax / al * orientation;
+            var mx = by / bl * orientation, my = -bx / bl * orientation;
+            var offset = 1 / Math.max(.2, 1 + nx * mx + ny * my);
+            var x = point.x + (nx + mx) * offset, y = point.y + (ny + my) * offset;
             if (first) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         function drawTriangle(texture, a, b, c, p, q, r) {
@@ -205,32 +201,27 @@
             var cc = (p.x * (cx - bx) + q.x * (ax - cx) + r.x * (bx - ax)) / denominator;
             var dd = (p.y * (cx - bx) + q.y * (ax - cx) + r.y * (bx - ax)) / denominator;
             var ee = p.x - aa * ax - cc * ay, ff = p.y - bb * ax - dd * ay;
-            var centerX = (p.x + q.x + r.x) / 3, centerY = (p.y + q.y + r.y) / 3;
+            var orientation = (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x) >= 0 ? 1 : -1;
             ctx.save(); ctx.beginPath();
-            tracePoint(p, centerX, centerY, true); tracePoint(q, centerX, centerY, false); tracePoint(r, centerX, centerY, false);
+            tracePoint(p, r, q, orientation, true); tracePoint(q, p, r, orientation, false); tracePoint(r, q, p, orientation, false);
             ctx.closePath(); ctx.clip(); ctx.setTransform(aa, bb, cc, dd, ee, ff); ctx.drawImage(texture, 0, 0); ctx.restore();
         }
         return {
-            kind: 'canvas2d', frameInterval: 1000 / CANVAS_FPS,
+            kind: 'canvas2d',
             draw: function (state) {
                 ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-                var texture = source;
-                if (blinkImage && state.blink > .001) {
-                    blendPainter.clearRect(0, 0, source.width, source.height); blendPainter.globalAlpha = 1;
-                    blendPainter.drawImage(source, 0, 0); blendPainter.globalAlpha = state.blink;
-                    blendPainter.drawImage(eyes, 0, 0); blendPainter.globalAlpha = 1; texture = blended;
-                }
+                var texture = eyeRig.paint(state.blink);
                 if (!state.motion) { ctx.drawImage(texture, 0, 0, canvas.width, canvas.height); return; }
-                // Reuse the mesh points rather than allocating a new point
-                // array on every frame; the fallback now paints at 60 fps.
+                // Regional weights are precomputed; frames allocate no mesh
+                // points and the displayed texture remains bounded in size.
                 for (var n = 0; n < nodes.length; n++) deform(nodes[n], state, warped[n]);
                 for (var c = 0; c < cells.length; c++) {
                     var cell = cells[c];
                     drawTriangle(texture, nodes[cell[0]], nodes[cell[1]], nodes[cell[2]], warped[cell[0]], warped[cell[1]], warped[cell[2]]);
                 }
             },
-            destroy: function () { source.width = eyes.width = blended.width = 1; }
+            destroy: function () { eyeRig.destroy(); }
         };
     }
 
@@ -252,10 +243,13 @@
         var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
         var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
         var mode = animationMode(options), chatState = 'idle';
-        var disposed = false, visible = true, frame = 0, elapsed = 0, rig = null, greetUntil = 0, messageTimer = 0;
+        var disposed = false, visible = true, frame = 0, rig = null, greeting = 0, hovered = false, messageTimer = 0;
         var pacer = createFramePacer();
-        var target = { x: 0, y: 0 }, pointer = { x: 0, y: 0 };
-        var state = { time: 0, motion: 0, greet: 0, x: 0, y: 0, blink: 0, frames: 0, drawMs: 0 };
+        var target = { x: 0, y: 0 }, motionInput = { x: 0, y: 0, hover: false, greeting: 0, chatState: 'idle' };
+        var dynamics = window.NewtabCompanionDynamics && window.NewtabCompanionDynamics.create({ seed: widget.id });
+        var state = { motion: 0, frames: 0, drawMs: 0, time: 0, headX: 0, headY: 0, headRoll: 0, bodyRoll: 0, breath: 0,
+            hairLeft: 0, hairRight: 0, earLeft: 0, earRight: 0, blink: 0, gazeX: 0, gazeY: 0, greet: 0 };
+        if (dynamics) Object.assign(state, dynamics.advance(0, motionInput));
         var blinkImage = new Image();
         var ready = { art: false, blink: false, blinkFailed: false };
         function shouldMove() {
@@ -263,7 +257,9 @@
         }
         function drawNeutral() {
             if (!rig) return;
-            state.motion = 0; state.greet = 0; state.blink = 0; state.x = 0; state.y = 0; rig.draw(state);
+            // Keep the last live pose for a seamless resume, even when the
+            // user explicitly chooses a neutral still image while paused.
+            rig.draw(Object.assign({}, state, { motion: 0, blink: 0, greet: 0 }));
         }
         function sync() {
             if (disposed) return;
@@ -273,24 +269,18 @@
             } else {
                 if (frame) cancelAnimationFrame(frame); frame = 0;
                 root.dataset.motion = !rig ? 'static' : mode === 'off' ? 'off' : mode === 'auto' && reduced.matches ? 'reduced' : 'paused';
-                root.classList.remove('is-greeting'); drawNeutral();
+                root.classList.remove('is-greeting');
+                if (mode === 'off' || mode === 'auto' && reduced.matches) drawNeutral();
             }
         }
         function tick(now) {
             frame = 0;
             if (!shouldMove()) return sync();
-            var delta = pacer.advance(now, rig.frameInterval);
+            var delta = pacer.advance(now, rig.kind === 'canvas2d');
             if (delta !== null) {
-                elapsed += delta;
-                var follow = -Math.expm1(-delta / POINTER_RESPONSE_MS);
-                pointer.x += (target.x - pointer.x) * follow; pointer.y += (target.y - pointer.y) * follow;
-                state.time = elapsed / 1000; state.motion = 1; state.x = pointer.x; state.y = pointer.y;
-                state.greet = Math.max(0, Math.min(1, (greetUntil - now) / 600));
-                if (chatState === 'thinking') state.x += Math.sin(state.time * .7) * .3;
-                if (chatState === 'replying') state.greet = Math.max(state.greet, .15 + .12 * Math.sin(state.time * 3));
-                var phase = (state.time + 2.1) % 4.6;
-                var blink = phase > 3 && phase < 3.26 ? Math.sin((phase - 3) / .26 * Math.PI) : 0;
-                state.blink = Math.max(blink, state.greet > .4 ? .75 * state.greet : 0);
+                motionInput.x = target.x; motionInput.y = target.y; motionInput.hover = hovered;
+                motionInput.greeting = greeting; motionInput.chatState = chatState;
+                Object.assign(state, dynamics.advance(delta, motionInput)); state.motion = 1;
                 var paintStarted = performance.now(); rig.draw(state); state.drawMs = performance.now() - paintStarted; state.frames++;
                 root.classList.toggle('is-greeting', state.greet > .02);
             }
@@ -301,12 +291,19 @@
             var rect = root.getBoundingClientRect();
             root.style.setProperty('--companion-height', rect.height + 'px');
             var rendered = canvas.getBoundingClientRect(), ratio = Math.min(window.devicePixelRatio || 1, 2);
+            var longest = rig && rig.kind === 'canvas2d' ? 1024 : 2048;
+            ratio = Math.min(ratio, longest / Math.max(1, rendered.width, rendered.height));
             var width = Math.max(1, Math.round(rendered.width * ratio)), height = Math.max(1, Math.round(rendered.height * ratio));
-            if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
-            if (rig) rig.draw(state);
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width; canvas.height = height;
+                if (rig) { if (mode === 'off' || mode === 'auto' && reduced.matches) drawNeutral(); else rig.draw(state); }
+            }
         }
         function start() {
             if (disposed || rig || !ready.art || (!ready.blink && !ready.blinkFailed)) return;
+            // The portrait and chat button remain usable if an optional
+            // animation module failed to download on a first uncached visit.
+            if (!dynamics || !window.NewtabCompanionEyes) { root.dataset.motion = 'static'; return; }
             rig = createRig(canvas, image, ready.blink ? blinkImage : null);
             if (!rig) useCanvasFallback();
             if (rig) { resize(); drawNeutral(); root.classList.add('has-rig'); root.dataset.renderer = rig.kind; }
@@ -330,15 +327,16 @@
             message.textContent = String(options.greeting || '今天想聊些什麼？').slice(0, 80);
             root.classList.add('is-speaking'); clearTimeout(messageTimer);
             messageTimer = setTimeout(function () { root.classList.remove('is-speaking'); }, 2400);
-            greetUntil = performance.now() + 750;
+            greeting++;
         }
         function move(event) {
             if (!shouldMove() || !finePointer.matches || event.pointerType !== 'mouse') return;
+            hovered = true;
             var rect = trigger.getBoundingClientRect();
             target.x = Math.max(-1, Math.min(1, (event.clientX - rect.left) / rect.width * 2 - 1));
             target.y = Math.max(-1, Math.min(1, (event.clientY - rect.top) / rect.height * 2 - 1));
         }
-        function resetPointer() { target.x = 0; target.y = 0; }
+        function resetPointer() { target.x = 0; target.y = 0; hovered = false; }
         function escape(event) { if (event.key === 'Escape') root.classList.remove('is-speaking'); }
         function updateChatState(value) {
             if (value === 'speaking') value = 'replying';
@@ -371,7 +369,10 @@
             var previous = rig; rig = null;
             useCanvasFallback();
             if (previous) previous.destroy();
-            if (rig) { root.dataset.renderer = rig.kind; resize(); drawNeutral(); } else root.classList.remove('has-rig');
+            if (rig) {
+                root.dataset.renderer = rig.kind; resize();
+                if (mode === 'off' || mode === 'auto' && reduced.matches) drawNeutral(); else rig.draw(state);
+            } else root.classList.remove('has-rig');
             sync();
         }
         canvas.addEventListener('webglcontextlost', lost);
@@ -391,7 +392,8 @@
             destroy: destroy,
             setAnimation: function (value) { mode = ['auto', 'on', 'off'].indexOf(value) >= 0 ? value : value === false ? 'off' : 'on'; sync(); },
             setChatState: updateChatState,
-            state: function () { return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, mode: mode, enabled: mode !== 'off', reduced: reduced.matches, renderer: rig ? rig.kind : 'image', drawMs: state.drawMs, targetFps: rig ? Math.round(1000 / rig.frameInterval) : 0, animationTime: state.time, pointerX: pointer.x, pointerY: pointer.y, chatState: chatState }; }
+            state: function () { return { motion: root.dataset.motion, frames: state.frames, blink: state.blink, mode: mode, enabled: mode !== 'off', reduced: reduced.matches, renderer: rig ? rig.kind : 'image', drawMs: state.drawMs, targetFps: rig ? pacer.target() : 0, animationTime: state.time, pointerX: state.gazeX / .004, pointerY: state.gazeY / .003, chatState: chatState,
+                pose: { headX: state.headX, headY: state.headY, headRoll: state.headRoll, bodyRoll: state.bodyRoll, breath: state.breath, hairLeft: state.hairLeft, hairRight: state.hairRight, earLeft: state.earLeft, earRight: state.earRight, gazeX: state.gazeX, gazeY: state.gazeY, greet: state.greet } }; }
         });
         return destroy;
     }

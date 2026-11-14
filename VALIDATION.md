@@ -1,4 +1,23 @@
-# Release 2026.11.14.9
+# Release 2026.11.14.13
+
+Validation date: 2026-11-14 (Asia/Taipei).
+
+- Replaced the portrait's synchronized sine waves and full-eye crossfade with fixed120Hz spring dynamics, interpolated display poses and continuous illustrated eyelid apertures. Head, torso, hair and ears have distinct response times. Greeting/chat transitions ease in; hidden or temporarily paused animation retains its pose.
+- WebGL renders on every display refresh. Canvas uses whole refresh periods instead of a fractional60FPS cadence on faster screens. The refresh estimator resets on resume, including moving from200Hz to60Hz. CPU/GPU backing dimensions are bounded independently.
+- Fixed Canvas triangle-edge seams exposed by the enlarged character on dark backgrounds. Existing character artwork, saved widget appearance/layout and in-page chat behavior remain intact.
+
+| Verification | Observed result |
+| --- | --- |
+| Physical dynamics | 7 unit tests passed:30–240Hz consistency, interpolation, gaze/head/hair response ordering, irregular blink timing, greetings/chat transitions, bounded stalls and amplitude limits. |
+| Browser integration | Full10-case Brave suite passed, followed by5 focused final cases including a new200→60Hz resume regression. Covers8viewport bounds, preference persistence, chat input, Canvas fallback, context loss, iframe visibility, missing optional modules and even synthetic refresh cadence. |
+| Actual paints | Independent probes hash artwork after real GPU/Canvas draws, separately from an uninstrumented timing pass. The old build produced90/60 actual changing frames per second; the new build follows native~200Hz on this RTX5070Ti test environment and uses~67FPS in Canvas. These measurements are environment-specific; CPU submission cost is not GPU completion time. |
+| Visual review | Default280×360 and enlarged600×800 on light/dark backgrounds, pointer direction, greetings, thinking/replying and explicitly labelled simulated maximum poses. Head/neck silhouette remained intact; the detected Canvas seams were corrected and rechecked. |
+| Eyelids | Open state restores exactly; pixels outside the eye regions remain unchanged. Near-full closure converges continuously. Canvas/WebGL eye-region mean channel difference0.025/255,max2/255 in the isolated parity fixture. |
+| Existing site | 9 startup cases,4 general desktop/mobile motion-preference cases and all character-chat fixtures passed. Personal Brave profile, installed extension and authentication helper were not modified. |
+
+This remains a procedural portrait mesh, not an imported Cubism model. It borrows motion principles from official Live2D guidance; separated and underpainted artwork would be required for a full perspective/expression rig. Local measurements, visual contact sheets and the60FPS preview recording are kept in ignored `.impeccable/review/`.
+
+# Release 2026.11.14.9 (historical results)
 
 Validation date: 2026-11-14 (Asia/Taipei).
 
