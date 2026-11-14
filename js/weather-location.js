@@ -199,6 +199,13 @@
         var geonames = element('a', null, 'GeoNames'); geonames.href = 'https://www.geonames.org/'; geonames.target = '_blank'; geonames.rel = 'noopener noreferrer';
         var geojs = element('a', null, 'GeoJS'); geojs.href = 'https://www.geojs.io/'; geojs.target = '_blank'; geojs.rel = 'noopener noreferrer';
         footer.append(source, document.createTextNode(' · '), geonames, document.createTextNode(' · '), geojs);
+        if (options.sourceInformation && options.sourceInformation.nodeType === 1) {
+            var forecastSource = element('section', 'weather-location-attribution');
+            forecastSource.setAttribute('aria-label', '天氣資料來源');
+            forecastSource.appendChild(element('h3', null, '天氣資料'));
+            forecastSource.appendChild(options.sourceInformation.cloneNode(true));
+            footer.prepend(forecastSource);
+        }
         dialog.append(header, hint, form, networkSection, status, results, empty, footer);
         form.addEventListener('submit', function (event) { search(session, event); });
         input.addEventListener('input', function () {

@@ -476,8 +476,16 @@
             var stored = JSON.parse(localStorage.getItem(WEATHER_MET_CACHE_KEY) || '{}');
             Object.keys(stored).slice(0, WEATHER_MET_CACHE_MAX).forEach(function (key) {
                 var entry = stored[key];
-                if (validMetEntry(entry) && (!weatherMetMemory[key] ||
-                    entry.data.fetchedAt > weatherMetMemory[key].data.fetchedAt)) weatherMetMemory[key] = entry;
+                if (!validMetEntry(entry)) return;
+                var remembered = weatherMetMemory[key];
+                if (!remembered || entry.data.fetchedAt > remembered.data.fetchedAt) weatherMetMemory[key] = entry;
+                else if (entry.data.fetchedAt === remembered.data.fetchedAt &&
+                    weatherForecastRetryAfter(entry.data) > weatherForecastRetryAfter(remembered.data)) {
+                    // Another tab may have attempted a forecast upgrade without
+                    // fetching a new MET reading. Share only its bounded retry
+                    // deadline; never replace the retained provider timestamps.
+                    remembered.data = Object.assign({}, remembered.data, { forecastRetryAfter: entry.data.forecastRetryAfter });
+                }
             });
         } catch (e) { /* The memory cache still honors refresh limits. */ }
         Object.keys(weatherMetMemory).forEach(function (key) {
@@ -508,7 +516,6 @@
     /** Cache entries never turn missing temperatures into a successful reading. */
     function readWeatherCache(lat, lon) {
         var met = readMetCache(lat, lon);
-        if (met && !met.stale) return met;
         try {
             var raw = global.localStorage && localStorage.getItem(WEATHER_CACHE_KEY);
             if (!raw) return met;
@@ -518,18 +525,54 @@
                 Date.now() - c.ts > 7 * 24 * 60 * 60 * 1000) return met;
             if (Math.abs(c.lat - lat) > 0.001 || Math.abs(c.lon - lon) > 0.001) return met;
             // MET uses exact four-decimal request keys, not nearby-place matching.
-            if (c.data.provider === 'met-no') return met;
+            if (c.data.provider === 'met-no') {
+                // The dedicated record owns request throttling. A newer partial
+                // response may coexist with an older complete display cache;
+                // retain that graph across reload, for this exact request key.
+                if (met && metCacheKey(c.lat, c.lon) === metCacheKey(lat, lon) && validMetEntry({ data: c.data }) &&
+                    global.NewtabWeatherData.hasForecast(c.data) && !global.NewtabWeatherData.hasForecast(met.data)) {
+                    return { data: c.data, stale: true };
+                }
+                return met;
+            }
             var stale = Date.now() - c.ts > WEATHER_TTL_MS;
-            if (met && met.data.fetchedAt > c.ts) return met;
             c.data.provider = 'open-meteo';
             c.data.fetchedAt = c.ts;
+            if (met) {
+                // An old MET current-only record must not hide the complete
+                // forecast obtained while upgrading it, including on reload.
+                var metComplete = global.NewtabWeatherData.hasForecast(met.data);
+                var primaryComplete = global.NewtabWeatherData.hasForecast(c.data);
+                if (!met.stale && metComplete && (stale || !primaryComplete || met.data.fetchedAt >= c.ts)) return met;
+                if (!stale && primaryComplete) return { data: c.data, stale: false };
+                if (primaryComplete && !metComplete) return { data: c.data, stale: stale };
+                if (!met.stale || met.data.fetchedAt > c.ts) return met;
+            }
             return { data: c.data, stale: stale };
         } catch (e) {
             return met;
         }
     }
 
-    function writeWeatherCache(lat, lon, data) {
+    function weatherForecastRetryAfter(data) {
+        var retryAfter = data && data.forecastRetryAfter;
+        return typeof retryAfter === 'number' && isFinite(retryAfter) && retryAfter > Date.now() &&
+            retryAfter <= Date.now() + WEATHER_TTL_MS ? retryAfter : 0;
+    }
+
+    function weatherForecastDue(data) {
+        return !global.NewtabWeatherData.hasForecast(data) && !weatherForecastRetryAfter(data);
+    }
+
+    function deferWeatherForecast(data) {
+        if (global.NewtabWeatherData.hasForecast(data)) return data;
+        // Reopening tabs must not repeatedly retry an unavailable primary.
+        // Keep MET's original fetch/refresh times and its full location cache.
+        return Object.assign({}, data, { forecastRetryAfter: Math.min(Date.now() + WEATHER_TTL_MS,
+            data.provider === 'met-no' && data.refreshAfter > Date.now() ? data.refreshAfter : Infinity) });
+    }
+
+    function writeMetCache(lat, lon, data) {
         if (data.provider === 'met-no') {
             var key = metCacheKey(lat, lon);
             if (metHasCacheRoom(key)) {
@@ -537,6 +580,10 @@
                 try { localStorage.setItem(WEATHER_MET_CACHE_KEY, JSON.stringify(weatherMetMemory)); } catch (e) { /* memory cache remains */ }
             }
         }
+    }
+
+    function writeWeatherCache(lat, lon, data) {
+        writeMetCache(lat, lon, data);
         try {
             if (global.localStorage) {
                 localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({
@@ -709,6 +756,7 @@
             var current = findWidget(w.id);
             if (!current) return;
             global.NewtabWeatherLocation.open({ opener: city,
+                sourceInformation: body._weatherSource,
                 focusTarget: function () { return body.isConnected ? body.querySelector('.weather-city-button') : null; },
                 city: current.options && ['manual', 'network', 'default'].indexOf(current.options.locationSource) >= 0 ? current.options.city : '',
                 isCurrent: function () { return body.isConnected && !!findWidget(w.id); },
@@ -736,8 +784,8 @@
 
     function weatherHeading() {
         return '<div class="weather-heading"><button type="button" class="weather-city-button" aria-label="選擇天氣城市" title="選擇天氣城市"><span class="weather-city"></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>' +
-            '<div class="weather-actions"><button type="button" class="weather-locate" title="重新定位" aria-label="重新定位">定位</button>' +
-            '<button type="button" class="weather-retry" title="更新天氣" aria-label="更新天氣">更新</button></div></div>';
+            '<div class="weather-actions"><button type="button" class="weather-locate" title="重新定位" aria-label="重新定位"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22"/></svg></button>' +
+            '<button type="button" class="weather-retry" title="更新天氣" aria-label="更新天氣"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5M5.3 7.8a7.5 7.5 0 0 1 12.3-2L20 9M4 15l2.4 3.2a7.5 7.5 0 0 0 12.3-2"/></svg></button></div></div>';
     }
 
     function weatherSource(body, data) {
@@ -769,7 +817,9 @@
             note.className = 'weather-source-note'; note.textContent = '預報 · 數值已四捨五入';
             source.appendChild(note);
         }
-        body.appendChild(source);
+        // Keep attribution and fetch details one click away in city settings,
+        // without a permanent footer over the user's background.
+        body._weatherSource = source;
     }
 
     function paintWeatherReady(body, w, location, data, opts) {
@@ -802,8 +852,8 @@
                 if (current) { current.options = Object.assign({}, current.options || {}, { weatherUnit: unit }); persist(); }
             }
         });
-        body.querySelector('.weather-retry').textContent = opts.failed ? '重試' : '更新';
         body.querySelector('.weather-retry').setAttribute('aria-label', opts.failed ? '重試天氣更新' : '更新天氣');
+        body.querySelector('.weather-retry').title = opts.failed ? '重試天氣更新' : '更新天氣';
         weatherSource(body, data);
         weatherActions(body, w, focusClass);
         if (focusSelector) { var target = body.querySelector(focusSelector); if (target) target.focus({ preventScroll: true }); }
@@ -811,6 +861,7 @@
 
     function paintWeatherPending(body, w, location, message, failed) {
         var focusClass = weatherFocusClass(body);
+        body._weatherSource = null;
         body.className = 'widget-body weather-body widget-surface ' + (failed ? 'is-error' : 'is-loading');
         body.setAttribute('aria-busy', failed ? 'false' : 'true');
         body.innerHTML = weatherHeading() + '<div class="weather-status" role="status" aria-live="polite"></div>' +
@@ -818,8 +869,8 @@
             (!location ? '<button type="button" class="weather-default">先看台北天氣</button>' : '');
         body.querySelector('.weather-city').textContent = location ? location.city : '選擇城市';
         body.querySelector('.weather-status').textContent = message + (location && location.locationSource === 'network' ? '（網路估算）' : '');
-        body.querySelector('.weather-retry').textContent = failed ? '重試' : '更新';
         body.querySelector('.weather-retry').setAttribute('aria-label', failed ? '重試天氣更新' : '更新天氣');
+        body.querySelector('.weather-retry').title = failed ? '重試天氣更新' : '更新天氣';
         weatherActions(body, w, focusClass);
     }
 
@@ -868,10 +919,17 @@
             if (cached && cached.data) {
                 shown = cached.data;
                 body._weatherShown = shown;
-                if (!cached.stale && (!options.force || cached.data.provider === 'met-no')) {
+                var needsForecast = weatherForecastDue(shown);
+                var completeForecast = global.NewtabWeatherData.hasForecast(shown);
+                if (!cached.stale && !needsForecast && (!options.force || cached.data.provider === 'met-no' && completeForecast)) {
                     run.pending = false;
                     paintWeatherReady(body, w, location, shown);
                     return;
+                }
+                if (!completeForecast) {
+                    shown = deferWeatherForecast(shown);
+                    body._weatherShown = shown;
+                    writeWeatherCache(lat, lon, shown);
                 }
             }
             if (shown) paintWeatherReady(body, w, location, shown, { stale: true, loading: true });
@@ -882,12 +940,18 @@
             run.cancelFetch = fetchWeatherNetwork(lat, lon, function (err, data) {
                 if (!active()) return;
                 run.pending = false;
-                if (err || !data) {
+                if (err || !data || shown && global.NewtabWeatherData.hasForecast(shown) && !global.NewtabWeatherData.hasForecast(data)) {
+                    // A partial response is not an upgrade to a complete saved
+                    // forecast. Keep its graph and honestly mark it as old data.
+                    // Still retain a successfully fetched MET response's request
+                    // deadline without replacing the complete general cache.
+                    if (!err && data) writeMetCache(lat, lon, deferWeatherForecast(data));
                     if (shown) paintWeatherReady(body, w, location, shown, { stale: true, failed: true });
                     else paintWeatherPending(body, w, location, navigator.onLine === false ? '目前離線，連線後可重試' :
                         err && err.message === 'timeout' ? '連線逾時，請重試' : '暫時無法取得天氣，請重試', true);
                     return;
                 }
+                data = deferWeatherForecast(data);
                 writeWeatherCache(lat, lon, data);
                 body._weatherShown = data;
                 paintWeatherReady(body, w, location, data);
@@ -909,7 +973,7 @@
                 var opts = w.options || {};
                 if (!validWeatherCoordinates(opts.lat, opts.lon) || opts.locationSource === 'fallback') return;
                 var cached = readWeatherCache(opts.lat, opts.lon);
-                if (force || !cached || cached.stale) loadWeatherInto(body, w, { force: true });
+                if (force || !cached || cached.stale || weatherForecastDue(cached.data)) loadWeatherInto(body, w, { force: true });
             });
         }
         global.addEventListener('online', function () { refresh(true); });

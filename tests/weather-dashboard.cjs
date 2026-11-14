@@ -60,12 +60,14 @@ async function fixture({ width = 640, height = 400, viewportWidth = 1920, viewpo
         if (url.origin === origin) return route.continue();
         if (url.hostname === 'api.open-meteo.com') {
             requests.primary++;
-            return mode === 'met' ? route.abort() : route.fulfill({ json: openForecast(temperature) });
+            return mode === 'met' || mode === 'legacy' ? route.abort() : route.fulfill({ json: openForecast(temperature) });
         }
         if (url.hostname === 'api.met.no') { requests.backup++; return route.fulfill({ json: metForecast() }); }
         return route.abort();
     });
     if (mode === 'legacy') await context.addInitScript(place => {
+        if (sessionStorage.getItem('__weather_legacy_seeded')) return;
+        sessionStorage.setItem('__weather_legacy_seeded', '1');
         const now = Date.now();
         localStorage.setItem('nt_weather_met_cache_v1', JSON.stringify({
             [place.lat + ',' + place.lon]: { data: { temp: 19, code: 3, humidity: 80, wind: 2,
@@ -104,6 +106,18 @@ async function hit(page, selector) {
         const r = el.getBoundingClientRect();
         return r.width > 0 && r.height > 0 && el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
     }), true, selector + ' is not clipped or covered');
+}
+
+async function assertSourceInCityDialog(page, provider) {
+    assert.equal(await page.locator('.weather-body .weather-source').count(), 0, 'Attribution stays out of the weather card');
+    await page.locator('.weather-city-button').click();
+    const source = page.locator('.weather-location-dialog [aria-label="天氣資料來源"] .weather-source');
+    await source.waitFor({ state: 'visible' });
+    assert.match(await source.innerText(), new RegExp(provider));
+    await hit(page, '.weather-location-dialog [aria-label="天氣資料來源"] .weather-source a:first-child');
+    assert.equal(await source.locator('a').nth(1).getAttribute('href'), 'https://creativecommons.org/licenses/by/4.0/');
+    await page.keyboard.press('Escape');
+    await page.locator('.weather-location-dialog').waitFor({ state: 'detached' });
 }
 
 test('forecast metrics, date selection, keyboard chart and temperature units change real values without refetch', async () => {
@@ -163,13 +177,9 @@ for (const [width, height] of [[160, 160], [320, 360], [640, 400], [900, 440]]) 
                 assert.equal(await page.locator(selector).isVisible(), true, selector + ' is shown at full size');
                 assert.notEqual(await page.locator(selector).innerText(), '');
             }
-            await hit(page, '.weather-city-button'); await page.locator('.weather-city-button').click();
-            await page.locator('.weather-location-dialog').waitFor();
-            await page.keyboard.press('Escape');
+            await hit(page, '.weather-city-button'); await assertSourceInCityDialog(page, 'Open-Meteo');
             assert.equal(await page.locator('.weather-city-button').evaluate(el => document.activeElement === el), true);
             await hit(page, '.weather-retry'); await hit(page, '.weather-locate');
-            await hit(page, '.weather-source a:first-child');
-            assert.equal(await page.locator('.weather-source a').nth(1).getAttribute('href'), 'https://creativecommons.org/licenses/by/4.0/');
             await page.locator('.weather-body').evaluate(el => { el.scrollTop = 0; });
             if (width < 260) await page.locator('.widget[data-type="weather"]').screenshot({ path: `.impeccable/review/weather-card-${width}x${height}-expanded.png` });
             assert.deepEqual(errors, []);
@@ -227,15 +237,19 @@ test('chart inspection does not drag the card, while long-press resize persists 
     } finally { await context.close(); }
 });
 
-test('legacy current-only MET cache remains usable without inventing forecast or bypassing the provider interval', async () => {
+test('legacy MET cache keeps current conditions when forecast upgrade is unavailable, without bypassing the provider interval', async () => {
     const { context, page, requests, errors } = await fixture({ mode: 'legacy' });
     try {
         assert.match(await page.locator('.weather-temp').innerText(), /^19/);
         assert.equal(await page.locator('.weather-day').count(), 0);
         assert.equal(await page.locator('.weather-chart').isVisible(), false);
+        assert.deepEqual(requests, { primary: 1, backup: 0 }, 'Missing details attempt a primary upgrade while MET stays protected');
+        await page.reload({ waitUntil: 'domcontentloaded' }); await ready(page);
+        assert.deepEqual(requests, { primary: 1, backup: 0 }, 'Reload does not repeatedly request a failed automatic upgrade');
         await page.locator('.weather-retry').click(); await ready(page);
-        assert.deepEqual(requests, { primary: 0, backup: 0 });
-        assert.match(await page.locator('.weather-source').innerText(), /MET Norway/);
+        assert.deepEqual(requests, { primary: 2, backup: 0 }, 'An explicit retry may contact primary but does not bypass MET cache');
+        assert.equal(await page.locator('.weather-chart').isVisible(), false, 'Failed upgrade never invents a chart');
+        await assertSourceInCityDialog(page, 'MET Norway');
         assert.deepEqual(errors, []);
     } finally { await context.close(); }
 });
@@ -243,7 +257,7 @@ test('legacy current-only MET cache remains usable without inventing forecast or
 test('MET rain chart labels interval amounts in millimetres instead of fabricated percentages', async () => {
     const { context, page, requests, errors } = await fixture({ mode: 'met' });
     try {
-        assert.match(await page.locator('.weather-source').innerText(), /MET Norway/);
+        await assertSourceInCityDialog(page, 'MET Norway');
         await page.locator('.weather-metric[data-metric="rain"]').click();
         assert.match(await page.locator('.weather-reading').innerText(), /mm|毫米/);
         assert.doesNotMatch(await page.locator('.weather-reading').innerText(), /%/);

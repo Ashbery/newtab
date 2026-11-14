@@ -12,6 +12,8 @@
 .weather-source a { color: inherit; text-underline-offset: 2px; }
 .weather-source a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .weather-fetched { flex-basis: 100%; }
+.weather-actions :is(.weather-locate, .weather-retry) { display: inline-flex; align-items: center; justify-content: center; }
+.weather-actions svg { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 @media (max-width: 600px), (pointer: coarse) { .weather-city-button { min-height: 44px; } }
 .weather-location-dialog {
     width: min(440px, calc(100vw - 32px)); max-width: none; max-height: min(720px, calc(100dvh - 32px));
@@ -54,6 +56,10 @@
 .weather-location-empty { flex: 0 0 auto; margin: 10px 0 14px; padding: 20px 16px; border-radius: 12px; background: #edf3f7; color: #627c8c; font-size: 13px; line-height: 1.8; }
 .weather-location-footer { flex: 0 0 auto; margin-top: 16px; color: #667e8d; font-size: 11px; line-height: 1.7; }
 .weather-location-footer a { color: #526f82; text-underline-offset: 3px; }
+.weather-location-attribution { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #d5e2ea; }
+.weather-location-attribution h3 { margin: 0 0 4px; font-size: 11px; font-weight: 600; }
+.weather-location-attribution .weather-source { margin: 0; font-size: 11px; }
+.weather-location-attribution .weather-source-note { flex-basis: 100%; }
 @keyframes weather-location-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 @media (max-width: 480px) {
     .weather-location-dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 20px 16px; border-radius: 18px; }
@@ -61,9 +67,10 @@
     .weather-location-hint { margin-bottom: 16px; }
 }
 @media (max-width: 600px), (pointer: coarse) { .weather-location-network-button { min-height: 44px; } }
-@media (max-height: 420px) {
+/* Short windows must scroll the sheet, never squeeze city choices to zero. */
+@media (max-height: 720px) {
     .weather-location-dialog { padding-block: 14px; overflow-y: auto; }
     .weather-location-hint { margin-block: 8px; }
-    .weather-location-results { flex-shrink: 0; max-height: 180px; }
+    .weather-location-results { flex-shrink: 0; max-height: min(240px, 35dvh); }
 }
 @media (prefers-reduced-motion: reduce) { .weather-location-dialog[open] { animation: none; } .weather-location-result { transition: none; } }

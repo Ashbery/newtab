@@ -1,3 +1,21 @@
+# Release 2026.11.14.17
+
+## Weather actions and forecast recovery
+
+Weather locate/refresh actions now use accessible line icons. Their default surface is transparent, so the widget's own background supplies the tint, blur and opacity without a second painted layer. The weather appearance section supports independent button fill, transparency, icon color and radius, live preview, a button-only reset and the existing full reset. Refresh/error rebuilds retain these settings. Attribution and fetch details are available under the city selector instead of occupying the main weather panel.
+
+Legacy current-only caches now request missing forecast details instead of treating a valid current temperature as a complete forecast. A fresh complete primary forecast wins over an incomplete MET record, including after reload. Failed upgrades retain the available conditions, limit automatic primary retries and preserve MET's original three-hour/Expires deadline. The empty-state copy no longer promises that the next update must succeed.
+
+Validated in isolated Brave profiles with synthetic location/provider fixtures; no personal browser settings or authentication helper were changed:
+
+- Independent button/UI checks passed at 1440, 390 and 320 px: inherited and custom surfaces, alpha-zero, hover/active/focus/disabled, pending/error/ready rebuilds, reload, both resets, icon labels/tooltips and 44 px touch targets.
+- Weather dashboard browser checks: 12/12 passed, including forecast metric/day/unit changes, keyboard inspection, resize, pointer interaction, compact/large cards and attribution through city settings.
+- Data parsing checks: 20/20; cache-selection/retry checks: 7/7. The weather browser regression suite passed 26/26, followed by two focused passing additions for retaining a complete stale forecast and recording a newly fetched partial MET response's refresh deadline without replacing the complete display cache. The last case was rerun with both Open-Meteo and MET as the saved complete source, including reload and repeated refresh. The three migration cases were rerun after the cross-tab retry fix. These are 28 distinct passing browser cases, not a claim of a final repeated full-suite run.
+- Existing search appearance checks passed at 1440, 390, 320, 3440 and 5120 px after the shared settings changes.
+- Independent review caught and fixed a short-window city-dialog regression. At 320×480, 640×480 and 390×600, city results remain usable, source links scroll into view, selection closes the dialog and focus returns correctly.
+- A single real MET response parsed into 90 forecast instants and seven local days; browser fixtures separately exercise failures and old-cache upgrades. Live API availability is not guaranteed by fixture tests.
+- Review also corrected equal-fetch-time cache synchronization between tabs: a newer valid retry deadline is adopted without replacing the weather payload or provider timestamps. A later partial response cannot erase an existing complete forecast; its own MET refresh deadline is still saved. Retained complete MET display data must match the exact request-coordinate key and is marked stale; the dedicated MET cache remains authoritative for request timing.
+
 # Release 2026.11.14.16
 
 ## Gentle head and ear motion

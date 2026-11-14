@@ -86,6 +86,14 @@
     function currentPrecip(rows, at) {
         return rows.find(function (row) { return row.precipStart !== null && row.precipStart <= at && row.precipEnd > at; }) || nearest(rows, at);
     }
+    function hasForecast(data) {
+        // Current-only caches predate the dashboard. A valid temperature alone
+        // cannot establish that the saved response contains a usable forecast.
+        return !!data && Array.isArray(data.hourly) && data.hourly.some(function (row) {
+            return row && number(row.at) !== null && Math.abs(row.at) <= 8640000000000000 &&
+                ['temp', 'wind', 'precipMm', 'precipProbability'].some(function (key) { return number(row[key]) !== null; });
+        }) && Array.isArray(data.daily) && data.daily.some(function (day) { return day && validDate(day.date); });
+    }
     function parseOpenMeteo(json, suppliedNow) {
         var now = nowValue(suppliedNow), current = json && json.current || {};
         if (!json || json.error || number(current.temperature_2m) === null) throw new Error('invalid weather data');
@@ -234,5 +242,6 @@
         return Object.assign({}, data, { timeZone: target, daily: daily,
             high: today ? rounded(today.high) : null, low: today ? rounded(today.low) : null });
     }
-    return Object.freeze({ parseOpenMeteo: parseOpenMeteo, parseMet: parseMet, rezoneMet: rezoneMet, normalizeTimeZone: zone });
+    return Object.freeze({ parseOpenMeteo: parseOpenMeteo, parseMet: parseMet, rezoneMet: rezoneMet, normalizeTimeZone: zone,
+        hasForecast: hasForecast });
 });

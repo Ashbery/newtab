@@ -160,7 +160,7 @@
             notice.hidden = !!vals.length;
             if (!vals.length) {
                 reading.textContent = '';
-                notice.textContent = hours.length ? '這一天尚無此項預報。' : '詳細預報將於下次更新補齊。';
+                notice.textContent = hours.length ? '這一天尚無此項預報。' : '目前只有即時天氣，完整預報暫時無法取得。';
                 return;
             }
             var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);

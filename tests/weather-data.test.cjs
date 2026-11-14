@@ -68,6 +68,16 @@ test('Open-Meteo old current-only cache fixtures remain usable without invented 
     }
 });
 
+test('forecast availability distinguishes old current-only caches from usable provider series', () => {
+    assert.equal(Weather.hasForecast({ temp: 23, provider: 'met-no' }), false);
+    assert.equal(Weather.hasForecast({ hourly: [], daily: [] }), false);
+    assert.equal(Weather.hasForecast({ hourly: [{ at: NOW, temp: null }], daily: [{ date: '2026-11-14' }] }), false);
+    assert.equal(Weather.hasForecast({ hourly: [{ at: NOW, temp: 0 }], daily: [{ date: '2026-02-30' }] }), false);
+    assert.equal(Weather.hasForecast({ hourly: [{ at: NOW, temp: 0 }], daily: [{ date: '2026-11-14' }] }), true);
+    assert.equal(Weather.hasForecast(Weather.parseOpenMeteo(openForecast(), NOW)), true);
+    assert.equal(Weather.hasForecast(Weather.parseMet(metForecast([metPoint(NOW, 20)]), { now: NOW, timeZone: 'Asia/Taipei' })), true);
+});
+
 test('timestamps are sorted/deduplicated without filling gaps or shifting array values', () => {
     const input = openForecast(); input.hourly = { time: [START / 1000 + 7200, 'invalid', START / 1000, START / 1000, '2026-02-30T00:00'], temperature_2m: [22, 99, 20, 88, 77] };
     const value = Weather.parseOpenMeteo(input, NOW);

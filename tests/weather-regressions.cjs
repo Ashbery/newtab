@@ -15,6 +15,16 @@ const metForecast = (temp = 23.4, symbol = 'partlycloudy_day') => ({ properties:
     time: new Date().toISOString(), data: { instant: { details: { air_temperature: temp, relative_humidity: 72.2, wind_speed: 2.34 } },
         next_1_hours: { summary: { symbol_code: symbol } } }
 }] } });
+const completeForecast = (temp = 26) => {
+    const start = Math.floor(Date.now() / 3600000) * 3600000;
+    const date = new Date(start + 28800000).toISOString().slice(0, 10);
+    return { ...forecast(temp), timezone: 'Asia/Taipei', utc_offset_seconds: 28800,
+        hourly: { time: Array.from({ length: 72 }, (_, i) => start / 1000 + i * 3600),
+            temperature_2m: Array.from({ length: 72 }, (_, i) => temp + i % 6), weather_code: Array(72).fill(2),
+            precipitation: Array(72).fill(0), wind_speed_10m: Array(72).fill(2) },
+        daily: { time: [date, new Date(Date.parse(date) + 86400000).toISOString().slice(0, 10)],
+            temperature_2m_max: [30, 31], temperature_2m_min: [20, 21], weather_code: [2, 2] } };
+};
 const failures = [];
 let passed = 0;
 
@@ -90,6 +100,24 @@ async function ready(page, value = '24°') {
         document.querySelector('.weather-body')?.getAttribute('aria-busy') === 'false', value);
 }
 
+async function inspectSource(page, inspect) {
+    assert.equal(await page.locator('.weather-body .weather-source').count(), 0, 'credits do not crowd the widget');
+    await page.locator('.weather-city-button').click();
+    await page.locator('.weather-location-dialog[open] .weather-source').waitFor();
+    const result = await inspect();
+    await page.keyboard.press('Escape');
+    return result;
+}
+
+async function seedLegacyMet(page) {
+    return page.evaluate(({ taipei, cachedData }) => {
+        const data = { ...cachedData, provider: 'met-no', fetchedAt: Date.now() - 60000, refreshAfter: Date.now() + 10740000 };
+        localStorage.setItem('nt_weather_met_cache_v1', JSON.stringify({ '25.033,121.565': { data } }));
+        localStorage.setItem('nt_weather_cache', JSON.stringify({ ...taipei, ts: data.fetchedAt, data }));
+        return { fetchedAt: data.fetchedAt, refreshAfter: data.refreshAfter };
+    }, { taipei, cachedData });
+}
+
 async function selectCity(page, location) {
     // The picker itself has a dedicated suite; exercise its real host callback.
     await page.evaluate(location => {
@@ -107,7 +135,8 @@ async function test(name, run) {
 }
 
 (async () => {
-    const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
+    const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ?
+        { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : { channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' }) });
     try {
         await test('explicit Taipei choice cancels pending GPS and persists across reload', async () => {
             const { page, context, errors } = await fixture(browser);
@@ -281,6 +310,141 @@ async function test(name, run) {
             assert.deepEqual(errors, []); await context.close();
         });
 
+        await test('legacy current-only MET upgrades to a complete forecast and cannot mask it on reload', async () => {
+            const { page, context, errors } = await fixture(browser);
+            let primaryCalls = 0, backupCalls = 0;
+            const legacy = await seedLegacyMet(page);
+            await context.route('https://api.open-meteo.com/**', route => { primaryCalls++; return route.fulfill({ json: completeForecast() }); });
+            await context.route('https://api.met.no/**', route => { backupCalls++; return route.abort(); });
+            await addWeather(page, { ...taipei, locationSource: 'manual', timeZone: 'Asia/Taipei' }); await ready(page, '26°');
+            assert.equal(primaryCalls, 1); assert.equal(backupCalls, 0);
+            assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            assert.equal(await page.locator('.weather-day').count(), 2);
+            assert.equal(await page.locator('.weather-forecast-note').innerText(), '');
+            const preserved = await page.evaluate(() => JSON.parse(localStorage.getItem('nt_weather_met_cache_v1'))['25.033,121.565'].data);
+            assert.equal(preserved.fetchedAt, legacy.fetchedAt); assert.equal(preserved.refreshAfter, legacy.refreshAfter);
+            await page.reload(); await ready(page, '26°');
+            assert.equal(primaryCalls, 1); assert.equal(backupCalls, 0, 'complete primary cache is reused instead of the old MET reading');
+            assert.equal(await page.locator('.weather-city').innerText(), '台北');
+            assert.equal(await page.evaluate(() => NewtabWidgets.getLayout().widgets.find(w => w.type === 'weather').options.locationSource), 'manual');
+            assert.deepEqual(errors, []); await context.close();
+        });
+
+        await test('legacy current-only MET keeps its provider deadline, bounds retries, then automatically fills forecasts after expiry', async () => {
+            const { page, context, errors } = await fixture(browser);
+            let primaryCalls = 0, backupCalls = 0;
+            const legacy = await seedLegacyMet(page);
+            await context.route('https://api.open-meteo.com/**', route => { primaryCalls++; return route.abort(); });
+            await context.route('https://api.met.no/**', route => {
+                backupCalls++;
+                const json = metForecast(27);
+                const first = Date.now() + 3 * 3600000;
+                json.properties.timeseries = Array.from({ length: 72 }, (_, i) => ({ ...json.properties.timeseries[0], time: new Date(first + i * 3600000).toISOString() }));
+                return route.fulfill({ json });
+            });
+            await addWeather(page, { ...taipei, timeZone: 'Asia/Taipei' }); await ready(page, '19°');
+            assert.equal(primaryCalls, 1); assert.equal(backupCalls, 0);
+            const protectedData = await page.evaluate(() => JSON.parse(localStorage.getItem('nt_weather_met_cache_v1'))['25.033,121.565'].data);
+            assert.equal(protectedData.refreshAfter, legacy.refreshAfter); assert.equal(protectedData.fetchedAt, legacy.fetchedAt);
+            assert(protectedData.forecastRetryAfter > Date.now(), 'opening further tabs will not repeatedly hit the primary');
+            await page.reload(); await ready(page, '19°'); assert.equal(primaryCalls, 1);
+            await page.locator('.weather-retry').click(); await ready(page, '19°');
+            assert.equal(primaryCalls, 2); assert.equal(backupCalls, 0, 'manual retry may try primary, but cannot bypass the MET deadline');
+            await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 3 * 3600000; document.dispatchEvent(new Event('visibilitychange')); });
+            await ready(page, '27°'); assert.equal(primaryCalls, 3); assert.equal(backupCalls, 1);
+            assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            assert((await page.locator('.weather-day').count()) >= 3);
+            assert.deepEqual(errors, []); await context.close();
+        });
+
+        await test('legacy current-only primary cache also upgrades without resetting the chosen city', async () => {
+            const { page, context, errors } = await fixture(browser, { cache: { ...taipei, ts: Date.now(), data: cachedData } });
+            let calls = 0;
+            await context.route('https://api.open-meteo.com/**', route => { calls++; return route.fulfill({ json: completeForecast(28) }); });
+            await addWeather(page, { ...taipei, locationSource: 'manual' }); await ready(page, '28°');
+            assert.equal(calls, 1); assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            await page.reload(); await ready(page, '28°'); assert.equal(calls, 1);
+            assert.equal(await page.locator('.weather-city').innerText(), '台北');
+            assert.deepEqual(errors, []); await context.close();
+        });
+
+        await test('weather retains a complete stale forecast when either provider only offers a current reading', async () => {
+            const { page, context, errors } = await fixture(browser);
+            await seedLegacyMet(page);
+            const priorFetchedAt = await page.evaluate(({ json, taipei }) => {
+                const data = NewtabWeatherData.parseOpenMeteo(json);
+                data.fetchedAt = Date.now() - 3600000;
+                localStorage.setItem('nt_weather_cache', JSON.stringify({ ...taipei, ts: data.fetchedAt, data }));
+                return data.fetchedAt;
+            }, { json: completeForecast(), taipei });
+            let mode = 'partial', primaryCalls = 0, backupCalls = 0;
+            await context.route('https://api.open-meteo.com/**', route => {
+                primaryCalls++;
+                return mode === 'fail' ? route.abort() : route.fulfill({ json: mode === 'partial' ? forecast(42) : completeForecast(29) });
+            });
+            await context.route('https://api.met.no/**', route => { backupCalls++; return route.abort(); });
+            await addWeather(page, { ...taipei, timeZone: 'Asia/Taipei' });
+            await page.locator('.weather-body.is-offline').waitFor(); await ready(page, '26°');
+            assert.equal(primaryCalls, 1); assert.equal(backupCalls, 0);
+            assert.match(await page.locator('.weather-status').innerText(), /更新失敗.*先前資料/);
+            assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            mode = 'fail';
+            await page.locator('.weather-retry').click(); await page.locator('.weather-body.is-offline').waitFor(); await ready(page, '26°');
+            assert.equal(primaryCalls, 2); assert.equal(backupCalls, 0, 'protected current-only MET is read without another request');
+            const cached = await page.evaluate(() => JSON.parse(localStorage.getItem('nt_weather_cache')).data);
+            assert.equal(cached.fetchedAt, priorFetchedAt); assert(cached.hourly.length > 1, 'neither partial result overwrites the complete cache');
+            await page.reload(); await page.locator('.weather-body.is-offline').waitFor(); await ready(page, '26°');
+            assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            mode = 'complete';
+            await page.locator('.weather-retry').click(); await ready(page, '29°');
+            assert.equal(await page.locator('.weather-body.is-offline').count(), 0);
+            assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            assert.deepEqual(errors, []); await context.close();
+        });
+
+        await test('a new partial MET response retains its request deadline without replacing either complete provider forecast', async () => {
+            for (const provider of ['open-meteo', 'met-no']) {
+            const { page, context, errors } = await fixture(browser);
+            const now = Date.parse('2026-11-14T16:30:00Z');
+            await page.addInitScript(now => { Date.now = () => now; }, now);
+            await page.evaluate(({ now, json, taipei, provider }) => {
+                Date.now = () => now;
+                const data = NewtabWeatherData.parseOpenMeteo(json);
+                data.provider = provider;
+                data.fetchedAt = now - 4 * 3600000;
+                if (provider === 'met-no') {
+                    data.refreshAfter = now - 3600000;
+                    localStorage.setItem('nt_weather_met_cache_v1', JSON.stringify({ '25.033,121.565': { data } }));
+                }
+                localStorage.setItem('nt_weather_cache', JSON.stringify({ ...taipei, ts: data.fetchedAt, data }));
+            }, { now, json: completeForecast(), taipei, provider });
+            let backupCalls = 0;
+            await context.route('https://api.open-meteo.com/**', route => route.abort());
+            await context.route('https://api.met.no/**', route => {
+                backupCalls++;
+                const json = metForecast(22);
+                // A partial/truncated upstream response has only yesterday's
+                // last reading, so it supplies no date for today's dashboard.
+                json.properties.timeseries[0].time = new Date(now - 3600000).toISOString();
+                return route.fulfill({ json });
+            });
+            await addWeather(page, { ...taipei, timeZone: 'Asia/Taipei' });
+            await page.locator('.weather-body.is-offline').waitFor(); await ready(page, '26°');
+            const saved = await page.evaluate(() => ({ primary: JSON.parse(localStorage.getItem('nt_weather_cache')).data,
+                met: JSON.parse(localStorage.getItem('nt_weather_met_cache_v1'))['25.033,121.565'].data }));
+            assert.equal(saved.primary.provider, provider); assert(saved.primary.hourly.length > 1);
+            assert.equal(saved.met.provider, 'met-no'); assert.equal(saved.met.fetchedAt, now);
+            assert.equal(saved.met.refreshAfter, now + 10800000); assert.equal(saved.met.daily.length, 0);
+            await page.locator('.weather-retry').click(); await page.locator('.weather-body.is-offline').waitFor(); await ready(page, '26°');
+            assert.equal(backupCalls, 1, 'retaining the complete forecast must not lose the newly fetched MET deadline');
+            assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            await page.reload(); await page.locator('.weather-body.is-offline').waitFor(); await ready(page, '26°');
+            assert.equal(backupCalls, 1, 'reload keeps the older complete display and the newer MET throttle record');
+            assert.equal(await page.locator('.weather-chart').evaluate(el => el.hidden), false);
+            assert.deepEqual(errors, []); await context.close();
+            }
+        });
+
         await test('MET fallback credits real forecast data and preserves three-hour cache through force, reload and city roundtrips', async () => {
             const { page, context, errors } = await fixture(browser);
             let primaryCalls = 0, backupCalls = 0;
@@ -296,29 +460,31 @@ async function test(name, run) {
             });
             await addWeather(page, location); await ready(page, '23°');
             assert.equal(primaryCalls, 1); assert.equal(backupCalls, 1);
-            assert.equal(await page.locator('.weather-source a').first().innerText(), 'MET Norway');
-            assert.equal(await page.locator('.weather-source a').nth(1).getAttribute('href'), 'https://creativecommons.org/licenses/by/4.0/');
-            assert.match(await page.locator('.weather-source-note').innerText(), /預報.*四捨五入/);
+            const firstFetched = await inspectSource(page, async () => {
+                assert.equal(await page.locator('.weather-source a').first().innerText(), 'MET Norway');
+                assert.equal(await page.locator('.weather-source a').nth(1).getAttribute('href'), 'https://creativecommons.org/licenses/by/4.0/');
+                assert.match(await page.locator('.weather-source-note').innerText(), /預報.*四捨五入/);
+                return page.locator('.weather-fetched').getAttribute('datetime');
+            });
             assert.equal(await page.locator('.weather-hum').innerText(), '濕度 72%');
             assert.equal(await page.locator('.weather-wind').innerText(), '風 2.3m/s');
             assert.equal(await page.locator('.weather-hi').innerText(), '');
             assert.equal(await page.locator('.weather-lo').innerText(), '');
             assert.equal(await page.locator('.weather-feels').innerText(), '', 'no invented feels-like or daily extremes');
-            const firstFetched = await page.locator('.weather-fetched').getAttribute('datetime');
             const stored = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nt_weather_met_cache_v1')))[0].data);
             assert.equal(stored.provider, 'met-no'); assert.equal(stored.code, 2);
             assert(stored.refreshAfter - stored.fetchedAt >= 10800000, 'shorter Expires never reduces the three-hour floor');
             for (let i = 0; i < 3; i++) { await page.locator('.weather-retry').click(); await ready(page, '23°'); }
             await page.evaluate(() => dispatchEvent(new Event('online'))); await ready(page, '23°');
             assert.equal(primaryCalls, 1); assert.equal(backupCalls, 1);
-            assert.equal(await page.locator('.weather-fetched').getAttribute('datetime'), firstFetched, 'Update does not pretend cached weather was just fetched');
+            assert.equal(await inspectSource(page, () => page.locator('.weather-fetched').getAttribute('datetime')), firstFetched, 'Update does not pretend cached weather was just fetched');
             await selectCity(page, { lat: 35.68, lon: 139.76, city: '測試乙' }); await ready(page, '23°');
             assert.equal(primaryCalls, 2); assert.equal(backupCalls, 2);
             await selectCity(page, location); await ready(page, '23°');
             assert.equal(primaryCalls, 2); assert.equal(backupCalls, 2, 'A/B/A restores A from its own provider cache');
             await page.reload(); await ready(page, '23°');
             assert.equal(primaryCalls, 2); assert.equal(backupCalls, 2);
-            assert.equal(await page.locator('.weather-fetched').getAttribute('datetime'), firstFetched);
+            assert.equal(await inspectSource(page, () => page.locator('.weather-fetched').getAttribute('datetime')), firstFetched);
             assert.deepEqual(errors, []); await context.close();
         });
 
@@ -459,7 +625,7 @@ async function test(name, run) {
             assert.match(await page.locator('.weather-status').innerText(), /雨夾雪/);
             assert.equal(await page.locator('.weather-glyph svg path[stroke="#79b6cf"]').count(), 1, 'mixed precipitation contains rain');
             assert.equal(await page.locator('.weather-glyph svg path[stroke="#86b3cb"]').count(), 1, 'mixed precipitation contains snow');
-            assert.match(await page.locator('.weather-fetched').getAttribute('title'), /更新間隔至少 3 小時.*預報有效時間/);
+            assert.match(await inspectSource(page, () => page.locator('.weather-fetched').getAttribute('title')), /更新間隔至少 3 小時.*預報有效時間/);
             assert.deepEqual(errors, []); await context.close();
         });
 

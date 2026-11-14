@@ -17,11 +17,18 @@
         return { searchButtonTint: '#d8eaf3', searchButtonAlpha: 1, searchButtonIcon: '#365f7c', searchButtonRadius: 22 };
     }
 
+    function weatherButtonDefaults() {
+        return { weatherButtonMode: 'inherit', weatherButtonTint: '#e4f0f5', weatherButtonAlpha: .3,
+            weatherButtonText: '#303945', weatherButtonRadius: 8 };
+    }
+
     function defaults(type) {
         var value = { preset: 'glass', alpha: type === 'clock' || type === 'companion' ? 0 : .3,
             blur: 0, tint: '#f8fbfd', text: 'dark', border: 0, radius: 18, shadow: 0,
             bgDataUrl: undefined, bgAlpha: .35 };
-        return type === 'search' ? Object.assign(value, searchButtonDefaults()) : value;
+        if (type === 'search') Object.assign(value, searchButtonDefaults());
+        if (type === 'weather') Object.assign(value, weatherButtonDefaults());
+        return value;
     }
 
     function normalizeWidget(value) {
@@ -35,7 +42,10 @@
             bgDataUrl: typeof a.bgDataUrl === 'string' && a.bgDataUrl.indexOf('data:image/') === 0 && a.bgDataUrl.length <= 180000 ? a.bgDataUrl : undefined,
             bgAlpha: finite(a.bgAlpha, 0, 1),
             searchButtonTint: color(a.searchButtonTint), searchButtonAlpha: finite(a.searchButtonAlpha, 0, 1),
-            searchButtonIcon: color(a.searchButtonIcon), searchButtonRadius: finite(a.searchButtonRadius, 0, 22)
+            searchButtonIcon: color(a.searchButtonIcon), searchButtonRadius: finite(a.searchButtonRadius, 0, 22),
+            weatherButtonMode: ['inherit', 'custom'].indexOf(a.weatherButtonMode) >= 0 ? a.weatherButtonMode : undefined,
+            weatherButtonTint: color(a.weatherButtonTint), weatherButtonAlpha: finite(a.weatherButtonAlpha, 0, 1),
+            weatherButtonText: color(a.weatherButtonText), weatherButtonRadius: finite(a.weatherButtonRadius, 0, 22)
         };
     }
 
@@ -52,6 +62,7 @@
         if (!el || !widget) return;
         var a = resolved(widget);
         applySurface(el, a);
+        if (widget.type === 'weather') applyWeatherButtons(el, a);
         if (widget.type === 'search') {
             applySearchButton(el, a);
             // The compact panel moves this same container out of its widget.
@@ -87,6 +98,15 @@
         el.style.setProperty('--search-button-fill', 'rgba(' + rgb + ', ' + value.searchButtonAlpha + ')');
         el.style.setProperty('--search-button-ink', value.searchButtonIcon);
         el.style.setProperty('--search-button-radius', value.searchButtonRadius + 'px');
+    }
+
+    function applyWeatherButtons(el, value) {
+        var custom = value.weatherButtonMode === 'custom';
+        var rgb = [1, 3, 5].map(function (i) { return parseInt(value.weatherButtonTint.slice(i, i + 2), 16); }).join(', ');
+        // Inherit the surface underneath, without stacking a second alpha layer.
+        el.style.setProperty('--weather-button-fill', custom ? 'rgba(' + rgb + ', ' + value.weatherButtonAlpha + ')' : 'transparent');
+        el.style.setProperty('--weather-button-ink', custom ? value.weatherButtonText : value.text === 'light' ? '#f4f8fc' : '#303945');
+        el.style.setProperty('--weather-button-radius', (custom ? value.weatherButtonRadius : Math.min(value.radius, 22)) + 'px');
     }
 
     function applyBackground() {
@@ -188,10 +208,12 @@
         var fields = document.createElement('div'); fields.className = 'appearance-fields'; dialog.appendChild(fields);
         var values = resolved(widget);
         var searchUI = null;
+        var weatherUI = null;
         function update(key, value) {
             var patch = {}; patch[key] = value; global.NewtabWidgets.setAppearance(id, patch);
             var current = widgetById(id);
             if (searchUI && current) applySearchButton(searchUI.preview, resolved(current));
+            if (weatherUI && current) weatherUI.paint(resolved(current));
         }
         var controls = [
             control(fields, '組件背景透明度', (1 - values.alpha) * 100, function (v) { update('alpha', (100 - v) / 100); }),
@@ -245,6 +267,50 @@
             searchSection.appendChild(buttonReset); fields.insertBefore(searchSection, fields.firstChild);
             searchUI.set(values);
         }
+        if (widget.type === 'weather') {
+            var weatherSection = document.createElement('section'); weatherSection.className = 'appearance-weather-section';
+            var weatherTitle = document.createElement('h3'); weatherTitle.id = 'appearance-weather-title-' + (++serial); weatherTitle.textContent = '天氣操作按鈕';
+            weatherSection.setAttribute('aria-labelledby', weatherTitle.id); weatherSection.appendChild(weatherTitle);
+            var weatherPreview = document.createElement('div'); weatherPreview.className = 'appearance-weather-preview'; weatherPreview.inert = true; weatherPreview.setAttribute('aria-hidden', 'true');
+            var weatherLabel = document.createElement('span'); weatherLabel.textContent = '按鈕預覽'; weatherPreview.appendChild(weatherLabel);
+            var weatherIcons = document.createElement('span'); weatherIcons.className = 'appearance-weather-icons';
+            var weatherWidget = document.querySelector('.widget[data-id="' + id + '"]');
+            ['weather-locate', 'weather-retry'].forEach(function (cls) {
+                var sample = document.createElement('span'); sample.className = 'appearance-weather-preview-button';
+                var icon = weatherWidget && weatherWidget.querySelector('.' + cls + ' svg');
+                if (icon) sample.appendChild(icon.cloneNode(true));
+                weatherIcons.appendChild(sample);
+            });
+            weatherPreview.appendChild(weatherIcons); weatherSection.appendChild(weatherPreview);
+            var modeRow = document.createElement('label'); modeRow.className = 'appearance-tint appearance-weather-mode'; modeRow.textContent = '按鈕外觀';
+            var mode = document.createElement('select'); mode.setAttribute('aria-label', '按鈕外觀');
+            mode.innerHTML = '<option value="inherit">跟隨組件外觀</option><option value="custom">自訂按鈕外觀</option>';
+            mode.addEventListener('change', function () { update('weatherButtonMode', mode.value); });
+            modeRow.appendChild(mode); weatherSection.appendChild(modeRow);
+            var customFields = document.createElement('div'); customFields.className = 'appearance-weather-custom'; weatherSection.appendChild(customFields);
+            function weatherColor(label, key) {
+                var row = document.createElement('label'); row.className = 'appearance-tint'; row.textContent = label;
+                var input = document.createElement('input'); input.type = 'color'; input.setAttribute('aria-label', label);
+                input.addEventListener('input', function () { update(key, input.value); });
+                row.appendChild(input); customFields.appendChild(row); return input;
+            }
+            var weatherTint = weatherColor('按鈕背景色', 'weatherButtonTint');
+            var weatherAlpha = control(customFields, '按鈕背景透明度', (1 - values.weatherButtonAlpha) * 100, function (v) { update('weatherButtonAlpha', (100 - v) / 100); });
+            var weatherInk = weatherColor('按鈕圖示顏色', 'weatherButtonText');
+            var weatherRadius = control(customFields, '按鈕圓角', values.weatherButtonRadius, function (v) { update('weatherButtonRadius', v); }, 22, 'px');
+            var weatherReset = document.createElement('button'); weatherReset.type = 'button'; weatherReset.className = 'appearance-reset'; weatherReset.textContent = '恢復按鈕預設';
+            weatherUI = { paint: function (value) {
+                mode.value = value.weatherButtonMode; customFields.hidden = value.weatherButtonMode !== 'custom';
+                applySurface(weatherPreview, value); applyWeatherButtons(weatherPreview, value);
+            }, set: function (value) {
+                weatherTint.value = value.weatherButtonTint; weatherInk.value = value.weatherButtonText;
+                weatherAlpha.set((1 - value.weatherButtonAlpha) * 100); weatherRadius.set(value.weatherButtonRadius); this.paint(value);
+            } };
+            weatherReset.addEventListener('click', function () {
+                global.NewtabWidgets.setAppearance(id, weatherButtonDefaults()); weatherUI.set(resolved(widgetById(id)));
+            });
+            weatherSection.appendChild(weatherReset); fields.insertBefore(weatherSection, fields.firstChild); weatherUI.set(values);
+        }
         var animation = null;
         if (widget.type === 'companion' && global.NewtabWidgets.setCompanionOptions) {
             var animationRow = document.createElement('label'); animationRow.className = 'appearance-tint'; animationRow.textContent = '角色動畫';
@@ -291,6 +357,7 @@
             tint.value = values.tint;
             textColor.value = values.text;
             if (searchUI) searchUI.set(values);
+            if (weatherUI) weatherUI.set(values);
             if (imageControl) { imageControl.element.remove(); imageControl = null; }
             if (animation) {
                 animation.value = 'auto';
