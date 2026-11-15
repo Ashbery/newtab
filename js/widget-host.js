@@ -20,6 +20,8 @@
     var WEATHER_FETCH_MS = 8000;
     var WEATHER_LOCATION_MS = 12000;
     var WEATHER_PERMISSION_WAIT_MS = 30000;
+    var WEATHER_OPEN_COALESCE_MS = 60000;
+    var weatherOpenedWidgets = Object.create(null);
     var APPEARANCE_BG_MAX = 180000;
     var TAIPEI = { lat: 25.033, lon: 121.565, city: '台北' };
     var NOTES_MAX = 5000;
@@ -42,6 +44,7 @@
     var SEARCH_ICON_ONLY_PX = 120;
     var state = {
         layout: null,
+        persistedLayout: null,
         arranging: false,
         drag: null,
         resize: null,
@@ -73,7 +76,15 @@
     function persist() {
         if (global.NewtabLayoutProfiles && NewtabLayoutProfiles.isApplying()) return true;
         if (state.editor) { state.editor.dirty = true; emitChange(); return true; }
+        var latest = legacySavedLayout();
+        if (latest && state.persistedLayout) {
+            state.layout = mergeLegacyDraft(latest, state.layout, state.persistedLayout);
+            if (JSON.stringify(state.layout) === JSON.stringify(latest)) {
+                state.persistedLayout = L.clone(latest); emitChange(); return true;
+            }
+        }
         var ok = L.saveLayout(state.layout);
+        if (ok) state.persistedLayout = L.clone(state.layout);
         emitChange();
         return ok;
     }
@@ -101,6 +112,7 @@
         var previous = {};
         state.layout.widgets.forEach(function (w) { previous[w.id] = w; });
         state.layout = layout;
+        state.persistedLayout = L.clone(layout);
         var bodyOptions = {
             notes: ['content'], todo: ['items'], countdown: ['title', 'targetDate'], bookmarks: ['links'],
             weather: ['lat', 'lon', 'city', 'timeZone', 'locationSource', 'weatherUnit']
@@ -149,6 +161,7 @@
         return !!(
             t.closest('.appearance-dialog') ||
             t.closest('.weather-location-dialog') ||
+            t.closest('.weather-settings-dialog') ||
             t.closest('.character-chat-dialog') ||
             t.closest('.home-header') ||
             t.closest('.home-footer') ||
@@ -500,6 +513,107 @@
             typeof lon === 'number' && isFinite(lon) && Math.abs(lon) <= 180;
     }
 
+    function weatherPreferences(options) {
+        options = options || {};
+        var minutes = [0, 15, 30, 60, 120].indexOf(options.weatherRefreshMinutes) >= 0 ? options.weatherRefreshMinutes : 30;
+        return { weatherRefreshOnOpen: options.weatherRefreshOnOpen !== false, weatherRefreshMinutes: minutes };
+    }
+
+    function legacySavedLayout() {
+        // Profile storage already merges changed shared fields; do not bypass it.
+        try {
+            if (global.NewtabLayoutProfiles && JSON.parse(localStorage.getItem('nt_layout_profiles_v1') || 'null')) return null;
+            var layout = JSON.parse(localStorage.getItem('nt_layout_v1'));
+            return layout && Array.isArray(layout.widgets) ? L.normalizeLayout(layout) : null;
+        } catch (_) { return null; }
+    }
+
+    function mergeUnchangedFields(latest, draft, before) {
+        if (JSON.stringify(draft) === JSON.stringify(before)) return latest === undefined ? undefined : L.clone(latest);
+        function object(value) { return value && typeof value === 'object' && !Array.isArray(value); }
+        if (!object(draft) || !object(before) || !object(latest)) return draft === undefined ? undefined : L.clone(draft);
+        var result = {};
+        Array.from(new Set(Object.keys(latest).concat(Object.keys(draft), Object.keys(before)))).forEach(function (key) {
+            if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
+            var value = mergeUnchangedFields(latest[key], draft[key], before[key]);
+            if (value !== undefined) result[key] = value;
+        });
+        return result;
+    }
+
+    function mergeLegacyDraft(latest, draft, before) {
+        var result = mergeUnchangedFields(latest, draft, before), old = Object.create(null), remote = Object.create(null), seen = Object.create(null);
+        before.widgets.forEach(function (w) { old[w.id] = w; });
+        latest.widgets.forEach(function (w) { remote[w.id] = w; });
+        result.widgets = [];
+        draft.widgets.forEach(function (w) {
+            seen[w.id] = true;
+            var merged = mergeUnchangedFields(remote[w.id], w, old[w.id]);
+            if (merged) result.widgets.push(merged);
+        });
+        latest.widgets.forEach(function (w) { if (!seen[w.id] && !old[w.id]) result.widgets.push(L.clone(w)); });
+        return result;
+    }
+
+    function persistedWeatherLocation(w) {
+        try {
+            var layout = global.NewtabLayoutProfiles && NewtabLayoutProfiles.getState().enabled ?
+                NewtabLayoutProfiles.mergeShared({ widgets: [w] }) : JSON.parse(localStorage.getItem('nt_layout_v1'));
+            var saved = layout && layout.widgets.find(function (item) { return item.id === w.id; });
+            var options = saved && saved.options;
+            if (!options || !validWeatherCoordinates(options.lat, options.lon) || options.locationSource === 'fallback') return null;
+            return { lat: options.lat, lon: options.lon, city: options.city, timeZone: options.timeZone,
+                locationSource: options.locationSource, locationNotice: options.locationNotice || '' };
+        } catch (_) { return null; }
+    }
+
+    function adoptWeatherLocation(w, location) {
+        w.options = Object.assign({}, w.options || {}, location);
+        [state.persistedLayout, state.editor && state.editor.snapshot].forEach(function (layout) {
+            var saved = layout && layout.widgets.find(function (item) { return item.id === w.id; });
+            if (saved) saved.options = Object.assign({}, saved.options || {}, location);
+        });
+    }
+
+    function saveWeatherOptions(id, patch) {
+        var current = findWidget(id);
+        if (!current || current.type !== 'weather') return false;
+        var durable = legacySavedLayout();
+        if (durable) {
+            var savedWeather = durable.widgets.find(function (item) { return item.id === id; });
+            // A widget newly added in this unsaved arrangement remains a draft.
+            if (savedWeather) {
+                var before = state.persistedLayout || (state.editor ? state.editor.snapshot : L.clone(state.layout));
+                savedWeather.options = Object.assign({}, savedWeather.options || {}, patch);
+                if (!L.saveLayout(durable)) return false;
+                current.options = Object.assign({}, current.options || {}, patch);
+                state.layout = mergeLegacyDraft(durable, state.layout, before);
+                if (state.editor) state.editor.snapshot = mergeLegacyDraft(durable, state.editor.snapshot, before);
+                state.persistedLayout = L.clone(durable);
+                emitChange(); return true;
+            }
+            if (!state.editor || state.editor.snapshot.widgets.some(function (item) { return item.id === id; })) return false;
+        }
+        var previous = current.options;
+        current.options = Object.assign({}, previous || {}, patch);
+        // Location/refresh choices are content, not a tentative arrangement.
+        // Persist them without committing in-progress geometry, and retain them
+        // if the user subsequently cancels the arrangement.
+        if (state.editor) {
+            var snapshot = L.clone(state.editor.snapshot);
+            var saved = snapshot.widgets.find(function (item) { return item.id === id; });
+            if (saved) {
+                saved.options = Object.assign({}, saved.options || {}, patch);
+                if (!L.saveLayout(snapshot)) { current.options = previous; return false; }
+                state.editor.snapshot = snapshot;
+                emitChange();
+                return true;
+            }
+        }
+        if (!persist()) { current.options = previous; return false; }
+        return true;
+    }
+
     function validWeatherData(data) {
         return data && typeof data.temp === 'number' && isFinite(data.temp);
     }
@@ -709,7 +823,7 @@
     }
 
     /** Return one cancellation handle for both bounded provider attempts. */
-    function fetchWeatherNetwork(lat, lon, cb, timeZone) {
+    function fetchWeatherAttempt(lat, lon, cb, timeZone) {
         var cancelled = false;
         var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(lat) +
             '&longitude=' + encodeURIComponent(lon) +
@@ -725,6 +839,31 @@
             }, timeZone);
         });
         return function () { cancelled = true; if (cancelCurrent) cancelCurrent(); };
+    }
+
+    function fetchWeatherNetwork(lat, lon, cb, timeZone, automatic, initialFetchedAt) {
+        if (!automatic || !navigator.locks) return fetchWeatherAttempt(lat, lon, cb, timeZone);
+        var controller = new AbortController(), cancelFetch, release, cancelled = false;
+        // Tabs opened together share a just-refreshed reading instead of issuing
+        // one provider request per page. Explicit refresh remains immediate.
+        navigator.locks.request('newtab-weather:' + metCacheKey(lat, lon), { signal: controller.signal }, function () {
+            if (cancelled) return;
+            var cached = readWeatherCache(lat, lon);
+            if (cached && cached.data.fetchedAt > (initialFetchedAt || 0) && !weatherForecastDue(cached.data) && Date.now() - cached.data.fetchedAt < WEATHER_OPEN_COALESCE_MS) {
+                cb(null, cached.data); return;
+            }
+            return new Promise(function (resolve) {
+                release = resolve;
+                cancelFetch = fetchWeatherAttempt(lat, lon, function (err, data) {
+                    try { if (!cancelled) cb(err, data); } finally { resolve(); }
+                }, timeZone);
+            });
+        }).catch(function (error) { if (!cancelled) cb(error); });
+        return function () {
+            cancelled = true; controller.abort();
+            if (cancelFetch) cancelFetch();
+            if (release) release();
+        };
     }
 
     function resolveWeatherLocation(w, done, options) {
@@ -786,6 +925,7 @@
         var retry = body.querySelector('.weather-retry');
         var fallback = body.querySelector('.weather-default');
         var city = body.querySelector('.weather-city-button');
+        var settings = body.querySelector('.weather-settings');
         function bind(button, options) {
             if (!button) return;
             button.addEventListener('click', function (e) {
@@ -797,6 +937,20 @@
         bind(locate, { relocate: true, force: true });
         bind(retry, { force: true });
         bind(fallback, { useDefault: true, force: true });
+        if (settings) settings.addEventListener('click', function (event) {
+            event.preventDefault(); event.stopPropagation();
+            var current = findWidget(w.id);
+            if (!current || !global.NewtabWeatherSettings) return;
+            global.NewtabWeatherSettings.open({
+                opener: settings, options: weatherPreferences(current.options), city: current.options && current.options.city,
+                sourceInformation: body._weatherSource,
+                isCurrent: function () { return body.isConnected && !!findWidget(w.id); },
+                focusTarget: function () { return body.isConnected ? body.querySelector('.weather-settings') : null; },
+                onSave: function (values) { return saveWeatherOptions(w.id, weatherPreferences(values)); },
+                onCity: function () { var target = body.querySelector('.weather-city-button'); if (target) target.click(); },
+                onLocate: function () { var selected = findWidget(w.id); if (selected) loadWeatherInto(body, selected, { relocate: true, force: true }); }
+            });
+        });
         if (city) city.addEventListener('click', function (event) {
             event.preventDefault(); event.stopPropagation();
             if (!global.NewtabWeatherLocation) return;
@@ -810,7 +964,7 @@
                 onSelect: function (location) {
                     var selected = findWidget(w.id);
                     if (!body.isConnected || !selected) return;
-                    loadWeatherInto(body, selected, { location: location, force: true });
+                    return loadWeatherInto(body, selected, { location: location, force: true });
                 }
             });
         });
@@ -824,7 +978,7 @@
     function weatherFocusClass(body) {
         var active = document.activeElement;
         if (!body.contains(active)) return '';
-        return ['weather-retry', 'weather-locate', 'weather-default', 'weather-city-button'].filter(function (name) {
+        return ['weather-retry', 'weather-locate', 'weather-default', 'weather-city-button', 'weather-settings'].filter(function (name) {
             return active.classList.contains(name);
         })[0] || '';
     }
@@ -832,7 +986,8 @@
     function weatherHeading() {
         return '<div class="weather-heading"><button type="button" class="weather-city-button" aria-label="選擇天氣城市" title="選擇天氣城市"><span class="weather-city"></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>' +
             '<div class="weather-actions"><button type="button" class="weather-locate" title="重新定位" aria-label="重新定位"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22"/></svg></button>' +
-            '<button type="button" class="weather-retry" title="更新天氣" aria-label="更新天氣"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5M5.3 7.8a7.5 7.5 0 0 1 12.3-2L20 9M4 15l2.4 3.2a7.5 7.5 0 0 0 12.3-2"/></svg></button></div></div>';
+            '<button type="button" class="weather-retry" title="更新天氣" aria-label="更新天氣"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5M5.3 7.8a7.5 7.5 0 0 1 12.3-2L20 9M4 15l2.4 3.2a7.5 7.5 0 0 0 12.3-2"/></svg></button>' +
+            '<button type="button" class="weather-settings" title="天氣設定" aria-label="天氣設定"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9.5 3-.6 2.3-2 .9-2.1-.7-2 3.4 1.6 1.7v2.8l-1.6 1.7 2 3.4 2.1-.7 2 .9.6 2.3h4.1l.6-2.3 2-.9 2.1.7 2-3.4-1.6-1.7v-2.8l1.6-1.7-2-3.4-2.1.7-2-.9L13.6 3Z"/><circle cx="11.5" cy="12" r="3"/></svg></button></div></div>';
     }
 
     function weatherSource(body, data) {
@@ -924,6 +1079,12 @@
     function loadWeatherInto(body, w, options) {
         options = options || {};
         w = findWidget(w.id) || w;
+        var storedLocation = persistedWeatherLocation(w);
+        if (storedLocation) {
+            // Adopt a newer choice before refreshing a long-lived legacy tab.
+            // Reading never writes the rest of that tab's older layout back.
+            adoptWeatherLocation(w, storedLocation);
+        }
         if (body._weatherRun) body._weatherRun.cancel();
         var run = { cancelled: false, pending: true, cancelLocation: null, cancelFetch: null };
         run.cancel = function () {
@@ -935,6 +1096,8 @@
         function active() { return !run.cancelled && body.isConnected && !!findWidget(w.id); }
         var shown = body._weatherShown || null;
         var saved = w.options || {};
+        var saveFailed = false;
+        var initialStoredLocation = JSON.stringify(persistedWeatherLocation(w));
         var locating = !options.location && !options.useDefault && (options.relocate || saved.locationSource === 'fallback' || !validWeatherCoordinates(saved.lat, saved.lon));
         if (shown && body._weatherLocation) {
             paintWeatherReady(body, w, body._weatherLocation, shown, { stale: true, loading: true, message: locating ? '正在定位…' : '正在更新…' });
@@ -948,15 +1111,36 @@
                 return;
             }
             var current = findWidget(w.id);
-            current.options = Object.assign({}, current.options || {}, location, {
+            var latestStoredLocation = persistedWeatherLocation(current);
+            if (!options.location && latestStoredLocation && JSON.stringify(latestStoredLocation) !== initialStoredLocation) {
+                // A city chosen in another tab wins over this request's older
+                // device lookup (even while profile delivery waits for editing).
+                adoptWeatherLocation(current, latestStoredLocation);
+                loadWeatherInto(body, current, { force: options.force, automatic: true });
+                return;
+            }
+            var locationPatch = Object.assign({}, location, {
                 // Permission/provider errors are transient UI state, not a
                 // permanent property of a user's chosen city.
                 locationNotice: location.locationSource === 'network' ? '網路估算位置' : ''
             });
             // Resolve onto current state: another widget operation can clone the
             // layout while location/network requests are still in flight.
+            // A normal refresh must not rewrite a stale tab's saved location.
+            // Only a new explicit location or a successful device lookup saves.
+            var locationChanged = ['lat', 'lon', 'city', 'timeZone', 'locationSource', 'locationNotice'].some(function (key) {
+                return JSON.stringify(current.options && current.options[key]) !== JSON.stringify(locationPatch[key]);
+            });
+            var newChoice = options.location || options.useDefault || locating && !locationError;
+            if (newChoice && locationChanged && !saveWeatherOptions(w.id, locationPatch)) {
+                run.pending = false; saveFailed = true;
+                if (shown && body._weatherLocation) paintWeatherReady(body, current, body._weatherLocation, shown);
+                else paintWeatherPending(body, current, null, '無法儲存位置，請確認瀏覽器儲存空間後重試。', true);
+                var notice = body.querySelector('.weather-status');
+                if (notice) notice.textContent = '無法儲存新位置，原設定仍保留。';
+                return;
+            }
             w = current;
-            persist();
             var lat = location.lat;
             var lon = location.lon;
             var previous = body._weatherLocation;
@@ -968,6 +1152,12 @@
                 body._weatherShown = shown;
                 var needsForecast = weatherForecastDue(shown);
                 var completeForecast = global.NewtabWeatherData.hasForecast(shown);
+                var justUpdated = typeof shown.fetchedAt === 'number' && Date.now() - shown.fetchedAt < WEATHER_OPEN_COALESCE_MS;
+                if (options.useCache || options.automatic && (justUpdated && !needsForecast || !completeForecast && !needsForecast)) {
+                    run.pending = false;
+                    paintWeatherReady(body, w, location, shown, { stale: cached.stale });
+                    return;
+                }
                 if (!cached.stale && !needsForecast && (!options.force || cached.data.provider === 'met-no' && completeForecast)) {
                     run.pending = false;
                     paintWeatherReady(body, w, location, shown);
@@ -984,6 +1174,7 @@
                 body._weatherShown = null;
                 paintWeatherPending(body, w, location, '正在取得天氣…', false);
             }
+            body._weatherLastAttempt = Date.now();
             run.cancelFetch = fetchWeatherNetwork(lat, lon, function (err, data) {
                 if (!active()) return;
                 run.pending = false;
@@ -1002,8 +1193,9 @@
                 writeWeatherCache(lat, lon, data);
                 body._weatherShown = data;
                 paintWeatherReady(body, w, location, data);
-            }, location.timeZone);
+            }, location.timeZone, options.automatic, shown && shown.fetchedAt);
         }, options);
+        return !saveFailed;
     }
 
     var weatherRefreshBound = false;
@@ -1018,14 +1210,17 @@
                 var w = el && findWidget(el.getAttribute('data-id'));
                 if (!w) return;
                 var opts = w.options || {};
+                var preferences = weatherPreferences(opts);
                 if (!validWeatherCoordinates(opts.lat, opts.lon) || opts.locationSource === 'fallback') return;
+                if (!preferences.weatherRefreshMinutes) return;
                 var cached = readWeatherCache(opts.lat, opts.lon);
-                if (force || !cached || cached.stale || weatherForecastDue(cached.data)) loadWeatherInto(body, w, { force: true });
+                var checked = Math.max(body._weatherLastAttempt || 0, cached && cached.data.fetchedAt || 0);
+                if (force || Date.now() - checked >= preferences.weatherRefreshMinutes * 60000) loadWeatherInto(body, w, { force: true, automatic: !force });
             });
         }
         global.addEventListener('online', function () { refresh(true); });
         document.addEventListener('visibilitychange', function () { refresh(false); });
-        setInterval(function () { refresh(false); }, WEATHER_TTL_MS);
+        setInterval(function () { refresh(false); }, 60000);
     }
 
     function buildWeatherBody(w) {
@@ -1034,7 +1229,11 @@
         bindWeatherRefresh();
         // Cached coordinates resolve synchronously, after this body is mounted.
         requestAnimationFrame(function () {
-            if (body.isConnected) loadWeatherInto(body, w);
+            if (!body.isConnected) return;
+            var firstOpen = !weatherOpenedWidgets[w.id]; weatherOpenedWidgets[w.id] = true;
+            var preferences = weatherPreferences((findWidget(w.id) || w).options);
+            loadWeatherInto(body, w, { force: firstOpen && preferences.weatherRefreshOnOpen, automatic: true,
+                useCache: firstOpen && !preferences.weatherRefreshOnOpen });
         });
         return body;
     }
@@ -2061,8 +2260,10 @@
             state.editor = { snapshot: snapshot, rects: L.clone(state.renderedRects), grid: grid, views: views, family: family, selected: null, dirty: false, geometryDirty: false };
         } else if (!next && was && state.editor) {
             var editor = state.editor;
-            if (opts.cancel) { state.layout = L.clone(editor.snapshot); syncClockHour12Bridge(); }
-            else if (editor.geometryDirty) Object.keys(editor.views).forEach(function (family) {
+            var latest = legacySavedLayout();
+            if (opts.cancel) { state.layout = latest ? mergeLegacyDraft(latest, editor.snapshot, state.persistedLayout || editor.snapshot) : L.clone(editor.snapshot); syncClockHour12Bridge(); }
+            else if (latest) state.layout = mergeLegacyDraft(latest, state.layout, state.persistedLayout || editor.snapshot);
+            if (!opts.cancel && editor.geometryDirty) Object.keys(editor.views).forEach(function (family) {
                 var view = editor.views[family];
                 state.layout.widgets.forEach(function (w) {
                     if (view.dirty[w.id] && view.models[w.id]) {
@@ -2789,8 +2990,7 @@
             if (partial.tab) state.layout.rail.tab = partial.tab;
         }
         state.layout.rail = L.normalizeRail(state.layout.rail);
-        if (!state.editor && !(global.NewtabLayoutProfiles && NewtabLayoutProfiles.isApplying())) L.saveLayout(state.layout);
-        emitChange();
+        persist();
     }
 
     function getRailState() {
@@ -3199,6 +3399,7 @@
         }
         migrateDom();
         state.layout = L.loadLayout();
+        state.persistedLayout = L.clone(state.layout);
         state.initialViewport = L.viewport();
         migrateCompanionWidget();
         if (global.NewtabLayoutProfiles) NewtabLayoutProfiles.attach({ getLayout: function () { return L.clone(state.layout); }, isBusy: profileBusy, apply: applyProfileLayout });
@@ -3220,7 +3421,7 @@
         }
         // Save the one-time marker with the layout, so removing the character
         // stays removed and layout export/import retains that decision.
-        if (persistMigration !== false) L.saveLayout(state.layout);
+        if (persistMigration !== false) persist();
     }
 
     function setCompanionOptions(id, partial) {
@@ -3314,7 +3515,7 @@
         var el = document.querySelector('.widget[data-id="' + id + '"]');
         if (el) {
             var body = el.querySelector('.weather-body');
-            if (body) loadWeatherInto(body, w, { relocate: true, force: true });
+            if (body) loadWeatherInto(body, w, { force: true });
         }
         return { ok: true };
     }

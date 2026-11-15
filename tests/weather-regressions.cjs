@@ -508,10 +508,16 @@ async function test(name, run) {
             assert.deepEqual(errors, []); await context.close();
         });
 
-        await test('MET memory cache still prevents repeat requests when browser storage rejects writes', async () => {
+        await test('MET memory cache still prevents repeat requests when browser weather-cache storage rejects writes', async () => {
             const { page, context, errors } = await fixture(browser);
             let backupCalls = 0;
-            await page.evaluate(() => { Storage.prototype.setItem = function () { throw new DOMException('Blocked', 'QuotaExceededError'); }; });
+            await page.evaluate(() => {
+                const original = Storage.prototype.setItem;
+                Storage.prototype.setItem = function (key, value) {
+                    if (key === 'nt_weather_cache' || key === 'nt_weather_met_cache_v1') throw new DOMException('Blocked', 'QuotaExceededError');
+                    return original.call(this, key, value);
+                };
+            });
             await context.route('https://api.met.no/**', route => { backupCalls++; return route.fulfill({ json: metForecast() }); });
             await addWeather(page, taipei); await ready(page, '23°');
             await page.locator('.weather-retry').click(); await ready(page, '23°');

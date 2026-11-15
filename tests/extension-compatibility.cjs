@@ -130,18 +130,18 @@ async function seedWebsite(page) {
     assert.equal((await worker.evaluate(() => chrome.alarms.getAll())).length, 0);
     await popup.locator('label:has(#keepAliveToggle)').click();
     await popup.waitForFunction(async () => (await chrome.runtime.sendMessage({ action: 'getActivationStats' })).stats.isActive);
-    assert.equal((await worker.evaluate(() => chrome.alarms.getAll())).length, 3);
+    assert.equal((await worker.evaluate(() => chrome.alarms.getAll())).length, 0);
     const beforeHeartbeat = (await stats()).activationCount;
     await modern.page.clock.fastForward(31000);
-    await popup.waitForFunction(async count => (await chrome.runtime.sendMessage({ action: 'getActivationStats' })).stats.activationCount > count, beforeHeartbeat);
+    assert.equal((await stats()).activationCount, beforeHeartbeat, 'old pages no longer generate storage heartbeat activity');
     const settings = await worker.evaluate(() => chrome.storage.local.get(['keepAliveEnabled', 'activationStats', 'customVideo', 'videoType', 'videoName', 'round6Marker']));
     assert.equal(settings.keepAliveEnabled, true);
     assert.equal(settings.activationStats.startTime, 123456789);
-    assert(settings.activationStats.activationCount > 17);
+    assert.deepEqual(settings.activationStats, { activationCount: 17, startTime: 123456789, lastActivation: 123456790 }, 'legacy statistics remain intact, without a fabricated uptime');
     assert.equal(settings.customVideo, 'synthetic-original-media');
     assert.equal(settings.videoType, 'base64'); assert.equal(settings.videoName, '原本影片');
     assert.equal(settings.round6Marker, 'preserved');
-    evidence.push({ popupAndColdStart: settings, iframeHeartbeatRecorded: true, toggleAlarmCounts: [0, 3] });
+    evidence.push({ popupAndColdStart: settings, iframeHeartbeatRecorded: false, toggleAlarmCounts: [0, 0] });
 
     // A grandchild of the website is outside the navigation bridge scope.
     await modern.frame.evaluate(() => { const frame = document.createElement('iframe'); frame.id = 'nested-probe'; frame.src = 'https://example.test/nested'; document.body.appendChild(frame); });
@@ -165,7 +165,7 @@ async function seedWebsite(page) {
     await app.click();
     await shortcut.page.waitForURL(destination, { timeout: 10000 });
     evidence.push({ currentWebsite: 'direct URL and launcher shortcut navigated top-level', extensionId: id, hostPermissions: await worker.evaluate(() => chrome.runtime.getManifest().host_permissions) });
-    console.log('PASS: actual deployed search; current website search/shortcut/in-page character chat; top-level↔iframe localStorage and IndexedDB; popup settings/alarms/heartbeat; cold restart preserves settings/stats/media; other frames ignored.');
+    console.log('PASS: actual deployed search; current website search/shortcut/in-page character chat; top-level↔iframe localStorage and IndexedDB; popup settings without alarms/heartbeats; cold restart preserves settings/stats/media; other frames ignored.');
   } finally {
     if (context) await context.close();
     fs.writeFileSync(path.join(root, '.impeccable/review/round6-extension-integration.json'), JSON.stringify({ profile, evidence }, null, 2));

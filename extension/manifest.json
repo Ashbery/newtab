@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Ashbery 新分頁",
+  "version": "1.2.0",
+  "minimum_chrome_version": "106",
+  "description": "Nacho 風格的新分頁，保留個人背景與版面，提供可選的新分頁保留與角色圖示。",
+  "permissions": [
+    "storage",
+    "tabs",
+    "unlimitedStorage",
+    "alarms",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://ashbery.github.io/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://ashbery.github.io;"
+  },
+  "content_scripts": [
+    {
+      "matches": [ "https://ashbery.github.io/newtab/*" ],
+      "all_frames": true,
+      "js": [ "content.js" ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "helper.js", "inject.js" ],
+      "matches": [ "https://ashbery.github.io/*" ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Nacho 新分頁設定",
+    "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

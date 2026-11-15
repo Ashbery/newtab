@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nacho 新分頁設定</title>
+    <link rel="stylesheet" href="popup.css">
+    <script src="popup.js" defer></script>
+</head>
+<body>
+    <header class="identity">
+        <div class="portrait-wrap"><img id="portrait" src="icons/nacho-blue-512.png" width="88" height="88" alt="Nacho 藍色日常造型"></div>
+        <div class="identity-copy"><h1>Nacho</h1><p>新分頁設定</p></div>
+        <svg class="identity-star" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.2 6.8H21l-5.5 4 2.1 6.5-5.6-4-5.6 4 2.1-6.5-5.5-4h6.8Z"/></svg>
+    </header>
+    <main>
+        <section class="retention" aria-labelledby="retention-title">
+            <div class="setting-heading">
+                <h2 id="retention-title">保留新分頁</h2>
+                <label class="switch" aria-label="保留新分頁">
+                    <input type="checkbox" id="keepAliveToggle" aria-label="保留新分頁" aria-describedby="retention-help" disabled>
+                    <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                </label>
+            </div>
+            <p id="retention-help" class="help">減少背景新分頁被瀏覽器卸載。開啟後，會多保留這些分頁的記憶體。</p>
+            <p class="retention-status" id="statusText"><span class="status-dot" aria-hidden="true"></span><span id="statusLabel">正在確認設定…</span></p>
+            <p class="scope-note">只作用於 Ashbery 新分頁；重整仍會清空對話。</p>
+        </section>
+        <fieldset class="looks">
+            <legend>選一個今日的造型</legend>
+            <p class="help look-help">更換工具列圖示，Live2D 角色維持原樣。</p>
+            <div class="look-options">
+                <label class="look"><input type="radio" name="icon-theme" value="blue" checked disabled><span class="look-face"><img src="icons/nacho-blue-128.png" width="72" height="72" alt=""><span class="look-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m4 8 2.5 2.5L12 5"/></svg></span></span><span class="look-label">藍色日常</span></label>
+                <label class="look"><input type="radio" name="icon-theme" value="knit" disabled><span class="look-face"><img src="icons/nacho-knit-128.png" width="72" height="72" alt=""><span class="look-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m4 8 2.5 2.5L12 5"/></svg></span></span><span class="look-label">暖冬針織</span></label>
+                <label class="look"><input type="radio" name="icon-theme" value="ribbon" disabled><span class="look-face"><img src="icons/nacho-ribbon-128.png" width="72" height="72" alt=""><span class="look-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m4 8 2.5 2.5L12 5"/></svg></span></span><span class="look-label">緞帶制服</span></label>
+            </div>
+        </fieldset>
+        <div class="feedback" role="status" aria-live="polite"><span id="feedbackText"></span><button id="retry-settings" type="button" hidden>重試</button></div>
+        <button id="open-newtab" class="open-newtab" type="button"><span>開啟新分頁</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    </main>
+    <footer><span>Ashbery</span><span id="version"></span></footer>
+</body>
+</html>
