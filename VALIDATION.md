@@ -1,3 +1,15 @@
+# Release 2026.11.16.2
+
+## Open destinations without an intermediate blocked frame
+
+The previous same-tab app/search flow began loading the destination inside the native new-tab iframe. Extension frame policy could reject that navigation before the asynchronous background bridge promoted it to the top-level tab. Earlier compatibility checks asserted only the final URL and missed this intermediate failure. A disposable Brave reproduction with a deliberately delayed 350ms bridge storage lookup captured Gmail's blocked-frame error followed by the successful top-level navigation about 362ms later; this injected delay is a race reproduction, not a measurement of the user's browser.
+
+App tiles and the eleven legacy quick/app links now use native `target="_top"`. Search assigns the top-level location synchronously during the user's click/Enter gesture. The destination therefore never starts loading in the wrapper iframe. Standalone page behavior, arrangement click cancellation and explicit `_blank` folder/bookmark links remain intact. No extension source, permission, account setting or new-tab wrapper was changed.
+
+Verification passed **15/15 search unit cases**, including an embedded-search regression first observed failing against the previous source. The final **8-case isolated Brave navigation suite** uses the real extension and current website files, restrictive destination frame headers, delayed worker storage and browser-wide DNS blocking. All eight source timelines record zero destination iframe requests, blocked-frame console errors and observed child error commits. Gmail mouse/Enter, Images, a same-origin hostile response and typed-address search also render the synthetic destination at the correct top-level URL. An arrangement click stays in the new tab. Ctrl/middle clicks each open one tab to the intended synthetic URL and retain the source; because browser-created popup navigation can bypass route interception, these two cases verify tab selection/URL with CDP and deliberately do not claim destination rendering under the DNS block.
+
+The existing extension compatibility suite also passed deployed/current-site navigation, in-page chat presentation, shared localStorage/IndexedDB, retained media/settings across restart and unrelated-frame isolation. No real chat service or inference was called. Independent code and JavaScript reviews found no remaining issue. Syntax and whitespace checks passed. Evidence is kept in `.impeccable/review/navigation/`; the shipping test contains no experimental DOM patches. Tests use disposable browser data and no personal Gmail session.
+
 # Release 2026.11.16.1
 
 ## Durable weather choices and Nacho extension 1.2.0

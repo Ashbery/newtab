@@ -388,6 +388,9 @@
         var link = document.createElement('a');
         link.className = 'app-tile' + (hasLabel ? '' : ' is-icon-only');
         link.href = href;
+        // Leave the native new-tab wrapper directly; loading a destination in
+        // its iframe first can flash a blocked-page error before the bridge runs.
+        link.target = '_top';
         link.setAttribute('data-app-id', appId || '');
         link.draggable = false;
         var icon = document.createElement('span');

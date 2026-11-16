@@ -100,6 +100,7 @@ function createPage({ withSubmit = true } = {}) {
     document.getElementById = id => elements[id];
     document.createElement = () => new Element();
     const window = { location: { href: 'about:blank' } };
+    window.top = window;
     const context = { window, document, URL, setTimeout, clearTimeout: id => timers.delete(id),
         requestAnimationFrame: callback => setTimeout(callback, 16), cancelAnimationFrame: id => timers.delete(id) };
     vm.runInNewContext(source, context);
@@ -117,6 +118,20 @@ function createPage({ withSubmit = true } = {}) {
     };
     return { input, box, clearButton, submitButton, container, list, document, window, advance, type, key, currentRequest, respond };
 }
+
+test('embedded searches navigate the top-level tab without loading a destination inside the new-tab frame', () => {
+    for (const [query, expected] of [
+        ['貓貓', 'https://www.google.com/search?q=' + encodeURIComponent('貓貓')],
+        ['mail.google.com', 'https://mail.google.com/']
+    ]) {
+        const page = createPage();
+        page.window.top = { location: { href: 'chrome-extension://fixture/newtab.html' } };
+        page.type(query);
+        page.key('Enter');
+        assert.equal(page.window.top.location.href, expected);
+        assert.equal(page.window.location.href, 'about:blank', 'the child frame never starts a destination request');
+    }
+});
 
 test('searches dotted sentences, version numbers and unsafe schemes; navigates valid web addresses', () => {
     const page = createPage();

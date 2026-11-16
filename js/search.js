@@ -256,7 +256,8 @@
         if (!query) return;
         closeSuggestions();
         const destination = !forceSearch && navigationUrl(query);
-        global.location.href = destination || 'https://www.google.com/search?q=' + encodeURIComponent(query);
+        // Navigate during the user's gesture, before any iframe request begins.
+        global.top.location.href = destination || 'https://www.google.com/search?q=' + encodeURIComponent(query);
     }
 
     function submitSearch() {
